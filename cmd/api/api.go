@@ -86,9 +86,15 @@ func (app *application) mount() http.Handler {
 		})
 
 		r.Route("/users", func(r chi.Router) {
-			r.Put("/{userID}", app.updateUserHandler)
-			r.Post("/{userID}/profile-picture", app.uploadProfilePictureHandler)
-			r.Put("/{userID}/profile-picture", app.updateProfilePictureHandler)
+			r.Route("/{userID}", func(r chi.Router) {
+				r.Use(app.userContextMiddleware)
+				r.Put("/", app.updateUserHandler)
+				r.Post("/profile-picture", app.uploadProfilePictureHandler)
+				r.Put("/profile-picture", app.updateProfilePictureHandler)
+				r.Put("/follow", app.followUserHandler)
+				r.Put("/unfollow", app.unfollowUserHandler)
+			})
+
 		})
 
 	})

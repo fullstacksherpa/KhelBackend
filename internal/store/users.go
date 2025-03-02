@@ -9,23 +9,23 @@ import (
 )
 
 type User struct {
-	ID                       int64     `json:"id"`
-	FirstName                string    `json:"first_name"`
-	LastName                 string    `json:"last_name"`
-	Email                    string    `json:"email"`
-	Phone                    string    `json:"-"` // Sensitive data
-	Password                 password  `json:"-"` // Hide password
-	ProfilePictureURL        string    `json:"profile_picture_url,omitempty"`
-	SkillLevel               string    `json:"skill_level,omitempty"`
-	NoOfGames                int       `json:"no_of_games"`
-	RefreshToken             string    `json:"-"` // Sensitive data
-	IsEmailVerified          bool      `json:"is_email_verified"`
-	EmailVerificationToken   string    `json:"-"` // Sensitive data
-	EmailVerificationExpires time.Time `json:"-"` // Internal use only
-	ResetPasswordToken       string    `json:"-"` // Sensitive data
-	ResetPasswordExpires     time.Time `json:"-"` // Internal use only
-	CreatedAt                time.Time `json:"created_at"`
-	UpdatedAt                time.Time `json:"updated_at"`
+	ID                       int64          `json:"id"`
+	FirstName                string         `json:"first_name"`
+	LastName                 string         `json:"last_name"`
+	Email                    string         `json:"email"`
+	Phone                    string         `json:"-"` // Sensitive data
+	Password                 password       `json:"-"` // Hide password
+	ProfilePictureURL        sql.NullString `json:"profile_picture_url"`
+	SkillLevel               sql.NullString `json:"skill_level,omitempty"`
+	NoOfGames                sql.NullInt16  `json:"no_of_games"`
+	RefreshToken             string         `json:"-"` // Sensitive data
+	IsEmailVerified          bool           `json:"is_email_verified"`
+	EmailVerificationToken   string         `json:"-"` // Sensitive data
+	EmailVerificationExpires time.Time      `json:"-"` // Internal use only
+	ResetPasswordToken       string         `json:"-"` // Sensitive data
+	ResetPasswordExpires     time.Time      `json:"-"` // Internal use only
+	CreatedAt                time.Time      `json:"created_at"`
+	UpdatedAt                time.Time      `json:"updated_at"`
 }
 
 // Password struct to store plain text and hash
@@ -105,4 +105,36 @@ func (s *UsersStore) UpdateUser(ctx context.Context, userID int64, updates map[s
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 	return nil
+}
+
+func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {
+	query := `
+	   SELECT users.id, first_name, last_name, email, password, profile_picture_url, skill_level, created_at, no_of_games
+	   FROM users
+	   WHERE users.id = $1
+	`
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	user := &User{}
+	err := s.db.QueryRowContext(ctx, query, userID).Scan(
+		&user.ID,
+		&user.FirstName,
+		&user.LastName,
+		&user.Email,
+		&user.Password.hash,
+		&user.ProfilePictureURL,
+		&user.SkillLevel,
+		&user.CreatedAt,
+		&user.NoOfGames,
+	)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, ErrNotFound
+		default:
+			return nil, err
+		}
+	}
+	return user, nil
 }
