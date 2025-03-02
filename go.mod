@@ -2,17 +2,17 @@ module khel
 
 go 1.24.0
 
-require github.com/go-playground/validator/v10 v10.25.0
+require (
+	github.com/cloudinary/cloudinary-go/v2 v2.9.1
+	github.com/go-playground/validator/v10 v10.25.0
+	github.com/jackc/pgx/v5 v5.7.2
+	github.com/lib/pq v1.10.9
+)
 
 require (
-	github.com/cloudinary/cloudinary-go/v2 v2.9.1 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/google/uuid v1.5.0 // indirect
 	github.com/gorilla/schema v1.4.1 // indirect
-	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.7.2 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 )
 
 require (
@@ -21,7 +21,6 @@ require (
 )
 
 require (
-	github.com/cloudinary/cloudinary-go v1.7.0
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/go-chi/cors v1.2.1
 	github.com/go-playground/locales v0.14.1 // indirect

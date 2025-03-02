@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -135,4 +136,50 @@ func extractPublicIDFromURL(url string) string {
 	publicID = strings.TrimSuffix(publicID, ".jpg") // Add more extensions if needed
 
 	return publicID
+}
+
+func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: change later from context
+	// userID := chi.URLParam(r, "userID")
+	var userID = 1
+	var payload struct {
+		FirstName  *string `json:"first_name"`
+		LastName   *string `json:"last_name"`
+		SkillLevel *string `json:"skill_level"`
+		Phone      *string `json:"phone"`
+	}
+
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// Create update map dynamically
+	updates := make(map[string]interface{})
+	if payload.FirstName != nil {
+		updates["first_name"] = *payload.FirstName
+	}
+	if payload.LastName != nil {
+		updates["last_name"] = *payload.LastName
+	}
+	if payload.SkillLevel != nil {
+		updates["skill_level"] = *payload.SkillLevel
+	}
+	if payload.Phone != nil {
+		updates["phone"] = *payload.Phone
+	}
+
+	if len(updates) == 0 {
+		app.badRequestResponse(w, r, errors.New("bad request, updates values can't be nil"))
+		return
+	}
+
+	// Call update method
+	if err := app.store.Users.UpdateUser(r.Context(), int64(userID), updates); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent) // No content response on success
+	w.Write([]byte(fmt.Sprintf("User info updated successfully: %s", updates)))
 }

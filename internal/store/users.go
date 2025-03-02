@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -77,4 +78,31 @@ func (s *UsersStore) GetProfileUrl(ctx context.Context, userID string) (string, 
 		return "", fmt.Errorf("failed to retrieve profile picture URL: %v", err)
 	}
 	return oldProfilePictureURL, nil
+}
+
+func (s *UsersStore) UpdateUser(ctx context.Context, userID int64, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	// Build query dynamically based on provided fields
+	setClauses := []string{}
+	args := []interface{}{}
+	argCounter := 1
+
+	for field, value := range updates {
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", field, argCounter))
+		args = append(args, value)
+		argCounter++
+	}
+	args = append(args, userID)
+
+	query := fmt.Sprintf("UPDATE users SET %s, updated_at = NOW() WHERE id = $%d",
+		strings.Join(setClauses, ", "), argCounter)
+
+	_, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+	return nil
 }

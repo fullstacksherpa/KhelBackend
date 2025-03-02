@@ -74,6 +74,10 @@ func (app *application) mount() http.Handler {
 			r.Post("/{venueID}/photos", app.uploadVenuePhotoHandler)   // POST /venues/{venueID}/photos
 			// PATCH /venues/{venueID} - Update venue information
 			r.Patch("/{venueID}", app.updateVenueInfo)
+
+			r.Post("/{venueID}/reviews", app.createVenueReviewHandler)
+			r.Get("/{venueID}/reviews", app.getVenueReviewsHandler)
+			r.Delete("/{venueID}/reviews/{reviewID}", app.deleteVenueReviewHandler)
 		})
 		// Public routes
 		r.Route("/authentication", func(r chi.Router) {
@@ -82,6 +86,7 @@ func (app *application) mount() http.Handler {
 		})
 
 		r.Route("/users", func(r chi.Router) {
+			r.Put("/{userID}", app.updateUserHandler)
 			r.Post("/{userID}/profile-picture", app.uploadProfilePictureHandler)
 			r.Put("/{userID}/profile-picture", app.updateProfilePictureHandler)
 		})
