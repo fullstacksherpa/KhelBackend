@@ -1,9 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"crypto/sha256"
+	"encoding/hex"
 	"khel/internal/store"
 	"net/http"
+
+	"github.com/google/uuid"
 )
 
 type RegisterUserPayload struct {
@@ -11,6 +14,7 @@ type RegisterUserPayload struct {
 	LastName  string `json:"last_name" validate:"required,max=100"`
 	Email     string `json:"email" validate:"required,email,max=255"`
 	Phone     string `json:"phone" validate:"required,len=10,numeric"`
+	Password  string `json:"password" validate:"required,min=3,max=72"`
 }
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -31,14 +35,32 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		Email:     payload.Email,
 		Phone:     payload.Phone,
 	}
+	// hash the user password.
+	if err := user.Password.Set(payload.Password); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
 
 	ctx := r.Context()
 
-	err := app.store.Users.Create(ctx, user)
-	if err != nil {
-		fmt.Printf("failed to create a user: %s", err)
-	}
+	plainToken := uuid.New().String()
 
+	hash := sha256.Sum256([]byte(plainToken))
+	hashToken := hex.EncodeToString(hash[:])
+	// store the user
+	err := app.store.Users.CreateAndInvite(ctx, user, hashToken, app.config.mail.exp)
+	if err != nil {
+		switch err {
+		case store.ErrDuplicateEmail:
+			app.badRequestResponse(w, r, err)
+		case store.ErrDuplicatePhoneNumber:
+			app.badRequestResponse(w, r, err)
+		default:
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+	//TODO: return userwithtokenpayload
 	if err := app.jsonResponse(w, http.StatusCreated, user); err != nil {
 		app.internalServerError(w, r, err)
 	}

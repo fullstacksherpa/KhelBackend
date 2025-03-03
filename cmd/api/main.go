@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	_ "github.com/lib/pq"
@@ -45,6 +46,9 @@ func main() {
 			maxOpenConns: maxOpenConns,
 			maxIdleConns: maxIdleConns,
 			maxIdleTime:  os.Getenv("DB_MAX_IDLE_TIME"),
+		},
+		mail: mailConfig{
+			exp: time.Hour * 24 * 3, //3 days
 		},
 	}
 

@@ -3,29 +3,35 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
+)
+
+var (
+	ErrDuplicateEmail       = errors.New("a user with that email already exists")
+	ErrDuplicatePhoneNumber = errors.New("a user with that phone number already exists")
 )
 
 type User struct {
-	ID                       int64          `json:"id"`
-	FirstName                string         `json:"first_name"`
-	LastName                 string         `json:"last_name"`
-	Email                    string         `json:"email"`
-	Phone                    string         `json:"-"` // Sensitive data
-	Password                 password       `json:"-"` // Hide password
-	ProfilePictureURL        sql.NullString `json:"profile_picture_url"`
-	SkillLevel               sql.NullString `json:"skill_level,omitempty"`
-	NoOfGames                sql.NullInt16  `json:"no_of_games"`
-	RefreshToken             string         `json:"-"` // Sensitive data
-	IsEmailVerified          bool           `json:"is_email_verified"`
-	EmailVerificationToken   string         `json:"-"` // Sensitive data
-	EmailVerificationExpires time.Time      `json:"-"` // Internal use only
-	ResetPasswordToken       string         `json:"-"` // Sensitive data
-	ResetPasswordExpires     time.Time      `json:"-"` // Internal use only
-	CreatedAt                time.Time      `json:"created_at"`
-	UpdatedAt                time.Time      `json:"updated_at"`
+	ID                   int64          `json:"id"`
+	FirstName            string         `json:"first_name"`
+	LastName             string         `json:"last_name"`
+	Email                string         `json:"email"`
+	Phone                string         `json:"-"` // Sensitive data
+	Password             password       `json:"-"` // Hide password
+	ProfilePictureURL    sql.NullString `json:"profile_picture_url"`
+	SkillLevel           sql.NullString `json:"skill_level,omitempty"`
+	NoOfGames            sql.NullInt16  `json:"no_of_games"`
+	RefreshToken         string         `json:"-"` // Sensitive data
+	IsActive             bool           `json:"is_active"`
+	ResetPasswordToken   string         `json:"-"` // Sensitive data
+	ResetPasswordExpires time.Time      `json:"-"` // Internal use only
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
 // Password struct to store plain text and hash
@@ -34,24 +40,49 @@ type password struct {
 	hash []byte  `json:"-"` // Hide hashed password
 }
 
+func (p *password) Set(text string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(text), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	p.text = &text
+	p.hash = hash
+
+	return nil
+}
+
+func (p *password) Compare(text string) error {
+	return bcrypt.CompareHashAndPassword(p.hash, []byte(text))
+}
+
 type UsersStore struct {
 	db *sql.DB
 }
 
-func (s *UsersStore) Create(ctx context.Context, user *User) error {
-	// TODO: change later password
-	// Dummy hashed password (bcrypt hash of "test12345")
-	dummyHashedPassword := []byte("$2a$10$K8hURwzST/8JhP8S12vMyuPAZEKYbQfHJpY2P1q2xGmU6T9eyTxlK")
+func (s *UsersStore) Create(ctx context.Context, tx *sql.Tx, user *User) error {
+
 	query := `
 	  INSERT INTO users (first_name, last_name, password, email, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at
 	`
-	err := s.db.QueryRowContext(
-		//TODO: change to user.Password.hash on $3
-		ctx, query, user.FirstName, user.LastName, dummyHashedPassword, user.Email, user.Phone,
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	err := tx.QueryRowContext(
+		ctx, query, user.FirstName, user.LastName, user.Password.hash, user.Email, user.Phone,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		return err
+		switch {
+		//TODO: check unique constraint in db
+		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key"`:
+			return ErrDuplicateEmail
+		case err.Error() == `pq: duplicate key value violates unique constraint "users_phone_key"`:
+			return ErrDuplicatePhoneNumber
+		default:
+			return err
+		}
 	}
 	return nil
 }
@@ -137,4 +168,32 @@ func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {
 		}
 	}
 	return user, nil
+}
+
+func (s *UsersStore) CreateAndInvite(ctx context.Context, user *User, token string, invitationExp time.Duration) error {
+	return withTx(s.db, ctx, func(tx *sql.Tx) error {
+		if err := s.Create(ctx, tx, user); err != nil {
+			return err
+		}
+
+		if err := s.createUserInvitation(ctx, tx, token, invitationExp, user.ID); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (s *UsersStore) createUserInvitation(ctx context.Context, tx *sql.Tx, token string, exp time.Duration, userID int64) error {
+	query := `INSERT INTO user_invitations (token, user_id, expiry) VALUES ($1, $2, $3)`
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	_, err := tx.ExecContext(ctx, query, token, userID, time.Now().Add(exp))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

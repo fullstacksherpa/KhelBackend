@@ -30,6 +30,11 @@ type config struct {
 	db     dbConfig
 	env    string
 	apiURL string
+	mail   mailConfig
+}
+
+type mailConfig struct {
+	exp time.Duration
 }
 
 type dbConfig struct {
@@ -79,11 +84,6 @@ func (app *application) mount() http.Handler {
 			r.Get("/{venueID}/reviews", app.getVenueReviewsHandler)
 			r.Delete("/{venueID}/reviews/{reviewID}", app.deleteVenueReviewHandler)
 		})
-		// Public routes
-		r.Route("/authentication", func(r chi.Router) {
-			r.Post("/user", app.registerUserHandler)
-
-		})
 
 		r.Route("/users", func(r chi.Router) {
 			r.Route("/{userID}", func(r chi.Router) {
@@ -94,6 +94,12 @@ func (app *application) mount() http.Handler {
 				r.Put("/follow", app.followUserHandler)
 				r.Put("/unfollow", app.unfollowUserHandler)
 			})
+
+		})
+
+		// Public routes
+		r.Route("/authentication", func(r chi.Router) {
+			r.Post("/user", app.registerUserHandler)
 
 		})
 
