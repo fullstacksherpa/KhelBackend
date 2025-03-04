@@ -3,6 +3,7 @@ package main
 import (
 	"expvar"
 	"khel/internal/db"
+	"khel/internal/mailer"
 	"khel/internal/store"
 	"log"
 	"os"
@@ -22,7 +23,7 @@ const version = "0.0.1"
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 	// Retrieve and convert maxOpenConns
 	maxOpenConnsStr := os.Getenv("DB_MAX_OPEN_CONNS")
@@ -38,9 +39,10 @@ func main() {
 	}
 
 	cfg := config{
-		addr:   os.Getenv("ADDR"),
-		env:    os.Getenv("ENV"),
-		apiURL: os.Getenv("EXTERNAL_URL"),
+		addr:        os.Getenv("ADDR"),
+		env:         os.Getenv("ENV"),
+		frontendURL: os.Getenv("FRONTEND_URL"),
+		apiURL:      os.Getenv("EXTERNAL_URL"),
 		db: dbConfig{
 			addr:         os.Getenv("DB_ADDR"),
 			maxOpenConns: maxOpenConns,
@@ -48,7 +50,11 @@ func main() {
 			maxIdleTime:  os.Getenv("DB_MAX_IDLE_TIME"),
 		},
 		mail: mailConfig{
-			exp: time.Hour * 24 * 3, //3 days
+			exp:       time.Hour * 24 * 3, //3 days
+			fromEmail: os.Getenv("SENDGRID_FROM_EMAIL"),
+			mailtrap: mailTrapConfig{
+				apiKey: os.Getenv("MAILTRAP_API_KEY"),
+			},
 		},
 	}
 
@@ -81,11 +87,20 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	// client to send email for activation
+	// mailer := mailer.NewSendgrid(cfg.mail.sendGrid.apiKey, cfg.mail.fromEmail)
+
+	mailtrap, err := mailer.NewMailTrapClient(cfg.mail.mailtrap.apiKey, cfg.mail.fromEmail)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	app := &application{
 		config: cfg,
 		logger: logger,
 		store:  store,
 		cld:    cld,
+		mailer: mailtrap,
 	}
 
 	//Metrics collected

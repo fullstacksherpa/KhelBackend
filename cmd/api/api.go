@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"khel/internal/mailer"
 	"khel/internal/store"
 
 	"net/http"
@@ -23,18 +24,26 @@ type application struct {
 	store  store.Storage
 	logger *zap.SugaredLogger
 	cld    *cloudinary.Cloudinary
+	mailer mailer.Client
 }
 
 type config struct {
-	addr   string
-	db     dbConfig
-	env    string
-	apiURL string
-	mail   mailConfig
+	addr        string
+	db          dbConfig
+	env         string
+	apiURL      string
+	mail        mailConfig
+	frontendURL string
 }
 
 type mailConfig struct {
-	exp time.Duration
+	exp       time.Duration
+	fromEmail string
+	mailtrap  mailTrapConfig
+}
+
+type mailTrapConfig struct {
+	apiKey string
 }
 
 type dbConfig struct {

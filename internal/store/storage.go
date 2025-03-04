@@ -19,6 +19,7 @@ type Storage struct {
 		Create(context.Context, *sql.Tx, *User) error
 		CreateAndInvite(ctx context.Context, user *User, token string, exp time.Duration) error
 		Activate(context.Context, string) error
+		Delete(context.Context, int64) error
 		SetProfile(context.Context, string, string) error
 		GetProfileUrl(context.Context, string) (string, error)
 		UpdateUser(context.Context, int64, map[string]interface{}) error
