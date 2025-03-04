@@ -2,6 +2,7 @@ package main
 
 import (
 	"expvar"
+	"khel/internal/auth"
 	"khel/internal/db"
 	"khel/internal/mailer"
 	"khel/internal/store"
@@ -106,12 +107,20 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	// Authenticator
+	jwtAuthenticator := auth.NewJWTAuthenticator(
+		cfg.auth.token.secret,
+		cfg.auth.token.iss,
+		cfg.auth.token.iss,
+	)
+
 	app := &application{
-		config: cfg,
-		logger: logger,
-		store:  store,
-		cld:    cld,
-		mailer: mailtrap,
+		config:        cfg,
+		logger:        logger,
+		store:         store,
+		cld:           cld,
+		mailer:        mailtrap,
+		authenticator: jwtAuthenticator,
 	}
 
 	//Metrics collected

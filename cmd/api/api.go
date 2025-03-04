@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"expvar"
+	"khel/internal/auth"
 	"khel/internal/mailer"
 	"khel/internal/store"
 
@@ -20,11 +22,12 @@ import (
 )
 
 type application struct {
-	config config
-	store  store.Storage
-	logger *zap.SugaredLogger
-	cld    *cloudinary.Cloudinary
-	mailer mailer.Client
+	config        config
+	store         store.Storage
+	logger        *zap.SugaredLogger
+	cld           *cloudinary.Cloudinary
+	mailer        mailer.Client
+	authenticator auth.Authenticator
 }
 
 type config struct {
@@ -95,6 +98,7 @@ func (app *application) mount() http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		//Operations
 		r.With(app.BasicAuthMiddleware()).Get("/health", app.healthCheckHandler)
+		r.With(app.BasicAuthMiddleware()).Get("/debug/vars", expvar.Handler().ServeHTTP)
 
 		r.Route("/venues", func(r chi.Router) {
 			r.Post("/", app.createVenueHandler)
@@ -112,7 +116,7 @@ func (app *application) mount() http.Handler {
 		r.Route("/users", func(r chi.Router) {
 			r.Put("/activate/{token}", app.activateUserHandler)
 			r.Route("/{userID}", func(r chi.Router) {
-				r.Use(app.userContextMiddleware)
+				r.Use(app.AuthTokenMiddleware)
 				r.Put("/", app.updateUserHandler)
 				r.Post("/profile-picture", app.uploadProfilePictureHandler)
 				r.Put("/profile-picture", app.updateProfilePictureHandler)
@@ -125,6 +129,7 @@ func (app *application) mount() http.Handler {
 		// Public routes
 		r.Route("/authentication", func(r chi.Router) {
 			r.Post("/user", app.registerUserHandler)
+			r.Post("/token", app.createTokenHandler)
 
 		})
 
