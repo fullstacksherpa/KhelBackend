@@ -56,6 +56,17 @@ func main() {
 				apiKey: os.Getenv("MAILTRAP_API_KEY"),
 			},
 		},
+		auth: authConfig{
+			basic: basicConfig{
+				user: os.Getenv("AUTH_BASIC_USER"),
+				pass: os.Getenv("AUTH_BASIC_PASS"),
+			},
+			token: tokenConfig{
+				secret: os.Getenv("AUTH_TOKEN_SECRET"),
+				exp:    time.Hour * 24 * 3, // 3 days
+				iss:    "Khel",
+			},
+		},
 	}
 
 	// Logger
