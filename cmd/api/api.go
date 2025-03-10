@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"expvar"
+	"fmt"
+	"khel/docs" //this is required to generate swagger docs
 	"khel/internal/auth"
 	"khel/internal/mailer"
 	"khel/internal/store"
@@ -18,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
 )
 
@@ -45,9 +48,11 @@ type authConfig struct {
 	token tokenConfig
 }
 type tokenConfig struct {
-	secret string
-	exp    time.Duration
-	iss    string
+	refreshSecret   string
+	secret          string
+	accessTokenExp  time.Duration
+	refreshTokenExp time.Duration
+	iss             string
 }
 type basicConfig struct {
 	user string
@@ -79,8 +84,6 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// Basic CORS
-	// for more ideas, see: https://developer.github.com/v3/#cross-origin-resource-sharing
 	r.Use(cors.Handler(cors.Options{
 		// AllowedOrigins:   []string{"https://foo.com"}, // Use this to allow specific origin hosts
 		AllowedOrigins: []string{"https://*", "http://*"},
@@ -96,8 +99,10 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Route("/v1", func(r chi.Router) {
-		//Operations
 		r.With(app.BasicAuthMiddleware()).Get("/health", app.healthCheckHandler)
+		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
+		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
+
 		r.With(app.BasicAuthMiddleware()).Get("/debug/vars", expvar.Handler().ServeHTTP)
 
 		r.Route("/venues", func(r chi.Router) {
@@ -114,6 +119,7 @@ func (app *application) mount() http.Handler {
 		})
 
 		r.Route("/users", func(r chi.Router) {
+			r.Post("/logout", app.logoutHandler)
 			r.Put("/activate/{token}", app.activateUserHandler)
 			r.Route("/{userID}", func(r chi.Router) {
 				r.Use(app.AuthTokenMiddleware)
@@ -123,13 +129,23 @@ func (app *application) mount() http.Handler {
 				r.Put("/follow", app.followUserHandler)
 				r.Put("/unfollow", app.unfollowUserHandler)
 			})
+		})
+		r.Route("/games", func(r chi.Router) {
+			r.Post("/create", app.createGameHandler)
+			r.Route("/{gameID}", func(r chi.Router) {
+				r.Get("/players", app.getGamePlayersHandler)
+				r.Post("/request", app.CreateJoinRequest)
+				r.Post("/accept", app.AcceptJoinRequest)
+				r.Post("/reject", app.RejectJoinRequest)
 
+			})
 		})
 
 		// Public routes
 		r.Route("/authentication", func(r chi.Router) {
 			r.Post("/user", app.registerUserHandler)
 			r.Post("/token", app.createTokenHandler)
+			r.Post("/refresh", app.refreshTokenHandler)
 
 		})
 
@@ -138,6 +154,10 @@ func (app *application) mount() http.Handler {
 }
 
 func (app *application) run(mux http.Handler) error {
+	// Docs
+	docs.SwaggerInfo.Version = version
+	docs.SwaggerInfo.Host = app.config.apiURL
+	docs.SwaggerInfo.BasePath = "/v1"
 
 	srv := &http.Server{
 		Addr:         app.config.addr,

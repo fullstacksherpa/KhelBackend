@@ -7,7 +7,6 @@ import (
 	"khel/internal/mailer"
 	"khel/internal/store"
 	"net/http"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -22,10 +21,22 @@ type RegisterUserPayload struct {
 }
 
 type UserWithToken struct {
-	*store.User
-	Token string `json:"token"`
+	*store.User `json:"user"`
+	Token       string `json:"token"`
 }
 
+// registerUserHandler godoc
+//
+//	@Summary		Registers a user
+//	@Description	Registers a user
+//	@Tags			authentication
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body		RegisterUserPayload	true	"User credentials"
+//	@Success		201		{object}	UserWithToken		"User registered"
+//	@Failure		400		{object}	error
+//	@Failure		500		{object}	error
+//	@Router			/authentication/user [post]
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	var payload RegisterUserPayload
 	if err := readJSON(w, r, &payload); err != nil {
@@ -111,6 +122,19 @@ type CreateUserTokenPayload struct {
 	Password string `json:"password" validate:"required,min=3,max=72"`
 }
 
+// createTokenHandler godoc
+//
+//	@Summary		Creates a token
+//	@Description	Creates a token for a user
+//	@Tags			authentication
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body		CreateUserTokenPayload	true	"User credentials"
+//	@Success		200		{string}	string					"Token"
+//	@Failure		400		{object}	error
+//	@Failure		401		{object}	error
+//	@Failure		500		{object}	error
+//	@Router			/authentication/token [post]
 func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Request) {
 	var payload CreateUserTokenPayload
 	if err := readJSON(w, r, &payload); err != nil {
@@ -138,23 +162,94 @@ func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Reques
 		app.unauthorizedErrorResponse(w, r, err)
 		return
 	}
-
-	claims := jwt.MapClaims{
-		"sub": user.ID,
-		"exp": time.Now().Add(app.config.auth.token.exp).Unix(),
-		"iat": time.Now().Unix(),
-		"nbf": time.Now().Unix(),
-		"iss": app.config.auth.token.iss,
-		"aud": app.config.auth.token.iss,
-	}
-
-	token, err := app.authenticator.GenerateToken(claims)
+	accessToken, refreshToken, err := app.authenticator.GenerateTokens(user.ID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	if err := app.jsonResponse(w, http.StatusCreated, token); err != nil {
+	// Save refresh token in the database
+	err = app.store.Users.SaveRefreshToken(r.Context(), user.ID, refreshToken)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	response := map[string]string{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+	}
+
+	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
+		app.internalServerError(w, r, err)
+	}
+}
+
+func (app *application) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	user := getUserFromContext(r)
+	userID := user.ID
+
+	// Delete refresh token from DB
+	err := app.store.Users.DeleteRefreshToken(r.Context(), userID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (app *application) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		RefreshToken string `json:"refresh_token" validate:"required"`
+	}
+
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	token, err := app.authenticator.ValidateRefreshToken(payload.RefreshToken)
+	if err != nil || !token.Valid {
+		app.unauthorizedErrorResponse(w, r, fmt.Errorf("invalid refresh token"))
+		return
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		app.unauthorizedErrorResponse(w, r, fmt.Errorf("invalid claims"))
+		return
+	}
+
+	userID := claims["sub"].(int64)
+
+	// Ensure refresh token exists in DB
+	savedToken, err := app.store.Users.GetRefreshToken(r.Context(), userID)
+	if err != nil || savedToken != payload.RefreshToken {
+		app.unauthorizedErrorResponse(w, r, fmt.Errorf("refresh token mismatch"))
+		return
+	}
+
+	// Generate new tokens
+	accessToken, newRefreshToken, err := app.authenticator.GenerateTokens(userID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Update refresh token in DB
+	err = app.store.Users.SaveRefreshToken(r.Context(), userID, newRefreshToken)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	response := map[string]string{
+		"access_token":  accessToken,
+		"refresh_token": newRefreshToken,
+	}
+
+	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
 		app.internalServerError(w, r, err)
 	}
 }

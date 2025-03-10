@@ -3,6 +3,7 @@ package auth
 import "github.com/golang-jwt/jwt/v5"
 
 type Authenticator interface {
-	GenerateToken(claims jwt.Claims) (string, error)
-	ValidateToken(token string) (*jwt.Token, error)
+	GenerateTokens(userID int64) (string, string, error)
+	ValidateAccessToken(token string) (*jwt.Token, error)
+	ValidateRefreshToken(token string) (*jwt.Token, error)
 }

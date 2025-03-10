@@ -19,21 +19,21 @@ var (
 )
 
 type User struct {
-	ID                   int64          `json:"id"`
-	FirstName            string         `json:"first_name"`
-	LastName             string         `json:"last_name"`
-	Email                string         `json:"email"`
-	Phone                string         `json:"-"` // Sensitive data
-	Password             password       `json:"-"` // Hide password
-	ProfilePictureURL    sql.NullString `json:"profile_picture_url"`
-	SkillLevel           sql.NullString `json:"skill_level,"`
-	NoOfGames            sql.NullInt16  `json:"no_of_games"`
-	RefreshToken         string         `json:"-"` // Sensitive data
-	IsActive             bool           `json:"is_active"`
-	ResetPasswordToken   string         `json:"-"` // Sensitive data
-	ResetPasswordExpires time.Time      `json:"-"` // Internal use only
-	CreatedAt            time.Time      `json:"created_at"`
-	UpdatedAt            time.Time      `json:"updated_at"`
+	ID                   int64      `json:"id"`
+	FirstName            string     `json:"first_name"`
+	LastName             string     `json:"last_name"`
+	Email                string     `json:"email"`
+	Phone                string     `json:"-"` // Sensitive data
+	Password             password   `json:"-"` // Hide password
+	ProfilePictureURL    NullString `json:"profile_picture_url" swaggertype:"string"`
+	SkillLevel           NullString `json:"skill_level" swaggertype:"string"`
+	NoOfGames            NullInt16  `json:"no_of_games" swaggertype:"integer"`
+	RefreshToken         string     `json:"-"` // Sensitive data
+	IsActive             bool       `json:"is_active"`
+	ResetPasswordToken   string     `json:"-"` // Sensitive data
+	ResetPasswordExpires time.Time  `json:"-"` // Internal use only
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 // Password struct to store plain text and hash
@@ -343,4 +343,43 @@ func (s *UsersStore) GetByEmail(ctx context.Context, email string) (*User, error
 	}
 
 	return user, nil
+}
+
+func (s *UsersStore) SaveRefreshToken(ctx context.Context, userID int64, refreshToken string) error {
+	query := `UPDATE users SET refresh_token = $1, updated_at = NOW() WHERE id = $2`
+	_, err := s.db.ExecContext(ctx, query, refreshToken, userID)
+	if err != nil {
+		return fmt.Errorf("failed to save refresh token: %w", err)
+	}
+	return nil
+}
+
+func (s *UsersStore) DeleteRefreshToken(ctx context.Context, userID int64) error {
+	query := `UPDATE users SET refresh_token = NULL, updated_at = NOW() WHERE id = $1`
+	_, err := s.db.ExecContext(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete refresh token: %w", err)
+	}
+	return nil
+}
+
+// GetRefreshToken retrieves the refresh token for a specific user from the database.
+func (s *UsersStore) GetRefreshToken(ctx context.Context, userID int64) (string, error) {
+	var refreshToken string
+
+	// Query to retrieve the refresh token for the given userID
+	query := `SELECT refresh_token FROM users WHERE id = $1`
+	err := s.db.QueryRowContext(ctx, query, userID).Scan(&refreshToken)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// No rows returned, which means no refresh token found for the user
+			return "", fmt.Errorf("no refresh token found for user %d", userID)
+		}
+		// Handle other database errors
+		return "", fmt.Errorf("failed to retrieve refresh token: %v", err)
+	}
+
+	// Return the refresh token
+	return refreshToken, nil
 }

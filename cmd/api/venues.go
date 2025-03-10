@@ -18,6 +18,21 @@ type CreateVenuePayload struct {
 	OpenTime    *string   `json:"open_time,omitempty" validate:"max=50"`  // Store operating hours (optional)
 }
 
+// CreateVenue godoc
+//
+//	@Summary		Register a venue in our system
+//	@Description	Register a new venue with details such as name, address, location, and amenities.
+//	@Tags			Venue
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body		CreateVenuePayload	true	"Venue details payload"
+//	@Success		201		{object}	store.Venue			"Venue created successfully"
+//	@Failure		400		{object}	error				"Invalid request payload"
+//	@Failure		401		{object}	error				"Unauthorized"
+//	@Failure		500		{object}	error				"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues [post]
+
 func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Request) {
 	var payload CreateVenuePayload
 
@@ -30,10 +45,10 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 
 	// 2. Get authenticated user (replace with actual user retrieval)
 	// user := getUserFromContext(r)
-	var userID int64 = 1
+	user := getUserFromContext(r)
 
 	// 3. Check for existing venue before uploading images
-	exists, err := app.store.Venues.CheckIfVenueExists(r.Context(), payload.Name, userID)
+	exists, err := app.store.Venues.CheckIfVenueExists(r.Context(), payload.Name, user.ID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -52,7 +67,7 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 
 	// Proceed with venue creation
 	venue := &store.Venue{
-		OwnerID:     userID,
+		OwnerID:     user.ID,
 		Name:        payload.Name,
 		Address:     payload.Address,
 		Location:    payload.Location,

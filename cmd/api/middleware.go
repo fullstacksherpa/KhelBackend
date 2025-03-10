@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -65,7 +66,7 @@ func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 		}
 
 		token := parts[1]
-		jwtToken, err := app.authenticator.ValidateToken(token)
+		jwtToken, err := app.authenticator.ValidateAccessToken(token)
 		if err != nil {
 			app.unauthorizedErrorResponse(w, r, err)
 			return
@@ -89,5 +90,34 @@ func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 
 		ctx = context.WithValue(ctx, userCtx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (app *application) RequireGameAdminAssistant(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := getUserFromContext(r) // Fetch user from context
+
+		// Extract gameID from URL
+		gameIDStr := chi.URLParam(r, "gameID")
+		gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "Invalid game ID")
+			return
+		}
+
+		// Check if user is admin or assistant
+		isAdminAssistant, err := app.store.Games.IsAdminAssistant(r.Context(), gameID, user.ID)
+		if err != nil {
+			app.logger.Errorf("Error checking admin status: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "Database error")
+			return
+		}
+		if !isAdminAssistant {
+			writeJSONError(w, http.StatusForbidden, "Insufficient privileges")
+			return
+		}
+
+		// Proceed if user is an admin/assistant
+		next.ServeHTTP(w, r)
 	})
 }

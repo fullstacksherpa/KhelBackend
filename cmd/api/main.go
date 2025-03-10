@@ -21,6 +21,22 @@ import (
 
 const version = "0.0.1"
 
+//	@title			Khel API
+//	@description	API for Khel, a complete sport application.
+
+//	@contact.name	API Support
+//	@contact.url	http://www.swagger.io/support
+//	@contact.email	support@swagger.io
+
+//	@license.name	Apache 2.0
+//	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
+
+//	@BasePath					/v1
+//	@securityDefinitions.apikey	ApiKeyAuth
+//	@in							header
+//	@name						Authorization
+//	@description
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -63,9 +79,11 @@ func main() {
 				pass: os.Getenv("AUTH_BASIC_PASS"),
 			},
 			token: tokenConfig{
-				secret: os.Getenv("AUTH_TOKEN_SECRET"),
-				exp:    time.Hour * 24 * 3, // 3 days
-				iss:    "Khel",
+				refreshSecret:   os.Getenv("AUTH_TOKEN_REFRESH_SECRET"),
+				secret:          os.Getenv("AUTH_TOKEN_SECRET"),
+				accessTokenExp:  time.Hour * 24 * 3, // 3 days
+				refreshTokenExp: time.Hour * 24 * 9, // 9 days
+				iss:             "Khel",
 			},
 		},
 	}
@@ -109,6 +127,7 @@ func main() {
 
 	// Authenticator
 	jwtAuthenticator := auth.NewJWTAuthenticator(
+		cfg.auth.token.refreshSecret,
 		cfg.auth.token.secret,
 		cfg.auth.token.iss,
 		cfg.auth.token.iss,

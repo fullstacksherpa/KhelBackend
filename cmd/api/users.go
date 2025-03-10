@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"khel/internal/store"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -253,7 +252,7 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// UnfollowUser gdoc
+// UnfollowUser godoc
 //
 //	@Summary		Unfollow a user
 //	@Description	Unfollow a user by ID
@@ -284,36 +283,7 @@ func (app *application) unfollowUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (app *application) userContextMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, err := strconv.ParseInt(chi.URLParam(r, "userID"), 10, 64)
-		if err != nil {
-			app.badRequestResponse(w, r, err)
-			return
-		}
-		ctx := r.Context()
-		user, err := app.store.Users.GetByID(ctx, userID)
-		if err != nil {
-			switch err {
-			case store.ErrNotFound:
-				app.notFoundResponse(w, r, err)
-				return
-			default:
-				log.Printf("Error at GetById: %v", err) // Add this line for debugging
-				app.internalServerError(w, r, err)
-				return
-			}
-		}
-
-		ctx = context.WithValue(ctx, userCtx, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
-
-	})
-}
-
 func getUserFromContext(r *http.Request) *store.User {
 	user, _ := r.Context().Value(userCtx).(*store.User)
 	return user
 }
-
-//TODO: whereever we need userID change to user := getUserFromContext(r) then UserID : user.ID, on the post or venue to send on data layer

@@ -6,7 +6,7 @@ import (
 
 // healthcheckHandler godoc
 //
-//	@Summary		Healthcheck
+//	@Summary		Healthcheckk
 //	@Description	Healthcheck endpoint
 //	@Tags			ops
 //	@Produce		json

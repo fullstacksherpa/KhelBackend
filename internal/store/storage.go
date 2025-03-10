@@ -24,6 +24,9 @@ type Storage struct {
 		SetProfile(context.Context, string, string) error
 		GetProfileUrl(context.Context, string) (string, error)
 		UpdateUser(context.Context, int64, map[string]interface{}) error
+		SaveRefreshToken(ctx context.Context, userID int64, refreshToken string) error
+		DeleteRefreshToken(ctx context.Context, userID int64) error
+		GetRefreshToken(ctx context.Context, userID int64) (string, error)
 	}
 	Venues interface {
 		Create(context.Context, *Venue) error
@@ -42,6 +45,19 @@ type Storage struct {
 		Follow(ctx context.Context, followerID, userID int64) error
 		Unfollow(ctx context.Context, followerID, userID int64) error
 	}
+	Games interface {
+		Create(context.Context, *Game) error
+		GetGameByID(ctx context.Context, gameID int64) (*Game, error)
+		CheckRequestExist(ctx context.Context, gameID int64, userID int64) (bool, error)
+		AddToGameRequest(ctx context.Context, gameID int64, UserID int64) error
+		IsAdminAssistant(ctx context.Context, gameID int64, userID int64) (bool, error)
+		SetMatchFull(ctx context.Context, gameID int64) error
+		InsertNewPlayer(ctx context.Context, gameID int64, userID int64) error
+		UpdateRequestStatus(ctx context.Context, gameID, userID int64, status GameRequestStatus) error
+		GetJoinRequest(ctx context.Context, gameID, userID int64) (*GameRequest, error)
+		GetPlayerCount(ctx context.Context, gameID int) (int, error)
+		GetGamePlayers(ctx context.Context, gameID int64) ([]*User, error)
+	}
 }
 
 func NewStorage(db *sql.DB) Storage {
@@ -50,6 +66,7 @@ func NewStorage(db *sql.DB) Storage {
 		Venues:    &VenuesStore{db},
 		Reviews:   &ReviewStore{db},
 		Followers: &FollowerStore{db},
+		Games:     &GameStore{db},
 	}
 }
 
