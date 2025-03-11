@@ -117,15 +117,18 @@ func (app *application) mount() http.Handler {
 			r.Get("/{venueID}/reviews", app.getVenueReviewsHandler)
 			r.Delete("/{venueID}/reviews/{reviewID}", app.deleteVenueReviewHandler)
 		})
+		// Route that does NOT require authentication
+		r.Put("/users/activate/{token}", app.activateUserHandler)
 
 		r.Route("/users", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+			r.Put("/", app.updateUserHandler)
+			r.Post("/profile-picture", app.uploadProfilePictureHandler)
+			r.Put("/profile-picture", app.updateProfilePictureHandler)
 			r.Post("/logout", app.logoutHandler)
-			r.Put("/activate/{token}", app.activateUserHandler)
+
 			r.Route("/{userID}", func(r chi.Router) {
 				r.Use(app.AuthTokenMiddleware)
-				r.Put("/", app.updateUserHandler)
-				r.Post("/profile-picture", app.uploadProfilePictureHandler)
-				r.Put("/profile-picture", app.updateProfilePictureHandler)
 				r.Put("/follow", app.followUserHandler)
 				r.Put("/unfollow", app.unfollowUserHandler)
 			})

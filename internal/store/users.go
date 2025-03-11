@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -89,7 +90,7 @@ func (s *UsersStore) Create(ctx context.Context, tx *sql.Tx, user *User) error {
 	return nil
 }
 
-func (s *UsersStore) SetProfile(ctx context.Context, url string, userID string) error {
+func (s *UsersStore) SetProfile(ctx context.Context, url string, userID int64) error {
 	query := `UPDATE users SET profile_picture_url = $1 WHERE id = $2`
 	_, err := s.db.ExecContext(ctx, query, url, userID)
 	if err != nil {
@@ -98,7 +99,7 @@ func (s *UsersStore) SetProfile(ctx context.Context, url string, userID string) 
 	return nil
 }
 
-func (s *UsersStore) GetProfileUrl(ctx context.Context, userID string) (string, error) {
+func (s *UsersStore) GetProfileUrl(ctx context.Context, userID int64) (string, error) {
 	var oldProfilePictureURL string
 	query := `SELECT profile_picture_url FROM users WHERE id = $1`
 	err := s.db.QueryRowContext(ctx, query, userID).Scan(&oldProfilePictureURL)
@@ -118,12 +119,24 @@ func (s *UsersStore) UpdateUser(ctx context.Context, userID int64, updates map[s
 		return fmt.Errorf("no fields to update")
 	}
 
+	// Validate skill_level if it's being updated
+	if skillLevel, ok := updates["skill_level"]; ok {
+		validSkillLevels := map[string]bool{"beginner": true, "intermediate": true, "advanced": true}
+		if !validSkillLevels[skillLevel.(string)] {
+			return fmt.Errorf("invalid skill level")
+		}
+	}
+
 	// Build query dynamically based on provided fields
 	setClauses := []string{}
 	args := []interface{}{}
 	argCounter := 1
 
 	for field, value := range updates {
+		// Sanitize field names to prevent SQL injection
+		if !isValidField(field) {
+			return fmt.Errorf("invalid field name: %s", field)
+		}
 		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", field, argCounter))
 		args = append(args, value)
 		argCounter++
@@ -135,9 +148,21 @@ func (s *UsersStore) UpdateUser(ctx context.Context, userID int64, updates map[s
 
 	_, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
+		log.Printf("Failed to update user: %v", err)
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 	return nil
+}
+
+// Helper function to validate field names
+func isValidField(field string) bool {
+	validFields := map[string]bool{
+		"first_name":  true,
+		"last_name":   true,
+		"skill_level": true,
+		"phone":       true,
+	}
+	return validFields[field]
 }
 
 func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {

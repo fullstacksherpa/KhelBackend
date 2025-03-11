@@ -21,8 +21,8 @@ type Storage struct {
 		CreateAndInvite(ctx context.Context, user *User, token string, exp time.Duration) error
 		Activate(context.Context, string) error
 		Delete(context.Context, int64) error
-		SetProfile(context.Context, string, string) error
-		GetProfileUrl(context.Context, string) (string, error)
+		SetProfile(context.Context, string, int64) error
+		GetProfileUrl(context.Context, int64) (string, error)
 		UpdateUser(context.Context, int64, map[string]interface{}) error
 		SaveRefreshToken(ctx context.Context, userID int64, refreshToken string) error
 		DeleteRefreshToken(ctx context.Context, userID int64) error

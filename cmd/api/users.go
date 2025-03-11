@@ -7,7 +7,6 @@ import (
 	"khel/internal/store"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/go-chi/chi/v5"
@@ -17,27 +16,61 @@ type userKey string
 
 const userCtx userKey = "user"
 
+// for cloudinary uploadParams
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+// uploadProfilePictureHandler godoc
+//
+//	@Summary		Upload profile picture
+//	@Description	Uploads a user's profile picture and saves the URL in the database
+//	@Tags			users
+//	@Accept			mpfd
+//	@Produce		json
+//	@Param			profile_picture	formData	file	true	"Profile picture file size limit is 2MB"
+//	@Success		200				{string}	string	"Profile picture uploaded successfully: <URL>"
+//	@Failure		400				{object}	error	"Unable to parse form or retrieve file"
+//	@Failure		500				{object}	error	"Failed to upload image to Cloudinary or save URL in database"
+//	@Router			/users/profile-picture [post]
 func (app *application) uploadProfilePictureHandler(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
+	user := getUserFromContext(r)
+	userID := user.ID
+	overwrite := boolPtr(true) // Using the helper function
 
 	// Parse the multipart form
-	err := r.ParseMultipartForm(10 << 20) // 10 MB
+	err := r.ParseMultipartForm(2 << 20) // 2 MB
 	if err != nil {
-		http.Error(w, "Unable to parse form", http.StatusBadRequest)
+		http.Error(w, "Unable to parse form, file size limit is 2MB", http.StatusBadRequest)
 		return
 	}
 
 	// Retrieve the file from the form data
-	file, _, err := r.FormFile("profile_picture")
+	file, fileHeader, err := r.FormFile("profile_picture")
 	if err != nil {
 		http.Error(w, "Unable to retrieve file", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
+	// Validate file type (allow only JPEG & PNG)
+	contentType := fileHeader.Header.Get("Content-Type")
+	if contentType != "image/jpeg" && contentType != "image/png" {
+		http.Error(w, "Only JPEG and PNG images are allowed", http.StatusBadRequest)
+		return
+	}
+
 	// Upload the file to Cloudinary
 	ctx := context.Background()
-	uploadResult, err := app.cld.Upload.Upload(ctx, file, uploader.UploadParams{})
+
+	uploadParams := uploader.UploadParams{
+		PublicID:  fmt.Sprintf("profile_pictures/%d", userID), // Save with userID as filename
+		Overwrite: overwrite,
+		// Replace old profile pic
+		Folder:         "profile_pictures",          // Organized storage
+		Transformation: "w_300,h_300,c_fill,q_auto", // Resize to 300x300, auto quality
+	}
+	uploadResult, err := app.cld.Upload.Upload(ctx, file, uploadParams)
 	if err != nil {
 		http.Error(w, "Failed to upload image to Cloudinary", http.StatusInternalServerError)
 		return
@@ -54,17 +87,30 @@ func (app *application) uploadProfilePictureHandler(w http.ResponseWriter, r *ht
 	w.Write([]byte(fmt.Sprintf("Profile picture uploaded successfully: %s", uploadResult.SecureURL)))
 }
 
+// updateProfilePictureHandler godoc
+//
+//	@Summary		Update profile picture
+//	@Description	Updates a user's profile picture, saves the new URL in the database, and deletes the old one from Cloudinary
+//	@Tags			users
+//	@Accept			mpfd
+//	@Produce		json
+//	@Param			profile_picture	formData	file	true	"Profile picture file (max size: 2MB)"
+//	@Success		200				{string}	string	"Profile picture updated successfully: <URL>"
+//	@Failure		400				{object}	error	"Unable to parse form or retrieve file"
+//	@Failure		500				{object}	error	"Failed to upload image to Cloudinary, update database, or delete old image"
+//	@Router			/users/profile-picture [put]
 func (app *application) updateProfilePictureHandler(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "userID")
+	user := getUserFromContext(r)
+	userID := user.ID
 
 	// Parse the multipart form
-	err := r.ParseMultipartForm(10 << 20) // 10 MB
+	err := r.ParseMultipartForm(2 << 20) // 2 MB limit
 	if err != nil {
-		http.Error(w, "Unable to parse form", http.StatusBadRequest)
+		http.Error(w, "Unable to parse form, file size limit is 2MB", http.StatusBadRequest)
 		return
 	}
 
-	// Retrieve the file from the form data
+	// Retrieve the file from form data
 	file, _, err := r.FormFile("profile_picture")
 	if err != nil {
 		http.Error(w, "Unable to retrieve file", http.StatusBadRequest)
@@ -72,82 +118,50 @@ func (app *application) updateProfilePictureHandler(w http.ResponseWriter, r *ht
 	}
 	defer file.Close()
 
-	// Get the current profile picture URL from the database
-	oldUrl, err := app.store.Users.GetProfileUrl(r.Context(), userID)
-	if err != nil {
-		http.Error(w, "Failed to retrieve current profile picture URL", http.StatusInternalServerError)
-		return
+	// Upload the new file to Cloudinary with specific PublicID to ensure replacement
+	uploadParams := uploader.UploadParams{
+		Folder:         "profile_pictures",
+		Overwrite:      boolPtr(true),                              // Ensure overwrite of the existing file
+		Transformation: "w_300,h_300,c_fill,q_auto",                // Optional transformations (e.g., resizing)
+		PublicID:       fmt.Sprintf("profile_pictures/%d", userID), // Use userID as the PublicID to replace the old image
 	}
 
-	// Upload the new file to Cloudinary
-	uploadResult, err := app.cld.Upload.Upload(
-		r.Context(), // Use the request context
-		file,
-		uploader.UploadParams{Folder: "venues"},
-	)
+	uploadResult, err := app.cld.Upload.Upload(r.Context(), file, uploadParams)
 	if err != nil {
 		http.Error(w, "Failed to upload image to Cloudinary", http.StatusInternalServerError)
 		return
 	}
 
-	// Save the new URL in the database
+	// Save the new profile picture URL in the database
 	err = app.store.Users.SetProfile(r.Context(), uploadResult.SecureURL, userID)
 	if err != nil {
 		http.Error(w, "Failed to update profile picture URL in database", http.StatusInternalServerError)
 		return
 	}
 
-	// Delete the old image from Cloudinary
-	if oldUrl != "" {
-		publicID := extractPublicIDFromURL(oldUrl) // Use the correct variable name
-		_, err = app.cld.Upload.Destroy(r.Context(), uploader.DestroyParams{PublicID: publicID})
-		if err != nil {
-			// Log the error but don't fail the request
-			fmt.Printf("Failed to delete old profile picture from Cloudinary: %v\n", err)
-		}
-	}
+	// Return JSON response with new image URL
 	if err := app.jsonResponse(w, http.StatusOK, uploadResult.SecureURL); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("Profile picture updated successfully: %s", uploadResult.SecureURL)))
 }
 
-// extractPublicIDFromURL extracts the public ID from a Cloudinary URL
-func extractPublicIDFromURL(url string) string {
-	// Split the URL by "/"
-	parts := strings.Split(url, "/")
-
-	// Find the index of "upload" in the URL
-	uploadIndex := -1
-	for i, part := range parts {
-		if part == "upload" {
-			uploadIndex = i
-			break
-		}
-	}
-
-	// If "upload" is not found, return an empty string
-	if uploadIndex == -1 || uploadIndex >= len(parts)-1 {
-		return ""
-	}
-
-	// The public ID starts after the version number (e.g., "v1740815725")
-	// So we skip the version number and take everything after it
-	publicIDWithExtension := strings.Join(parts[uploadIndex+2:], "/")
-
-	// Remove the file extension (e.g., ".png", ".jpg")
-	publicID := strings.TrimSuffix(publicIDWithExtension, ".png")
-	publicID = strings.TrimSuffix(publicID, ".jpg") // Add more extensions if needed
-
-	return publicID
-}
-
+// UpdateUser godoc
+//
+//	@Summary		Update user information
+//	@Description	Update user information such as first name, last name, skill level, and phone number
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		object	true	"Field name should be 	first_name,  last_name, skill_level, phone whichever who want to update"
+//	@Success		204		{string}	string	"User info updated successfully"
+//	@Failure		400		{object}	error	"Bad request, update values can't be nil"
+//	@Failure		404		{object}	error	"User not found"
+//	@Failure		500		{object}	error	"Internal server error"
+//	@Router			/users [put]
 func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: change later from context
-	// userID := chi.URLParam(r, "userID")
-	var userID = 1
+	user := getUserFromContext(r)
+	userID := user.ID
 	var payload struct {
 		FirstName  *string `json:"first_name"`
 		LastName   *string `json:"last_name"`
@@ -233,6 +247,18 @@ func (app *application) followUserHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// ActivateUser godoc
+//
+//	@Summary		Activate user account
+//	@Description	Activate a user account using an activation token provided in the URL
+//	@Tags			authentication
+//	@Accept			json
+//	@Produce		json
+//	@Param			token	path		string	true	"Activation token"
+//	@Success		204		{string}	string	"User activated"
+//	@Failure		404		{object}	error	"User not found"
+//	@Failure		500		{object}	error	"Internal server error"
+//	@Router			/users/activate/{token} [put]
 func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 

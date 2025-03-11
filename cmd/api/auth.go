@@ -122,15 +122,26 @@ type CreateUserTokenPayload struct {
 	Password string `json:"password" validate:"required,min=3,max=72"`
 }
 
+// TokenResponse represents the structure of the tokens in the response. made for swagger doc success output
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+// Envelope is a wrapper for API responses.made for swagger doc success output
+type Envelope struct {
+	Data TokenResponse `json:"data"`
+}
+
 // createTokenHandler godoc
 //
 //	@Summary		Creates a token
-//	@Description	Creates a token for a user
+//	@Description	Creates a token for a user after signin or login.
 //	@Tags			authentication
 //	@Accept			json
 //	@Produce		json
 //	@Param			payload	body		CreateUserTokenPayload	true	"User credentials"
-//	@Success		200		{string}	string					"Token"
+//	@Success		200		{object}	Envelope				"Token to save at MMKV"
 //	@Failure		400		{object}	error
 //	@Failure		401		{object}	error
 //	@Failure		500		{object}	error
@@ -185,6 +196,17 @@ func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// LogoutUser godoc
+//
+//	@Summary		logout user
+//	@Description	logout user which will nullify refresh token
+//	@Tags			authentication
+//	@Accept			json
+//	@Produce		json
+//	@Success		204	{string}	string	"No Content"
+//	@Failure		500	{object}	error	"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/users/logout [post]
 func (app *application) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(r)
 	userID := user.ID
@@ -199,6 +221,23 @@ func (app *application) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type RefreshPayload struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+// refreshTokenHandler godoc
+//
+//	@Summary		Refresh authentication tokens
+//	@Description	Validates the provided refresh token and issues new access and refresh tokens.
+//	@Tags			authentication
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body		RefreshPayload	true	"Refresh token payload"
+//	@Success		200		{object}	Envelope		"New access and refresh tokens"
+//	@Failure		400		{object}	error			"Bad request"
+//	@Failure		401		{object}	error			"Unauthorized"
+//	@Failure		500		{object}	error			"Internal server error"
+//	@Router			/authentication/refresh [post]
 func (app *application) refreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		RefreshToken string `json:"refresh_token" validate:"required"`

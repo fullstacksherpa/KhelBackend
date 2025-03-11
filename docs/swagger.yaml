@@ -62,6 +62,18 @@ definitions:
     - email
     - password
     type: object
+  main.Envelope:
+    properties:
+      data:
+        $ref: '#/definitions/main.TokenResponse'
+    type: object
+  main.RefreshPayload:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
   main.RegisterUserPayload:
     properties:
       email:
@@ -85,6 +97,13 @@ definitions:
     - last_name
     - password
     - phone
+    type: object
+  main.TokenResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
     type: object
   main.UserWithToken:
     properties:
@@ -181,11 +200,43 @@ info:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   title: Khel API
 paths:
+  /authentication/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Validates the provided refresh token and issues new access and
+        refresh tokens.
+      parameters:
+      - description: Refresh token payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.RefreshPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: New access and refresh tokens
+          schema:
+            $ref: '#/definitions/main.Envelope'
+        "400":
+          description: Bad request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      summary: Refresh authentication tokens
+      tags:
+      - authentication
   /authentication/token:
     post:
       consumes:
       - application/json
-      description: Creates a token for a user
+      description: Creates a token for a user after signin or login.
       parameters:
       - description: User credentials
         in: body
@@ -197,9 +248,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: Token
+          description: Token to save at MMKV
           schema:
-            type: string
+            $ref: '#/definitions/main.Envelope'
         "400":
           description: Bad Request
           schema: {}
@@ -290,6 +341,39 @@ paths:
       summary: Healthcheckk
       tags:
       - ops
+  /users:
+    put:
+      consumes:
+      - application/json
+      description: Update user information such as first name, last name, skill level,
+        and phone number
+      parameters:
+      - description: "Field name should be \tfirst_name,  last_name, skill_level,
+          phone whichever who want to update"
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: User info updated successfully
+          schema:
+            type: string
+        "400":
+          description: Bad request, update values can't be nil
+          schema: {}
+        "404":
+          description: User not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      summary: Update user information
+      tags:
+      - users
   /users/{userID}/follow:
     put:
       consumes:
@@ -346,6 +430,109 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Unfollow a user
+      tags:
+      - users
+  /users/activate/{token}:
+    put:
+      consumes:
+      - application/json
+      description: Activate a user account using an activation token provided in the
+        URL
+      parameters:
+      - description: Activation token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: User activated
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      summary: Activate user account
+      tags:
+      - authentication
+  /users/logout:
+    post:
+      consumes:
+      - application/json
+      description: logout user which will nullify refresh token
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: logout user
+      tags:
+      - authentication
+  /users/profile-picture:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Uploads a user's profile picture and saves the URL in the database
+      parameters:
+      - description: Profile picture file size limit is 2MB
+        in: formData
+        name: profile_picture
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Profile picture uploaded successfully: <URL>'
+          schema:
+            type: string
+        "400":
+          description: Unable to parse form or retrieve file
+          schema: {}
+        "500":
+          description: Failed to upload image to Cloudinary or save URL in database
+          schema: {}
+      summary: Upload profile picture
+      tags:
+      - users
+    put:
+      consumes:
+      - multipart/form-data
+      description: Updates a user's profile picture, saves the new URL in the database,
+        and deletes the old one from Cloudinary
+      parameters:
+      - description: 'Profile picture file (max size: 2MB)'
+        in: formData
+        name: profile_picture
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Profile picture updated successfully: <URL>'
+          schema:
+            type: string
+        "400":
+          description: Unable to parse form or retrieve file
+          schema: {}
+        "500":
+          description: Failed to upload image to Cloudinary, update database, or delete
+            old image
+          schema: {}
+      summary: Update profile picture
       tags:
       - users
 securityDefinitions:
