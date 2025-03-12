@@ -121,3 +121,32 @@ func (app *application) RequireGameAdminAssistant(next http.Handler) http.Handle
 		next.ServeHTTP(w, r)
 	})
 }
+
+func (app *application) CheckAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := getUserFromContext(r)
+
+		// Extract gameID from URL
+		gameIDStr := chi.URLParam(r, "gameID")
+		gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "Invalid game ID")
+			return
+		}
+
+		// Check if user is admin
+		isAdmin, err := app.store.Games.IsAdmin(r.Context(), gameID, user.ID)
+		if err != nil {
+			app.logger.Errorf("Error checking admin status: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "Database error")
+			return
+		}
+		if !isAdmin {
+			writeJSONError(w, http.StatusForbidden, "Insufficient privileges")
+			return
+		}
+
+		// Proceed if user is an admin/assistant
+		next.ServeHTTP(w, r)
+	})
+}

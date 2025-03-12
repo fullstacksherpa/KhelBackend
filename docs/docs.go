@@ -158,6 +158,122 @@ const docTemplate = `{
             }
         },
         "/games": {
+            "get": {
+                "description": "Returns a list of games based on filters such as sport type, game level, venue, booking status, location, and time range. The response includes both raw game data and GeoJSON features for mapping.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Retrieve a list of games",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Sport type to filter games (e.g., basketball)",
+                        "name": "sport_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Game level (e.g., intermediate)",
+                        "name": "game_level",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Venue ID to filter games",
+                        "name": "venue_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter games based on booking status",
+                        "name": "is_booked",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User latitude for location filtering",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude for location filtering",
+                        "name": "lon",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Radius in kilometers for location-based filtering (0 for no filter)",
+                        "name": "radius",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter games starting after this time (RFC3339 format)",
+                        "name": "start_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter games ending before this time (RFC3339 format)",
+                        "name": "end_before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum price",
+                        "name": "min_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum price",
+                        "name": "max_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of results to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pagination offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort order, either 'asc' or 'desc'",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of games and GeoJSON features",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request parameters",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -203,6 +319,291 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Game overlaps with existing game",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/accept": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Accepts a pending join request for a game by updating the request status to accepted and inserting the player into the game. The game ID is provided in the URL path and the user ID is provided in the request body.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Accept a join request for a game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Payload containing the user ID to accept",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "user_id": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Message confirming the join request acceptance and player addition",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid game ID, payload error, or request is not in pending state",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Join request not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/assign-assistant/{playerID}": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows a game admin to assign the assistant role to a player for a specified game.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Assign an assistant role to a player",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Player ID to be assigned as assistant",
+                        "name": "playerID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Assistant role assigned successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid game ID, invalid player ID, or player not found/already an assistant",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Only game admins can assign assistants",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/players": {
+            "get": {
+                "description": "Fetches the list of players participating in a specific game. The game ID is provided in the URL path.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Retrieve players for a game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of game players",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.PlayerResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid game ID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Game players not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Rejects a pending join request for a game. The game ID is specified in the URL path and the user ID is provided in the request body.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Reject a join request for a game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Payload containing the user ID of the join request to reject",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "user_id": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Message confirming the join request was rejected",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid game ID, payload error, or request is not pending",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Join request not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/request": {
+            "post": {
+                "description": "Allows a user to send a request to join a specific game. The game ID is provided in the URL path.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Send a request to join a game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Join request submitted for approval",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid game ID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Game not found or inactive",
+                        "schema": {}
+                    },
+                    "409": {
+                        "description": "Join request already sent",
                         "schema": {}
                     },
                     "500": {
@@ -517,6 +918,57 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/venues": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Register a new venue with details such as name, address, location, and amenities.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Register a venue in our system",
+                "parameters": [
+                    {
+                        "description": "Venue details payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateVenuePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Venue created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/store.Venue"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -603,11 +1055,73 @@ const docTemplate = `{
                 }
             }
         },
+        "main.CreateVenuePayload": {
+            "type": "object",
+            "required": [
+                "address",
+                "location",
+                "name"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "amenities": {
+                    "description": "Example validation for amenity count",
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "location": {
+                    "description": "[longitude, latitude]",
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "open_time": {
+                    "description": "Store operating hours (optional)",
+                    "type": "string",
+                    "maxLength": 50
+                }
+            }
+        },
         "main.Envelope": {
             "type": "object",
             "properties": {
                 "data": {
                     "$ref": "#/definitions/main.TokenResponse"
+                }
+            }
+        },
+        "main.PlayerResponse": {
+            "type": "object",
+            "properties": {
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "profile_picture_url": {
+                    "$ref": "#/definitions/store.NullString"
+                },
+                "skill_level": {
+                    "$ref": "#/definitions/store.NullString"
                 }
             }
         },
@@ -749,6 +1263,19 @@ const docTemplate = `{
                 }
             }
         },
+        "store.NullString": {
+            "type": "object",
+            "properties": {
+                "valid": {
+                    "description": "Indicates if the value is non-null",
+                    "type": "boolean"
+                },
+                "value": {
+                    "description": "The actual string value",
+                    "type": "string"
+                }
+            }
+        },
         "store.User": {
             "type": "object",
             "properties": {
@@ -778,6 +1305,56 @@ const docTemplate = `{
                 },
                 "skill_level": {
                     "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "store.Venue": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "amenities": {
+                    "description": "Array of strings",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_urls": {
+                    "description": "Array of image URLs",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "location": {
+                    "description": "PostGIS point (longitude, latitude)",
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "open_time": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
                 },
                 "updated_at": {
                     "type": "string"

@@ -46,17 +46,20 @@ type Storage struct {
 		Unfollow(ctx context.Context, followerID, userID int64) error
 	}
 	Games interface {
+		GetGames(ctx context.Context, q GameFilterQuery) ([]GameWithVenue, error)
 		Create(context.Context, *Game) error
 		GetGameByID(ctx context.Context, gameID int64) (*Game, error)
 		CheckRequestExist(ctx context.Context, gameID int64, userID int64) (bool, error)
 		AddToGameRequest(ctx context.Context, gameID int64, UserID int64) error
 		IsAdminAssistant(ctx context.Context, gameID int64, userID int64) (bool, error)
+		IsAdmin(ctx context.Context, gameID, userID int64) (bool, error)
 		SetMatchFull(ctx context.Context, gameID int64) error
 		InsertNewPlayer(ctx context.Context, gameID int64, userID int64) error
 		UpdateRequestStatus(ctx context.Context, gameID, userID int64, status GameRequestStatus) error
 		GetJoinRequest(ctx context.Context, gameID, userID int64) (*GameRequest, error)
 		GetPlayerCount(ctx context.Context, gameID int) (int, error)
 		GetGamePlayers(ctx context.Context, gameID int64) ([]*User, error)
+		AssignAssistant(ctx context.Context, gameID, playerID int64) error
 	}
 }
 

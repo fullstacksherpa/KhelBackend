@@ -133,22 +133,29 @@ func (app *application) mount() http.Handler {
 				r.Put("/unfollow", app.unfollowUserHandler)
 			})
 		})
+
+		//TODO: appoint as assistance from game players.
 		r.Route("/games", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+			r.Get("/", app.getGamesHandler)
 			r.Post("/create", app.createGameHandler)
 			r.Route("/{gameID}", func(r chi.Router) {
+				r.With(app.CheckAdmin).Post("/assign-assistant/{playerID}", app.AssignAssistantHandler)
 				r.Get("/players", app.getGamePlayersHandler)
 				r.Post("/request", app.CreateJoinRequest)
-				r.Post("/accept", app.AcceptJoinRequest)
-				r.Post("/reject", app.RejectJoinRequest)
+				r.With(app.RequireGameAdminAssistant).Post("/accept", app.AcceptJoinRequest)
+				r.With(app.RequireGameAdminAssistant).Post("/reject", app.RejectJoinRequest)
 
 			})
 		})
+
+		//secure routes
+		r.With(app.AuthTokenMiddleware).Post("/authentication/refresh", app.refreshTokenHandler)
 
 		// Public routes
 		r.Route("/authentication", func(r chi.Router) {
 			r.Post("/user", app.registerUserHandler)
 			r.Post("/token", app.createTokenHandler)
-			r.Post("/refresh", app.refreshTokenHandler)
 
 		})
 

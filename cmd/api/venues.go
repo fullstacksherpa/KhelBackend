@@ -32,7 +32,6 @@ type CreateVenuePayload struct {
 //	@Failure		500		{object}	error				"Internal server error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues [post]
-
 func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Request) {
 	var payload CreateVenuePayload
 

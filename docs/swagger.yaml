@@ -62,10 +62,54 @@ definitions:
     - email
     - password
     type: object
+  main.CreateVenuePayload:
+    properties:
+      address:
+        maxLength: 255
+        type: string
+      amenities:
+        description: Example validation for amenity count
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      description:
+        maxLength: 500
+        type: string
+      location:
+        description: '[longitude, latitude]'
+        items:
+          type: number
+        type: array
+      name:
+        maxLength: 100
+        type: string
+      open_time:
+        description: Store operating hours (optional)
+        maxLength: 50
+        type: string
+    required:
+    - address
+    - location
+    - name
+    type: object
   main.Envelope:
     properties:
       data:
         $ref: '#/definitions/main.TokenResponse'
+    type: object
+  main.PlayerResponse:
+    properties:
+      first_name:
+        type: string
+      id:
+        type: integer
+      phone:
+        type: string
+      profile_picture_url:
+        $ref: '#/definitions/store.NullString'
+      skill_level:
+        $ref: '#/definitions/store.NullString'
     type: object
   main.RefreshPayload:
     properties:
@@ -166,6 +210,15 @@ definitions:
         description: Visibility (public or private)
         type: string
     type: object
+  store.NullString:
+    properties:
+      valid:
+        description: Indicates if the value is non-null
+        type: boolean
+      value:
+        description: The actual string value
+        type: string
+    type: object
   store.User:
     properties:
       created_at:
@@ -186,6 +239,40 @@ definitions:
         type: string
       skill_level:
         type: string
+      updated_at:
+        type: string
+    type: object
+  store.Venue:
+    properties:
+      address:
+        type: string
+      amenities:
+        description: Array of strings
+        items:
+          type: string
+        type: array
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image_urls:
+        description: Array of image URLs
+        items:
+          type: string
+        type: array
+      location:
+        description: PostGIS point (longitude, latitude)
+        items:
+          type: number
+        type: array
+      name:
+        type: string
+      open_time:
+        type: string
+      owner_id:
+        type: integer
       updated_at:
         type: string
     type: object
@@ -292,6 +379,86 @@ paths:
       tags:
       - authentication
   /games:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of games based on filters such as sport type, game
+        level, venue, booking status, location, and time range. The response includes
+        both raw game data and GeoJSON features for mapping.
+      parameters:
+      - description: Sport type to filter games (e.g., basketball)
+        in: query
+        name: sport_type
+        type: string
+      - description: Game level (e.g., intermediate)
+        in: query
+        name: game_level
+        type: string
+      - description: Venue ID to filter games
+        in: query
+        name: venue_id
+        type: integer
+      - description: Filter games based on booking status
+        in: query
+        name: is_booked
+        type: boolean
+      - description: User latitude for location filtering
+        in: query
+        name: lat
+        type: number
+      - description: User longitude for location filtering
+        in: query
+        name: lon
+        type: number
+      - description: Radius in kilometers for location-based filtering (0 for no filter)
+        in: query
+        name: radius
+        type: integer
+      - description: Filter games starting after this time (RFC3339 format)
+        in: query
+        name: start_after
+        type: string
+      - description: Filter games ending before this time (RFC3339 format)
+        in: query
+        name: end_before
+        type: string
+      - description: Minimum price
+        in: query
+        name: min_price
+        type: integer
+      - description: Maximum price
+        in: query
+        name: max_price
+        type: integer
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination offset
+        in: query
+        name: offset
+        type: integer
+      - description: Sort order, either 'asc' or 'desc'
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of games and GeoJSON features
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request parameters
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      summary: Retrieve a list of games
+      tags:
+      - Games
     post:
       consumes:
       - application/json
@@ -326,6 +493,204 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Create a new game
+      tags:
+      - Games
+  /games/{gameID}/accept:
+    post:
+      consumes:
+      - application/json
+      description: Accepts a pending join request for a game by updating the request
+        status to accepted and inserting the player into the game. The game ID is
+        provided in the URL path and the user ID is provided in the request body.
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      - description: Payload containing the user ID to accept
+        in: body
+        name: payload
+        required: true
+        schema:
+          properties:
+            user_id:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Message confirming the join request acceptance and player addition
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid game ID, payload error, or request is not in pending
+            state
+          schema: {}
+        "404":
+          description: Join request not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Accept a join request for a game
+      tags:
+      - Games
+  /games/{gameID}/assign-assistant/{playerID}:
+    post:
+      consumes:
+      - application/json
+      description: Allows a game admin to assign the assistant role to a player for
+        a specified game.
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      - description: Player ID to be assigned as assistant
+        in: path
+        name: playerID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Assistant role assigned successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid game ID, invalid player ID, or player not found/already
+            an assistant
+          schema: {}
+        "403":
+          description: Only game admins can assign assistants
+          schema: {}
+        "500":
+          description: Database error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Assign an assistant role to a player
+      tags:
+      - Games
+  /games/{gameID}/players:
+    get:
+      consumes:
+      - application/json
+      description: Fetches the list of players participating in a specific game. The
+        game ID is provided in the URL path.
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of game players
+          schema:
+            items:
+              $ref: '#/definitions/main.PlayerResponse'
+            type: array
+        "400":
+          description: Invalid game ID
+          schema: {}
+        "404":
+          description: Game players not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      summary: Retrieve players for a game
+      tags:
+      - Games
+  /games/{gameID}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Rejects a pending join request for a game. The game ID is specified
+        in the URL path and the user ID is provided in the request body.
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      - description: Payload containing the user ID of the join request to reject
+        in: body
+        name: payload
+        required: true
+        schema:
+          properties:
+            user_id:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Message confirming the join request was rejected
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid game ID, payload error, or request is not pending
+          schema: {}
+        "404":
+          description: Join request not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Reject a join request for a game
+      tags:
+      - Games
+  /games/{gameID}/request:
+    post:
+      consumes:
+      - application/json
+      description: Allows a user to send a request to join a specific game. The game
+        ID is provided in the URL path.
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Join request submitted for approval
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid game ID
+          schema: {}
+        "404":
+          description: Game not found or inactive
+          schema: {}
+        "409":
+          description: Join request already sent
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      summary: Send a request to join a game
       tags:
       - Games
   /health:
@@ -535,6 +900,40 @@ paths:
       summary: Update profile picture
       tags:
       - users
+  /venues:
+    post:
+      consumes:
+      - application/json
+      description: Register a new venue with details such as name, address, location,
+        and amenities.
+      parameters:
+      - description: Venue details payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateVenuePayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Venue created successfully
+          schema:
+            $ref: '#/definitions/store.Venue'
+        "400":
+          description: Invalid request payload
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Register a venue in our system
+      tags:
+      - Venue
 securityDefinitions:
   ApiKeyAuth:
     in: header
