@@ -106,16 +106,24 @@ func (app *application) mount() http.Handler {
 		r.With(app.BasicAuthMiddleware()).Get("/debug/vars", expvar.Handler().ServeHTTP)
 
 		r.Route("/venues", func(r chi.Router) {
-			r.Post("/", app.createVenueHandler)
-			//Call DELETE /venues/{venueID}/photos?photo_url={url}.
-			r.Delete("/{venueID}/photos", app.deleteVenuePhotoHandler) // DELETE /venues/{venueID}/photos?photo_url={url}
-			r.Post("/{venueID}/photos", app.uploadVenuePhotoHandler)   // POST /venues/{venueID}/photos
-			// PATCH /venues/{venueID} - Update venue information
-			r.Patch("/{venueID}", app.updateVenueInfo)
+			r.Use(app.AuthTokenMiddleware)
 
+			// Public or user-accessible routes
+			r.Post("/", app.createVenueHandler)
 			r.Post("/{venueID}/reviews", app.createVenueReviewHandler)
 			r.Get("/{venueID}/reviews", app.getVenueReviewsHandler)
-			r.Delete("/{venueID}/reviews/{reviewID}", app.deleteVenueReviewHandler)
+
+			// Routes that require venue ownership
+			r.Route("/{venueID}", func(r chi.Router) {
+				r.Use(app.IsOwnerMiddleware)
+
+				r.Patch("/", app.updateVenueInfo)
+				r.Delete("/photos", app.deleteVenuePhotoHandler)
+				r.Post("/photos", app.uploadVenuePhotoHandler)
+			})
+
+			// Route that requires review ownership
+			r.With(app.IsReviewOwnerMiddleware).Delete("/{venueID}/reviews/{reviewID}", app.deleteVenueReviewHandler)
 		})
 		// Route that does NOT require authentication
 		r.Put("/users/activate/{token}", app.activateUserHandler)

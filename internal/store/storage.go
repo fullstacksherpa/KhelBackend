@@ -30,16 +30,18 @@ type Storage struct {
 	}
 	Venues interface {
 		Create(context.Context, *Venue) error
-		Update(context.Context, string, map[string]interface{}) error
+		Update(ctx context.Context, venueID int64, updateData map[string]interface{}) error
 		CheckIfVenueExists(context.Context, string, int64) (bool, error)
-		RemovePhotoURL(context.Context, string, string) error
-		AddPhotoURL(context.Context, string, string) error
+		RemovePhotoURL(ctx context.Context, venueID int64, photoURL string) error
+		AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error
+		IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error)
 	}
 	Reviews interface {
 		CreateReview(context.Context, *Review) error
 		GetReviews(context.Context, int64) ([]Review, error)
 		DeleteReview(context.Context, int64, int64) error
 		GetReviewStats(context.Context, int64) (int, float64, error)
+		IsReviewOwner(ctx context.Context, reviewID int64, userID int64) (bool, error)
 	}
 	Followers interface {
 		Follow(ctx context.Context, followerID, userID int64) error

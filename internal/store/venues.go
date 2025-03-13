@@ -103,7 +103,7 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 }
 
 // RemovePhotoURL removes a specific photo URL from a venue's image_urls array
-func (s *VenuesStore) RemovePhotoURL(ctx context.Context, venueID string, photoURL string) error {
+func (s *VenuesStore) RemovePhotoURL(ctx context.Context, venueID int64, photoURL string) error {
 	query := `
 		UPDATE venues
 		SET image_urls = array_remove(image_urls, $1)
@@ -117,7 +117,7 @@ func (s *VenuesStore) RemovePhotoURL(ctx context.Context, venueID string, photoU
 }
 
 // AddPhotoURL adds a new photo URL to a venue's image_urls array
-func (s *VenuesStore) AddPhotoURL(ctx context.Context, venueID string, photoURL string) error {
+func (s *VenuesStore) AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error {
 	query := `
 		UPDATE venues
 		SET image_urls = array_append(image_urls, $1)
@@ -131,7 +131,7 @@ func (s *VenuesStore) AddPhotoURL(ctx context.Context, venueID string, photoURL 
 }
 
 // Update updates a venue's data in the database
-func (s *VenuesStore) Update(ctx context.Context, venueID string, updateData map[string]interface{}) error {
+func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[string]interface{}) error {
 	// Start building the SQL query
 	query := "UPDATE venues SET "
 	args := []interface{}{}
@@ -193,4 +193,26 @@ func (s *VenuesStore) Update(ctx context.Context, venueID string, updateData map
 	}
 
 	return nil
+}
+
+// IsOwner checks if the user is the owner of the given venue
+func (s *VenuesStore) IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error) {
+	var ownerID int64
+
+	err := s.db.QueryRowContext(ctx, `SELECT owner_id FROM venues WHERE id = $1`, venueID).Scan(&ownerID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, fmt.Errorf("venue not found")
+		}
+
+		return false, err
+	}
+
+	// Check if the user ID matches the owner ID
+	if ownerID == userID {
+		return true, nil
+	}
+
+	// If the user is not the owner
+	return false, nil
 }

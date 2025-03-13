@@ -62,37 +62,6 @@ definitions:
     - email
     - password
     type: object
-  main.CreateVenuePayload:
-    properties:
-      address:
-        maxLength: 255
-        type: string
-      amenities:
-        description: Example validation for amenity count
-        items:
-          type: string
-        maxItems: 100
-        type: array
-      description:
-        maxLength: 500
-        type: string
-      location:
-        description: '[longitude, latitude]'
-        items:
-          type: number
-        type: array
-      name:
-        maxLength: 100
-        type: string
-      open_time:
-        description: Store operating hours (optional)
-        maxLength: 50
-        type: string
-    required:
-    - address
-    - location
-    - name
-    type: object
   main.Envelope:
     properties:
       data:
@@ -156,6 +125,19 @@ definitions:
       user:
         $ref: '#/definitions/store.User'
     type: object
+  main.createReviewPayload:
+    properties:
+      comment:
+        maxLength: 500
+        type: string
+      rating:
+        maximum: 5
+        minimum: 1
+        type: integer
+    required:
+    - comment
+    - rating
+    type: object
   store.Game:
     properties:
       admin_id:
@@ -218,6 +200,29 @@ definitions:
       value:
         description: The actual string value
         type: string
+    type: object
+  store.Review:
+    properties:
+      avatar_url:
+        type: string
+      comment:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      rating:
+        description: 1-5
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+      user_name:
+        description: Joined fields
+        type: string
+      venue_id:
+        type: integer
     type: object
   store.User:
     properties:
@@ -903,16 +908,19 @@ paths:
   /venues:
     post:
       consumes:
-      - application/json
+      - multipart/form-data
       description: Register a new venue with details such as name, address, location,
         and amenities.
       parameters:
-      - description: Venue details payload
-        in: body
-        name: payload
+      - description: Venue details (JSON string)
+        in: formData
+        name: venue
         required: true
-        schema:
-          $ref: '#/definitions/main.CreateVenuePayload'
+        type: string
+      - description: Venue images (up to 7 files)
+        in: formData
+        name: images
+        type: file
       produces:
       - application/json
       responses:
@@ -932,6 +940,223 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Register a venue in our system
+      tags:
+      - Venue
+  /venues/{venueID}:
+    patch:
+      consumes:
+      - application/json
+      description: Allows venue owners to update partial information about their venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Venue update payload
+        in: body
+        name: updateData
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Venue updated successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not update venue'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update venue information
+      tags:
+      - Venue
+  /venues/{venueID}/photos:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a specific venue photo from Cloudinary and removes it from
+        the database.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Photo URL to delete
+        in: query
+        name: photo_url
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Photo deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Missing venue ID or photo URL'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not delete photo'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a venue photo
+      tags:
+      - Venue
+    post:
+      consumes:
+      - multipart/form-data
+      description: Uploads a new venue photo to Cloudinary and adds the new photo
+        URL to the venue record.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Photo file to upload
+        in: formData
+        name: photo
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Photo uploaded successfully, returns {\"photo_url\": \"<newPhotoURL>\"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid input or missing file'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not process the upload'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Upload a new photo for a venue
+      tags:
+      - Venue
+  /venues/{venueID}/reviews:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all reviews for a specific venue along with the total
+        count and average rating.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reviews, total review count, and average rating
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: Invalid venue ID'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve reviews for a venue
+      tags:
+      - Venue
+    post:
+      consumes:
+      - application/json
+      description: Creates a new review for a specific venue. The review includes
+        a rating and comment.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Review payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.createReviewPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Review created successfully
+          schema:
+            $ref: '#/definitions/store.Review'
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create a review for a venue
+      tags:
+      - Venue
+  /venues/{venueID}/reviews/{reviewID}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a review for a venue. This operation is allowed only if
+        the requester is the review owner.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Review ID
+        in: path
+        name: reviewID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Review deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid review ID'
+          schema: {}
+        "404":
+          description: 'Not Found: Review not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a venue review
       tags:
       - Venue
 securityDefinitions:

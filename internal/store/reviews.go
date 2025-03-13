@@ -102,3 +102,13 @@ func (s *ReviewStore) GetReviewStats(ctx context.Context, venueID int64) (total 
 	err = s.db.QueryRowContext(ctx, query, venueID).Scan(&total, &average)
 	return total, average, err
 }
+
+func (s *ReviewStore) IsReviewOwner(ctx context.Context, reviewID int64, userID int64) (bool, error) {
+	var reviewUserID int64
+	err := s.db.QueryRowContext(ctx, `SELECT user_id FROM reviews WHERE id = $1`, reviewID).Scan(&reviewUserID)
+	if err != nil {
+		return false, err
+	}
+
+	return reviewUserID == userID, nil
+}

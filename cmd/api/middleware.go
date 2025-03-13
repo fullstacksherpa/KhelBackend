@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -147,6 +148,63 @@ func (app *application) CheckAdmin(next http.Handler) http.Handler {
 		}
 
 		// Proceed if user is an admin/assistant
+		next.ServeHTTP(w, r)
+	})
+}
+
+// IsOwnerMiddleware checks if the user is the owner of the venue
+func (app *application) IsOwnerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		venueIDStr := chi.URLParam(r, "venueID")
+		venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+		if err != nil {
+			app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %v", err))
+			return
+		}
+		if venueID == 0 {
+			app.badRequestResponse(w, r, errors.New("venue ID is required"))
+			return
+		}
+		user := getUserFromContext(r)
+		userID := user.ID
+
+		// Check if the user is the owner of the venue
+		isOwner, err := app.store.Venues.IsOwner(r.Context(), venueID, userID)
+		if err != nil || !isOwner {
+			app.forbiddenResponse(w, r)
+			return
+		}
+
+		// Continue to the next middleware or handler
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) IsReviewOwnerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract the reviewID from the URL parameter
+		reviewIDStr := chi.URLParam(r, "reviewID")
+		reviewID, err := strconv.ParseInt(reviewIDStr, 10, 64)
+		if err != nil {
+			app.badRequestResponse(w, r, fmt.Errorf("invalid review ID: %v", err))
+			return
+		}
+
+		user := getUserFromContext(r)
+		userID := user.ID
+
+		// Check if the user is the owner of the review
+		isOwner, err := app.store.Reviews.IsReviewOwner(r.Context(), reviewID, userID)
+		if err != nil {
+			app.internalServerError(w, r, fmt.Errorf("error checking review ownership: %v", err))
+			return
+		}
+
+		if !isOwner {
+			app.forbiddenResponse(w, r)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }

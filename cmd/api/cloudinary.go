@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
@@ -28,12 +29,18 @@ func (app *application) deletePhotoFromCloudinary(photoURL string) error {
 }
 
 // Helper function to extract the public ID from the Cloudinary URL
-func (app *application) extractPublicIDFromURL(url string) (string, error) {
-	// Example URL: https://res.cloudinary.com/demo/image/upload/v1234567/venues/abc123.jpg
-	// Public ID: venues/abc123
-	parts := strings.Split(url, "/")
-	if len(parts) < 9 {
-		return "", errors.New("invalid Cloudinary URL")
+func (app *application) extractPublicIDFromURL(photoURL string) (string, error) {
+	parsedURL, err := url.Parse(photoURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL format: %w", err)
 	}
-	return strings.Join(parts[8:], "/"), nil
+
+	pathParts := strings.Split(parsedURL.Path, "/")
+	for i, part := range pathParts {
+		if part == "upload" && i+1 < len(pathParts) {
+			return strings.Join(pathParts[i+1:], "/"), nil
+		}
+	}
+
+	return "", errors.New("failed to extract public ID from URL")
 }

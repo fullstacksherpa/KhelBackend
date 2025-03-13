@@ -928,7 +928,7 @@ const docTemplate = `{
                 ],
                 "description": "Register a new venue with details such as name, address, location, and amenities.",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -939,13 +939,17 @@ const docTemplate = `{
                 "summary": "Register a venue in our system",
                 "parameters": [
                     {
-                        "description": "Venue details payload",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/main.CreateVenuePayload"
-                        }
+                        "type": "string",
+                        "description": "Venue details (JSON string)",
+                        "name": "venue",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Venue images (up to 7 files)",
+                        "name": "images",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -965,6 +969,329 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}": {
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows venue owners to update partial information about their venue.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Update venue information",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Venue update payload",
+                        "name": "updateData",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Venue updated successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid input",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not update venue",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/photos": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Uploads a new venue photo to Cloudinary and adds the new photo URL to the venue record.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Upload a new photo for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Photo file to upload",
+                        "name": "photo",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Photo uploaded successfully, returns {\\\"photo_url\\\": \\\"\u003cnewPhotoURL\u003e\\\"}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid input or missing file",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not process the upload",
+                        "schema": {}
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Deletes a specific venue photo from Cloudinary and removes it from the database.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Delete a venue photo",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Photo URL to delete",
+                        "name": "photo_url",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Photo deleted successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Missing venue ID or photo URL",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not delete photo",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/reviews": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieves all reviews for a specific venue along with the total count and average rating.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Retrieve reviews for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reviews, total review count, and average rating",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid venue ID",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a new review for a specific venue. The review includes a rating and comment.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Create a review for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Review payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.createReviewPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Review created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/store.Review"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid input",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/reviews/{reviewID}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Deletes a review for a venue. This operation is allowed only if the requester is the review owner.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Delete a venue review",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Review ID",
+                        "name": "reviewID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Review deleted successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid review ID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found: Review not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {}
                     }
                 }
@@ -1052,48 +1379,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 72,
                     "minLength": 3
-                }
-            }
-        },
-        "main.CreateVenuePayload": {
-            "type": "object",
-            "required": [
-                "address",
-                "location",
-                "name"
-            ],
-            "properties": {
-                "address": {
-                    "type": "string",
-                    "maxLength": 255
-                },
-                "amenities": {
-                    "description": "Example validation for amenity count",
-                    "type": "array",
-                    "maxItems": 100,
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "description": {
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "location": {
-                    "description": "[longitude, latitude]",
-                    "type": "array",
-                    "items": {
-                        "type": "number"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 100
-                },
-                "open_time": {
-                    "description": "Store operating hours (optional)",
-                    "type": "string",
-                    "maxLength": 50
                 }
             }
         },
@@ -1190,6 +1475,24 @@ const docTemplate = `{
                 }
             }
         },
+        "main.createReviewPayload": {
+            "type": "object",
+            "required": [
+                "comment",
+                "rating"
+            ],
+            "properties": {
+                "comment": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "rating": {
+                    "type": "integer",
+                    "maximum": 5,
+                    "minimum": 1
+                }
+            }
+        },
         "store.Game": {
             "type": "object",
             "properties": {
@@ -1273,6 +1576,40 @@ const docTemplate = `{
                 "value": {
                     "description": "The actual string value",
                     "type": "string"
+                }
+            }
+        },
+        "store.Review": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "comment": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "description": "1-5",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_name": {
+                    "description": "Joined fields",
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
                 }
             }
         },
