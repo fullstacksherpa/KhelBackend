@@ -3,10 +3,12 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"khel/internal/mailer"
 	"khel/internal/store"
 	"net/http"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -289,6 +291,154 @@ func (app *application) refreshTokenHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
+		app.internalServerError(w, r, err)
+	}
+}
+
+type RequestResetPasswordPayload struct {
+	Email string `json:"email" validate:"required,email,max=255"`
+}
+
+// requestResetPasswordHandler godoc
+//
+//	@Summary		Request password reset
+//	@Description	Request password reset
+//	@Tags			authentication
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body		RequestResetPasswordPayload	true	"User email"
+//	@Success		200		{object}	map[string]string			"Reset token sent"
+//	@Failure		400		{object}	error
+//	@Failure		500		{object}	error
+//	@Router			/authentication/reset-password [post]
+func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	var payload RequestResetPasswordPayload
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	if err := Validate.Struct(payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	ctx := r.Context()
+
+	// Generate a reset token
+	resetToken := uuid.New().String()
+	hash := sha256.Sum256([]byte(resetToken))
+	hashToken := hex.EncodeToString(hash[:])
+
+	// Set expiration time (e.g., 1 hour from now)
+	resetTokenExpires := time.Now().Add(1 * time.Hour)
+
+	// Update user with reset token and expiration time
+	err := app.store.Users.UpdateResetToken(ctx, payload.Email, hashToken, resetTokenExpires)
+	if err != nil {
+		if err == store.ErrNotFound {
+			app.badRequestResponse(w, r, errors.New("email not found"))
+			return
+		}
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Send reset email
+	resetURL := fmt.Sprintf("%s/reset-password/%s", app.config.frontendURL, resetToken)
+
+	vars := struct {
+		Username string
+		ResetURL string
+	}{
+		Username: payload.Email,
+		ResetURL: resetURL,
+	}
+
+	isProdEnv := app.config.env == "production"
+	status, err := app.mailer.Send(mailer.ResetPasswordTemplate, payload.Email, payload.Email, vars, !isProdEnv)
+	if err != nil {
+		app.logger.Errorw("error sending reset password email", "error", err)
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.logger.Infow("Reset password email sent", "status code", status)
+
+	if err := app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Reset token sent"}); err != nil {
+		app.internalServerError(w, r, err)
+	}
+}
+
+type ResetPasswordPayload struct {
+	Token    string `json:"token" validate:"required"`
+	Password string `json:"password" validate:"required,min=3,max=72"`
+}
+
+// resetPasswordHandler godoc
+//
+//	@Summary		Reset password
+//	@Description	Reset password
+//	@Tags			authentication
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body		ResetPasswordPayload	true	"Reset password details"
+//	@Success		200		{object}	map[string]string		"Password reset successful"
+//	@Failure		400		{object}	error
+//	@Failure		500		{object}	error
+//	@Router			/authentication/reset-password [patch]
+func (app *application) resetPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	var payload ResetPasswordPayload
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	if err := Validate.Struct(payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	ctx := r.Context()
+
+	// Hash the token to compare with the stored hash
+	hash := sha256.Sum256([]byte(payload.Token))
+	hashToken := hex.EncodeToString(hash[:])
+
+	// Get user by reset token
+	user, err := app.store.Users.GetByResetToken(ctx, hashToken)
+	if err != nil {
+		if err == store.ErrNotFound {
+			app.badRequestResponse(w, r, errors.New("invalid or expired token"))
+			return
+		}
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Check if the token has expired
+	if time.Now().After(user.ResetPasswordExpires) {
+		app.badRequestResponse(w, r, errors.New("token has expired"))
+		return
+	}
+
+	// Update the user's password
+	if err := user.Password.Set(payload.Password); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Clear the reset token and expiration time
+	user.ResetPasswordToken = ""
+	user.ResetPasswordExpires = time.Time{}
+
+	// Save the updated user
+	if err := app.store.Users.Update(ctx, user); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	if err := app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Password reset successful"}); err != nil {
 		app.internalServerError(w, r, err)
 	}
 }

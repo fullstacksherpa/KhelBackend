@@ -27,6 +27,9 @@ type Storage struct {
 		SaveRefreshToken(ctx context.Context, userID int64, refreshToken string) error
 		DeleteRefreshToken(ctx context.Context, userID int64) error
 		GetRefreshToken(ctx context.Context, userID int64) (string, error)
+		UpdateResetToken(ctx context.Context, email, resetToken string, resetTokenExpires time.Time) error
+		GetByResetToken(ctx context.Context, resetToken string) (*User, error)
+		Update(ctx context.Context, user *User) error
 	}
 	Venues interface {
 		Create(context.Context, *Venue) error
@@ -62,6 +65,7 @@ type Storage struct {
 		GetPlayerCount(ctx context.Context, gameID int) (int, error)
 		GetGamePlayers(ctx context.Context, gameID int64) ([]*User, error)
 		AssignAssistant(ctx context.Context, gameID, playerID int64) error
+		CancelGame(ctx context.Context, gameID int64) error
 	}
 }
 

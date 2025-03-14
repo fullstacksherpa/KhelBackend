@@ -531,3 +531,16 @@ func nullTime(t time.Time) interface{} {
 	}
 	return t
 }
+
+func (s *GameStore) CancelGame(ctx context.Context, gameID int64) error {
+	query := `UPDATE games SET status = 'cancelled' WHERE id = $1`
+	result, err := s.db.ExecContext(ctx, query, gameID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}

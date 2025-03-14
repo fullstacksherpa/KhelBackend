@@ -408,3 +408,83 @@ func (s *UsersStore) GetRefreshToken(ctx context.Context, userID int64) (string,
 	// Return the refresh token
 	return refreshToken, nil
 }
+
+func (s *UsersStore) UpdateResetToken(ctx context.Context, email, resetToken string, resetTokenExpires time.Time) error {
+	query := `
+        UPDATE users
+        SET reset_password_token = $1, reset_password_expires = $2
+        WHERE email = $3
+    `
+	_, err := s.db.ExecContext(ctx, query, resetToken, resetTokenExpires, email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return err
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *UsersStore) GetByResetToken(ctx context.Context, resetToken string) (*User, error) {
+	query := `
+        SELECT id, first_name, last_name, email, phone, password, profile_picture_url, skill_level, no_of_games, refresh_token, is_active, reset_password_token, reset_password_expires, created_at, updated_at
+        FROM users
+        WHERE reset_password_token = $1
+    `
+	var user User
+	err := s.db.QueryRowContext(ctx, query, resetToken).Scan(
+		&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Phone, &user.Password, &user.ProfilePictureURL, &user.SkillLevel, &user.NoOfGames, &user.RefreshToken, &user.IsActive, &user.ResetPasswordToken, &user.ResetPasswordExpires, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, err
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+// Update updates a user's details in the database.
+func (s *UsersStore) Update(ctx context.Context, user *User) error {
+	query := `
+        UPDATE users
+        SET 
+            first_name = $1,
+            last_name = $2,
+            email = $3,
+            phone = $4,
+            password = $5,
+            profile_picture_url = $6,
+            skill_level = $7,
+            no_of_games = $8,
+            refresh_token = $9,
+            is_active = $10,
+            reset_password_token = $11,
+            reset_password_expires = $12,
+            updated_at = $13
+        WHERE id = $14
+    `
+	args := []interface{}{
+		user.FirstName,
+		user.LastName,
+		user.Email,
+		user.Phone,
+		user.Password.hash, // Use the hashed password
+		user.ProfilePictureURL,
+		user.SkillLevel,
+		user.NoOfGames,
+		user.RefreshToken,
+		user.IsActive,
+		user.ResetPasswordToken,
+		user.ResetPasswordExpires,
+		time.Now(), // Update the `updated_at` field
+		user.ID,
+	}
+
+	_, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

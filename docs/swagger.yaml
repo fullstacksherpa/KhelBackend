@@ -111,6 +111,26 @@ definitions:
     - password
     - phone
     type: object
+  main.RequestResetPasswordPayload:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+    required:
+    - email
+    type: object
+  main.ResetPasswordPayload:
+    properties:
+      password:
+        maxLength: 72
+        minLength: 3
+        type: string
+      token:
+        type: string
+    required:
+    - password
+    - token
+    type: object
   main.TokenResponse:
     properties:
       access_token:
@@ -322,6 +342,65 @@ paths:
           description: Internal server error
           schema: {}
       summary: Refresh authentication tokens
+      tags:
+      - authentication
+  /authentication/reset-password:
+    patch:
+      consumes:
+      - application/json
+      description: Reset password
+      parameters:
+      - description: Reset password details
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.ResetPasswordPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password reset successful
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Reset password
+      tags:
+      - authentication
+    post:
+      consumes:
+      - application/json
+      description: Request password reset
+      parameters:
+      - description: User email
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.RequestResetPasswordPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reset token sent
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Request password reset
       tags:
       - authentication
   /authentication/token:
@@ -696,6 +775,80 @@ paths:
           description: Internal server error
           schema: {}
       summary: Send a request to join a game
+      tags:
+      - Games
+  /games/{id}/cancel:
+    patch:
+      consumes:
+      - application/json
+      description: Allows an admin to cancel a game
+      parameters:
+      - description: Game ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Game cancelled successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request payload
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Game not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Cancel a game
+      tags:
+      - Games
+  /games/{id}/toggle-match-full:
+    patch:
+      consumes:
+      - application/json
+      description: Allows an admin to toggle match full status
+      parameters:
+      - description: Game ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Match full status updated
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request payload
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Game not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Toggle match full status
       tags:
       - Games
   /health:

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"khel/internal/store"
@@ -480,4 +481,75 @@ func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) 
 	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
 		app.internalServerError(w, r, err)
 	}
+}
+
+// ToggleMatchFull godoc
+//
+//	@Summary		Toggle match full status
+//	@Description	Allows an admin to toggle match full status
+//	@Tags			Games
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		int					true	"Game ID"
+//	@Success		200	{object}	map[string]string	"Match full status updated"
+//	@Failure		400	{object}	error				"Invalid request payload"
+//	@Failure		401	{object}	error				"Unauthorized"
+//	@Failure		404	{object}	error				"Game not found"
+//	@Failure		500	{object}	error				"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/games/{id}/toggle-match-full [patch]
+func (app *application) toggleMatchFullHandler(w http.ResponseWriter, r *http.Request) {
+	gameIDStr := chi.URLParam(r, "gameID")
+	gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Invalid game ID")
+		return
+	}
+	// Toggle match full status
+	err = app.store.Games.SetMatchFull(r.Context(), gameID)
+	if err == sql.ErrNoRows {
+		app.notFoundResponse(w, r, err)
+		return
+	} else if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Match full status updated"})
+}
+
+// CancelGame godoc
+//
+//	@Summary		Cancel a game
+//	@Description	Allows an admin to cancel a game
+//	@Tags			Games
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		int					true	"Game ID"
+//	@Success		200	{object}	map[string]string	"Game cancelled successfully"
+//	@Failure		400	{object}	error				"Invalid request payload"
+//	@Failure		401	{object}	error				"Unauthorized"
+//	@Failure		404	{object}	error				"Game not found"
+//	@Failure		500	{object}	error				"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/games/{id}/cancel [patch]
+func (app *application) cancelGameHandler(w http.ResponseWriter, r *http.Request) {
+	gameIDStr := chi.URLParam(r, "gameID")
+	gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Invalid game ID")
+		return
+	}
+
+	// Cancel the game
+	err = app.store.Games.CancelGame(r.Context(), gameID)
+	if err == sql.ErrNoRows {
+		app.notFoundResponse(w, r, err)
+		return
+	} else if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Game cancelled successfully"})
 }

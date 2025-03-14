@@ -153,12 +153,16 @@ func (app *application) mount() http.Handler {
 				r.Post("/request", app.CreateJoinRequest)
 				r.With(app.RequireGameAdminAssistant).Post("/accept", app.AcceptJoinRequest)
 				r.With(app.RequireGameAdminAssistant).Post("/reject", app.RejectJoinRequest)
+				r.With(app.RequireGameAdminAssistant).Patch("/toggle-match-full", app.toggleMatchFullHandler)
+				r.With(app.RequireGameAdminAssistant).Patch("/cancel-game", app.cancelGameHandler)
 
 			})
 		})
 
 		//secure routes
 		r.With(app.AuthTokenMiddleware).Post("/authentication/refresh", app.refreshTokenHandler)
+		r.With(app.AuthTokenMiddleware).Post("/authentication/reset-password", app.requestResetPasswordHandler)
+		r.With(app.AuthTokenMiddleware).Patch("/authentication/reset-password", app.resetPasswordHandler)
 
 		// Public routes
 		r.Route("/authentication", func(r chi.Router) {
