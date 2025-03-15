@@ -1232,6 +1232,119 @@ const docTemplate = `{
                 }
             }
         },
+        "/venues/{venueID}/available-times": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns the available booking time slots for a given venue and date by subtracting booked intervals from the venue’s pricing slots.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "List available time slots for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Date in YYYY-MM-DD format",
+                        "name": "date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of available time slots",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.AvailableTimeSlot"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid input",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not retrieve available times",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/bookings": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Books a venue for the specified time slot if available and calculates the total price based on the applicable pricing slot.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Book a venue time slot",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Booking details payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.BookVenuePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Booking created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/store.Booking"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid input",
+                        "schema": {}
+                    },
+                    "409": {
+                        "description": "Conflict: Time slot is already booked",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not create booking",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venues/{venueID}/photos": {
             "post": {
                 "security": [
@@ -1335,6 +1448,67 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error: Could not delete photo",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/pricing/{pricingID}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows venue owners to update the pricing information (day, time range, and price) for a specific pricing slot.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Update a pricing slot for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pricing Slot ID",
+                        "name": "pricingID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Pricing update payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.UpdatePricingPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pricing updated successfully",
+                        "schema": {
+                            "$ref": "#/definitions/store.PricingSlot"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid input",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not update pricing",
                         "schema": {}
                     }
                 }
@@ -1499,6 +1673,35 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "main.AvailableTimeSlot": {
+            "type": "object",
+            "properties": {
+                "end_time": {
+                    "type": "string"
+                },
+                "price_per_hour": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.BookVenuePayload": {
+            "type": "object",
+            "required": [
+                "end_time",
+                "start_time"
+            ],
+            "properties": {
+                "end_time": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                }
+            }
+        },
         "main.CreateGamePayload": {
             "type": "object",
             "required": [
@@ -1693,6 +1896,25 @@ const docTemplate = `{
                 }
             }
         },
+        "main.UpdatePricingPayload": {
+            "type": "object",
+            "properties": {
+                "day_of_week": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "description": "Format \"15:04:05\"",
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "description": "Format \"15:04:05\"",
+                    "type": "string"
+                }
+            }
+        },
         "main.UserWithToken": {
             "type": "object",
             "properties": {
@@ -1719,6 +1941,38 @@ const docTemplate = `{
                     "type": "integer",
                     "maximum": 5,
                     "minimum": 1
+                }
+            }
+        },
+        "store.Booking": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total_price": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "venue_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -1805,6 +2059,30 @@ const docTemplate = `{
                 "value": {
                     "description": "The actual string value",
                     "type": "string"
+                }
+            }
+        },
+        "store.PricingSlot": {
+            "type": "object",
+            "properties": {
+                "dayOfWeek": {
+                    "type": "string"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "startTime": {
+                    "description": "Note: start_time and end_time are stored as TIME in the DB.\nWe use time.Time to hold the time part.",
+                    "type": "string"
+                },
+                "venueID": {
+                    "type": "integer"
                 }
             }
         },

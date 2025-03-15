@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -215,4 +216,27 @@ func (s *VenuesStore) IsOwner(ctx context.Context, venueID int64, userID int64) 
 
 	// If the user is not the owner
 	return false, nil
+}
+
+// GetVenueByID retrieves a venue by its ID.
+func (s *VenuesStore) GetVenueByID(ctx context.Context, venueID int64) (*Venue, error) {
+	query := `
+		SELECT id, owner_id, name, address, description, amenities, open_time, image_urls, created_at, updated_at 
+		FROM venues 
+		WHERE id = $1`
+	row := s.db.QueryRowContext(ctx, query, venueID)
+	var v Venue
+	var amenitiesJSON []byte
+	var imageURLsJSON []byte
+	if err := row.Scan(&v.ID, &v.OwnerID, &v.Name, &v.Address, &v.Description, &amenitiesJSON, &v.OpenTime, &imageURLsJSON, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		return nil, err
+	}
+	// Unmarshal JSON arrays.
+	if err := json.Unmarshal(amenitiesJSON, &v.Amenities); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(imageURLsJSON, &v.ImageURLs); err != nil {
+		return nil, err
+	}
+	return &v, nil
 }

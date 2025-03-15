@@ -109,14 +109,17 @@ func (app *application) mount() http.Handler {
 			r.Use(app.AuthTokenMiddleware)
 
 			// Public or user-accessible routes
+			// Expects URL: /venues/{venueID}/available-times?date=YYYY-MM-DD
+			r.Get("/{venueID}/available-times", app.availableTimesHandler)
 			r.Post("/", app.createVenueHandler)
 			r.Post("/{venueID}/reviews", app.createVenueReviewHandler)
+			r.Post("/{venueID}/bookings", app.bookVenueHandler)
 			r.Get("/{venueID}/reviews", app.getVenueReviewsHandler)
 
 			// Routes that require venue ownership
 			r.Route("/{venueID}", func(r chi.Router) {
 				r.Use(app.IsOwnerMiddleware)
-
+				r.Put("/pricing/{pricingID}", app.updateVenuePricingHandler)
 				r.Patch("/", app.updateVenueInfo)
 				r.Delete("/photos", app.deleteVenuePhotoHandler)
 				r.Post("/photos", app.uploadVenuePhotoHandler)
