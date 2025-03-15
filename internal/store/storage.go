@@ -38,6 +38,7 @@ type Storage struct {
 		RemovePhotoURL(ctx context.Context, venueID int64, photoURL string) error
 		AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error
 		IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error)
+		GetVenueByID(ctx context.Context, venueID int64) (*Venue, error)
 	}
 	Reviews interface {
 		CreateReview(context.Context, *Review) error
@@ -67,6 +68,12 @@ type Storage struct {
 		AssignAssistant(ctx context.Context, gameID, playerID int64) error
 		CancelGame(ctx context.Context, gameID int64) error
 	}
+	Bookings interface {
+		GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error)
+		GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error)
+		CreateBooking(ctx context.Context, booking *Booking) error
+		UpdatePricing(ctx context.Context, p *PricingSlot) error
+	}
 }
 
 func NewStorage(db *sql.DB) Storage {
@@ -76,6 +83,7 @@ func NewStorage(db *sql.DB) Storage {
 		Reviews:   &ReviewStore{db},
 		Followers: &FollowerStore{db},
 		Games:     &GameStore{db},
+		Bookings:  &BookingStore{db},
 	}
 }
 
