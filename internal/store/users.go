@@ -20,21 +20,21 @@ var (
 )
 
 type User struct {
-	ID                   int64      `json:"id"`
-	FirstName            string     `json:"first_name"`
-	LastName             string     `json:"last_name"`
-	Email                string     `json:"email"`
-	Phone                string     `json:"-"` // Sensitive data
-	Password             password   `json:"-"` // Hide password
-	ProfilePictureURL    NullString `json:"profile_picture_url" swaggertype:"string"`
-	SkillLevel           NullString `json:"skill_level" swaggertype:"string"`
-	NoOfGames            NullInt16  `json:"no_of_games" swaggertype:"integer"`
-	RefreshToken         string     `json:"-"` // Sensitive data
-	IsActive             bool       `json:"is_active"`
-	ResetPasswordToken   string     `json:"-"` // Sensitive data
-	ResetPasswordExpires time.Time  `json:"-"` // Internal use only
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
+	ID                   int64          `json:"id"`
+	FirstName            string         `json:"first_name"`
+	LastName             string         `json:"last_name"`
+	Email                string         `json:"email"`
+	Phone                string         `json:"-"` // Sensitive data
+	Password             password       `json:"-"` // Hide password
+	ProfilePictureURL    sql.NullString `json:"profile_picture_url" swaggertype:"string"`
+	SkillLevel           sql.NullString `json:"skill_level" swaggertype:"string"`
+	NoOfGames            sql.NullInt16  `json:"no_of_games" swaggertype:"integer"`
+	RefreshToken         string         `json:"-"` // Sensitive data
+	IsActive             bool           `json:"is_active"`
+	ResetPasswordToken   string         `json:"-"` // Sensitive data
+	ResetPasswordExpires time.Time      `json:"-"` // Internal use only
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
 // Password struct to store plain text and hash
@@ -433,7 +433,7 @@ func (s *UsersStore) GetByResetToken(ctx context.Context, resetToken string) (*U
     `
 	var user User
 	err := s.db.QueryRowContext(ctx, query, resetToken).Scan(
-		&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Phone, &user.Password, &user.ProfilePictureURL, &user.SkillLevel, &user.NoOfGames, &user.RefreshToken, &user.IsActive, &user.ResetPasswordToken, &user.ResetPasswordExpires, &user.CreatedAt, &user.UpdatedAt,
+		&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Phone, &user.Password.hash, &user.ProfilePictureURL, &user.SkillLevel, &user.NoOfGames, &user.RefreshToken, &user.IsActive, &user.ResetPasswordToken, &user.ResetPasswordExpires, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

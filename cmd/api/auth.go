@@ -330,11 +330,15 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 	hash := sha256.Sum256([]byte(resetToken))
 	hashToken := hex.EncodeToString(hash[:])
 
-	// Set expiration time (e.g., 1 hour from now)
-	resetTokenExpires := time.Now().Add(1 * time.Hour)
+	resetTokenExpires := time.Now().UTC().Add(3 * time.Hour)
+
+	user, err := app.store.Users.GetByEmail(ctx, payload.Email)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+	}
 
 	// Update user with reset token and expiration time
-	err := app.store.Users.UpdateResetToken(ctx, payload.Email, hashToken, resetTokenExpires)
+	err = app.store.Users.UpdateResetToken(ctx, payload.Email, hashToken, resetTokenExpires)
 	if err != nil {
 		if err == store.ErrNotFound {
 			app.badRequestResponse(w, r, errors.New("email not found"))
@@ -351,7 +355,7 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 		Username string
 		ResetURL string
 	}{
-		Username: payload.Email,
+		Username: user.FirstName,
 		ResetURL: resetURL,
 	}
 
@@ -416,9 +420,13 @@ func (app *application) resetPasswordHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Check if the token has expired
-	if time.Now().After(user.ResetPasswordExpires) {
-		app.badRequestResponse(w, r, errors.New("token has expired"))
+	now := time.Now().UTC()
+	if now.After(user.ResetPasswordExpires.UTC()) {
+		err := fmt.Errorf("token expired at %s, current time is %s",
+			user.ResetPasswordExpires.UTC().Format(time.RFC3339),
+			now.Format(time.RFC3339),
+		)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
