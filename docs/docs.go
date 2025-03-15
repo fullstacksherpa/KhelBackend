@@ -1806,10 +1806,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "profile_picture_url": {
-                    "$ref": "#/definitions/store.NullString"
+                    "type": "string"
                 },
                 "skill_level": {
-                    "$ref": "#/definitions/store.NullString"
+                    "type": "string"
                 }
             }
         },
@@ -2045,19 +2045,6 @@ const docTemplate = `{
                 },
                 "visibility": {
                     "description": "Visibility (public or private)",
-                    "type": "string"
-                }
-            }
-        },
-        "store.NullString": {
-            "type": "object",
-            "properties": {
-                "valid": {
-                    "description": "Indicates if the value is non-null",
-                    "type": "boolean"
-                },
-                "value": {
-                    "description": "The actual string value",
                     "type": "string"
                 }
             }

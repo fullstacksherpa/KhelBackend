@@ -215,11 +215,11 @@ func (app *application) AcceptJoinRequest(w http.ResponseWriter, r *http.Request
 
 // Prepare response
 type PlayerResponse struct {
-	ID              int64            `json:"id"`
-	FirstName       string           `json:"first_name"`
-	ProfileImageURL store.NullString `json:"profile_picture_url"`
-	SkillLevel      store.NullString `json:"skill_level"`
-	Phone           string           `json:"phone"`
+	ID              int64          `json:"id"`
+	FirstName       string         `json:"first_name"`
+	ProfileImageURL sql.NullString `json:"profile_picture_url" swaggertype:"string"`
+	SkillLevel      sql.NullString `json:"skill_level" swaggertype:"string"`
+	Phone           string         `json:"phone"`
 }
 
 // GetGamePlayersHandler godoc
