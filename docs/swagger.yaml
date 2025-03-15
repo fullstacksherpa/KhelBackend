@@ -1,5 +1,24 @@
 basePath: /v1
 definitions:
+  main.AvailableTimeSlot:
+    properties:
+      end_time:
+        type: string
+      price_per_hour:
+        type: integer
+      start_time:
+        type: string
+    type: object
+  main.BookVenuePayload:
+    properties:
+      end_time:
+        type: string
+      start_time:
+        type: string
+    required:
+    - end_time
+    - start_time
+    type: object
   main.CreateGamePayload:
     properties:
       end_time:
@@ -138,6 +157,19 @@ definitions:
       refresh_token:
         type: string
     type: object
+  main.UpdatePricingPayload:
+    properties:
+      day_of_week:
+        type: string
+      end_time:
+        description: Format "15:04:05"
+        type: string
+      price:
+        type: integer
+      start_time:
+        description: Format "15:04:05"
+        type: string
+    type: object
   main.UserWithToken:
     properties:
       token:
@@ -157,6 +189,27 @@ definitions:
     required:
     - comment
     - rating
+    type: object
+  store.Booking:
+    properties:
+      created_at:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: integer
+      start_time:
+        type: string
+      status:
+        type: string
+      total_price:
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+      venue_id:
+        type: integer
     type: object
   store.Game:
     properties:
@@ -220,6 +273,24 @@ definitions:
       value:
         description: The actual string value
         type: string
+    type: object
+  store.PricingSlot:
+    properties:
+      dayOfWeek:
+        type: string
+      endTime:
+        type: string
+      id:
+        type: integer
+      price:
+        type: integer
+      startTime:
+        description: |-
+          Note: start_time and end_time are stored as TIME in the DB.
+          We use time.Time to hold the time part.
+        type: string
+      venueID:
+        type: integer
     type: object
   store.Review:
     properties:
@@ -1133,6 +1204,82 @@ paths:
       summary: Update venue information
       tags:
       - Venue
+  /venues/{venueID}/available-times:
+    get:
+      consumes:
+      - application/json
+      description: Returns the available booking time slots for a given venue and
+        date by subtracting booked intervals from the venue’s pricing slots.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Date in YYYY-MM-DD format
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of available time slots
+          schema:
+            items:
+              $ref: '#/definitions/main.AvailableTimeSlot'
+            type: array
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not retrieve available times'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List available time slots for a venue
+      tags:
+      - Venue
+  /venues/{venueID}/bookings:
+    post:
+      consumes:
+      - application/json
+      description: Books a venue for the specified time slot if available and calculates
+        the total price based on the applicable pricing slot.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Booking details payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.BookVenuePayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Booking created successfully
+          schema:
+            $ref: '#/definitions/store.Booking'
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "409":
+          description: 'Conflict: Time slot is already booked'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not create booking'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Book a venue time slot
+      tags:
+      - Venue
   /venues/{venueID}/photos:
     delete:
       consumes:
@@ -1204,6 +1351,47 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Upload a new photo for a venue
+      tags:
+      - Venue
+  /venues/{venueID}/pricing/{pricingID}:
+    put:
+      consumes:
+      - application/json
+      description: Allows venue owners to update the pricing information (day, time
+        range, and price) for a specific pricing slot.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Pricing Slot ID
+        in: path
+        name: pricingID
+        required: true
+        type: integer
+      - description: Pricing update payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.UpdatePricingPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pricing updated successfully
+          schema:
+            $ref: '#/definitions/store.PricingSlot'
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not update pricing'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update a pricing slot for a venue
       tags:
       - Venue
   /venues/{venueID}/reviews:
