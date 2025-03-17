@@ -137,7 +137,7 @@ type Envelope struct {
 
 // createTokenHandler godoc
 //
-//	@Summary		Creates a token
+//	@Summary		Login to get Token
 //	@Description	Creates a token for a user after signin or login.
 //	@Tags			authentication
 //	@Accept			json

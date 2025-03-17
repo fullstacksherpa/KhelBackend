@@ -32,6 +32,7 @@ func boolPtr(b bool) *bool {
 //	@Success		200				{string}	string	"Profile picture uploaded successfully: <URL>"
 //	@Failure		400				{object}	error	"Unable to parse form or retrieve file"
 //	@Failure		500				{object}	error	"Failed to upload image to Cloudinary or save URL in database"
+//	@Security		ApiKeyAuth
 //	@Router			/users/profile-picture [post]
 func (app *application) uploadProfilePictureHandler(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(r)
@@ -64,7 +65,7 @@ func (app *application) uploadProfilePictureHandler(w http.ResponseWriter, r *ht
 	ctx := context.Background()
 
 	uploadParams := uploader.UploadParams{
-		PublicID:  fmt.Sprintf("profile_pictures/%d", userID), // Save with userID as filename
+		PublicID:  fmt.Sprintf("/%d", userID), // Save with userID as filename
 		Overwrite: overwrite,
 		// Replace old profile pic
 		Folder:         "profile_pictures",          // Organized storage
@@ -98,6 +99,7 @@ func (app *application) uploadProfilePictureHandler(w http.ResponseWriter, r *ht
 //	@Success		200				{string}	string	"Profile picture updated successfully: <URL>"
 //	@Failure		400				{object}	error	"Unable to parse form or retrieve file"
 //	@Failure		500				{object}	error	"Failed to upload image to Cloudinary, update database, or delete old image"
+//	@Security		ApiKeyAuth
 //	@Router			/users/profile-picture [put]
 func (app *application) updateProfilePictureHandler(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(r)
@@ -121,9 +123,9 @@ func (app *application) updateProfilePictureHandler(w http.ResponseWriter, r *ht
 	// Upload the new file to Cloudinary with specific PublicID to ensure replacement
 	uploadParams := uploader.UploadParams{
 		Folder:         "profile_pictures",
-		Overwrite:      boolPtr(true),                              // Ensure overwrite of the existing file
-		Transformation: "w_300,h_300,c_fill,q_auto",                // Optional transformations (e.g., resizing)
-		PublicID:       fmt.Sprintf("profile_pictures/%d", userID), // Use userID as the PublicID to replace the old image
+		Overwrite:      boolPtr(true),               // Ensure overwrite of the existing file
+		Transformation: "w_300,h_300,c_fill,q_auto", // Optional transformations (e.g., resizing)
+		PublicID:       fmt.Sprintf("/%d", userID),  // Use userID as the PublicID to replace the old image
 	}
 
 	uploadResult, err := app.cld.Upload.Upload(r.Context(), file, uploadParams)
@@ -153,11 +155,12 @@ func (app *application) updateProfilePictureHandler(w http.ResponseWriter, r *ht
 //	@Tags			users
 //	@Accept			json
 //	@Produce		json
-//	@Param			body	body		object	true	"Field name should be 	first_name,  last_name, skill_level, phone whichever who want to update"
+//	@Param			body	body		object	true	"Request body containing fields to update: first_name, last_name, skill_level, phone"
 //	@Success		204		{string}	string	"User info updated successfully"
 //	@Failure		400		{object}	error	"Bad request, update values can't be nil"
 //	@Failure		404		{object}	error	"User not found"
 //	@Failure		500		{object}	error	"Internal server error"
+//	@Security		ApiKeyAuth
 //	@Router			/users [put]
 func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(r)
@@ -297,7 +300,7 @@ func (app *application) unfollowUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 	ctx := r.Context()
 
-	if err := app.store.Followers.Unfollow(ctx, followerUser.ID, unfollowedID); err != nil {
+	if err := app.store.Followers.Unfollow(ctx, unfollowedID, followerUser.ID); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"khel/internal/store"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -39,7 +40,7 @@ type CreateGamePayload struct {
 //	@Failure		409		{object}	error				"Game overlaps with existing game"
 //	@Failure		500		{object}	error				"Internal server error"
 //	@Security		ApiKeyAuth
-//	@Router			/games [post]
+//	@Router			/games/create [post]
 func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request) {
 	var payload CreateGamePayload
 
@@ -76,11 +77,18 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// 5. Save the game to the database
-	if err := app.store.Games.Create(r.Context(), game); err != nil {
+	gameID, err := app.store.Games.Create(r.Context(), game)
+	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
+	// Put the admin in the game player
+	err = app.store.Games.InsertAdminInPlayer(r.Context(), gameID, user.ID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "Failed to add player")
+		return
+	}
 	// 6. Return the created game as the response
 	if err := app.jsonResponse(w, http.StatusCreated, game); err != nil {
 		app.internalServerError(w, r, err)
@@ -101,6 +109,7 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 //	@Failure		404		{object}	error				"Game not found or inactive"
 //	@Failure		409		{object}	error				"Join request already sent"
 //	@Failure		500		{object}	error				"Internal server error"
+//	@Security		ApiKeyAuth
 //	@Router			/games/{gameID}/request [post]
 func (app *application) CreateJoinRequest(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(r)
@@ -234,6 +243,7 @@ type PlayerResponse struct {
 //	@Failure		400		{object}	error			"Invalid game ID"
 //	@Failure		404		{object}	error			"Game players not found"
 //	@Failure		500		{object}	error			"Internal server error"
+//	@Security		ApiKeyAuth
 //	@Router			/games/{gameID}/players [get]
 func (app *application) getGamePlayersHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse gameID from URL
@@ -386,8 +396,6 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 	app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Assistant role assigned successfully"})
 }
 
-// GET /getGames?sport_type=basketball&lat=40.7128&lon=-74.0060&radius=10&start_after=2024-03-01T00:00:00Z&game_level=intermediate&is_booked=false
-
 // GetGames godoc
 //
 //	@Summary		Retrieve a list of games
@@ -412,8 +420,9 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 //	@Success		200			{object}	map[string]interface{}	"List of games and GeoJSON features"
 //	@Failure		400			{object}	error					"Invalid request parameters"
 //	@Failure		500			{object}	error					"Internal server error"
-//	@Router			/games [get]
+//	@Router			/get-games [get]
 func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("getGamesHandler triggered") // Debug log
 	// Set default filter values.
 	fq := store.GameFilterQuery{
 		Limit:  20,
@@ -506,7 +515,7 @@ func (app *application) toggleMatchFullHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 	// Toggle match full status
-	err = app.store.Games.SetMatchFull(r.Context(), gameID)
+	err = app.store.Games.ToggleMatchFull(r.Context(), gameID)
 	if err == sql.ErrNoRows {
 		app.notFoundResponse(w, r, err)
 		return

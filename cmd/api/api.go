@@ -9,6 +9,7 @@ import (
 	"khel/internal/auth"
 	"khel/internal/mailer"
 	"khel/internal/store"
+	"log"
 
 	"net/http"
 	"os"
@@ -78,16 +79,21 @@ type dbConfig struct {
 
 func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("Incoming request: %s %s\n", r.Method, r.URL.Path)
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	r.Use(middleware.RequestID)
+	r.Use(middleware.StripSlashes)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	r.Use(cors.Handler(cors.Options{
-		// AllowedOrigins:   []string{"https://foo.com"}, // Use this to allow specific origin hosts
-		AllowedOrigins: []string{"https://*", "http://*"},
-		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -99,6 +105,7 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Route("/v1", func(r chi.Router) {
+		r.Get("/get-games", app.getGamesHandler)
 		r.With(app.BasicAuthMiddleware()).Get("/health", app.healthCheckHandler)
 		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
 		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
@@ -125,7 +132,6 @@ func (app *application) mount() http.Handler {
 				r.Post("/photos", app.uploadVenuePhotoHandler)
 			})
 
-			// Route that requires review ownership
 			r.With(app.IsReviewOwnerMiddleware).Delete("/{venueID}/reviews/{reviewID}", app.deleteVenueReviewHandler)
 		})
 		// Route that does NOT require authentication
@@ -145,10 +151,8 @@ func (app *application) mount() http.Handler {
 			})
 		})
 
-		//TODO: appoint as assistance from game players.
 		r.Route("/games", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
-			r.Get("/", app.getGamesHandler)
 			r.Post("/create", app.createGameHandler)
 			r.Route("/{gameID}", func(r chi.Router) {
 				r.With(app.CheckAdmin).Post("/assign-assistant/{playerID}", app.AssignAssistantHandler)

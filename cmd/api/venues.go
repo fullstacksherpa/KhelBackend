@@ -27,7 +27,7 @@ type CreateVenuePayload struct {
 //	@Accept			multipart/form-data
 //	@Produce		json
 //	@Param			venue	formData	string		true	"Venue details (JSON string)"
-//	@Param			images	formData	file		false	"Venue images (up to 7 files)"
+//	@Param			images	formData	[]file		false	"Venue images (up to 7 files)"
 //	@Success		201		{object}	store.Venue	"Venue created successfully"
 //	@Failure		400		{object}	error		"Invalid request payload"
 //	@Failure		401		{object}	error		"Unauthorized"
@@ -37,7 +37,7 @@ type CreateVenuePayload struct {
 func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Request) {
 	var payload CreateVenuePayload
 
-	// 1. Parse form and get files without uploading
+	// 1. Parse form  and get files without uploading
 	files, err := app.parseVenueForm(w, r, &payload)
 	if err != nil {
 		app.badRequestResponse(w, r, err) // Unified error handling

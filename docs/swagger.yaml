@@ -493,7 +493,7 @@ paths:
         "500":
           description: Internal Server Error
           schema: {}
-      summary: Creates a token
+      summary: Login to get Token
       tags:
       - authentication
   /authentication/user:
@@ -524,123 +524,6 @@ paths:
       summary: Registers a user
       tags:
       - authentication
-  /games:
-    get:
-      consumes:
-      - application/json
-      description: Returns a list of games based on filters such as sport type, game
-        level, venue, booking status, location, and time range. The response includes
-        both raw game data and GeoJSON features for mapping.
-      parameters:
-      - description: Sport type to filter games (e.g., basketball)
-        in: query
-        name: sport_type
-        type: string
-      - description: Game level (e.g., intermediate)
-        in: query
-        name: game_level
-        type: string
-      - description: Venue ID to filter games
-        in: query
-        name: venue_id
-        type: integer
-      - description: Filter games based on booking status
-        in: query
-        name: is_booked
-        type: boolean
-      - description: User latitude for location filtering
-        in: query
-        name: lat
-        type: number
-      - description: User longitude for location filtering
-        in: query
-        name: lon
-        type: number
-      - description: Radius in kilometers for location-based filtering (0 for no filter)
-        in: query
-        name: radius
-        type: integer
-      - description: Filter games starting after this time (RFC3339 format)
-        in: query
-        name: start_after
-        type: string
-      - description: Filter games ending before this time (RFC3339 format)
-        in: query
-        name: end_before
-        type: string
-      - description: Minimum price
-        in: query
-        name: min_price
-        type: integer
-      - description: Maximum price
-        in: query
-        name: max_price
-        type: integer
-      - description: Maximum number of results to return
-        in: query
-        name: limit
-        type: integer
-      - description: Pagination offset
-        in: query
-        name: offset
-        type: integer
-      - description: Sort order, either 'asc' or 'desc'
-        in: query
-        name: sort
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of games and GeoJSON features
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Invalid request parameters
-          schema: {}
-        "500":
-          description: Internal server error
-          schema: {}
-      summary: Retrieve a list of games
-      tags:
-      - Games
-    post:
-      consumes:
-      - application/json
-      description: Create a new game with details such as sport type, venue, start
-        time, and end time.
-      parameters:
-      - description: Game details payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/main.CreateGamePayload'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Game created successfully
-          schema:
-            $ref: '#/definitions/store.Game'
-        "400":
-          description: Invalid request payload
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "409":
-          description: Game overlaps with existing game
-          schema: {}
-        "500":
-          description: Internal server error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Create a new game
-      tags:
-      - Games
   /games/{gameID}/accept:
     post:
       consumes:
@@ -757,6 +640,8 @@ paths:
         "500":
           description: Internal server error
           schema: {}
+      security:
+      - ApiKeyAuth: []
       summary: Retrieve players for a game
       tags:
       - Games
@@ -836,6 +721,8 @@ paths:
         "500":
           description: Internal server error
           schema: {}
+      security:
+      - ApiKeyAuth: []
       summary: Send a request to join a game
       tags:
       - Games
@@ -913,6 +800,124 @@ paths:
       summary: Toggle match full status
       tags:
       - Games
+  /games/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new game with details such as sport type, venue, start
+        time, and end time.
+      parameters:
+      - description: Game details payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateGamePayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Game created successfully
+          schema:
+            $ref: '#/definitions/store.Game'
+        "400":
+          description: Invalid request payload
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "409":
+          description: Game overlaps with existing game
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new game
+      tags:
+      - Games
+  /get-games:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of games based on filters such as sport type, game
+        level, venue, booking status, location, and time range. The response includes
+        both raw game data and GeoJSON features for mapping.
+      parameters:
+      - description: Sport type to filter games (e.g., basketball)
+        in: query
+        name: sport_type
+        type: string
+      - description: Game level (e.g., intermediate)
+        in: query
+        name: game_level
+        type: string
+      - description: Venue ID to filter games
+        in: query
+        name: venue_id
+        type: integer
+      - description: Filter games based on booking status
+        in: query
+        name: is_booked
+        type: boolean
+      - description: User latitude for location filtering
+        in: query
+        name: lat
+        type: number
+      - description: User longitude for location filtering
+        in: query
+        name: lon
+        type: number
+      - description: Radius in kilometers for location-based filtering (0 for no filter)
+        in: query
+        name: radius
+        type: integer
+      - description: Filter games starting after this time (RFC3339 format)
+        in: query
+        name: start_after
+        type: string
+      - description: Filter games ending before this time (RFC3339 format)
+        in: query
+        name: end_before
+        type: string
+      - description: Minimum price
+        in: query
+        name: min_price
+        type: integer
+      - description: Maximum price
+        in: query
+        name: max_price
+        type: integer
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination offset
+        in: query
+        name: offset
+        type: integer
+      - description: Sort order, either 'asc' or 'desc'
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of games and GeoJSON features
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request parameters
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      summary: Retrieve a list of games
+      tags:
+      - Games
   /health:
     get:
       description: Healthcheck endpoint
@@ -933,8 +938,8 @@ paths:
       description: Update user information such as first name, last name, skill level,
         and phone number
       parameters:
-      - description: "Field name should be \tfirst_name,  last_name, skill_level,
-          phone whichever who want to update"
+      - description: 'Request body containing fields to update: first_name, last_name,
+          skill_level, phone'
         in: body
         name: body
         required: true
@@ -956,6 +961,8 @@ paths:
         "500":
           description: Internal server error
           schema: {}
+      security:
+      - ApiKeyAuth: []
       summary: Update user information
       tags:
       - users
@@ -1089,6 +1096,8 @@ paths:
         "500":
           description: Failed to upload image to Cloudinary or save URL in database
           schema: {}
+      security:
+      - ApiKeyAuth: []
       summary: Upload profile picture
       tags:
       - users
@@ -1117,6 +1126,8 @@ paths:
           description: Failed to upload image to Cloudinary, update database, or delete
             old image
           schema: {}
+      security:
+      - ApiKeyAuth: []
       summary: Update profile picture
       tags:
       - users
@@ -1132,10 +1143,13 @@ paths:
         name: venue
         required: true
         type: string
-      - description: Venue images (up to 7 files)
+      - collectionFormat: csv
+        description: Venue images (up to 7 files)
         in: formData
+        items:
+          type: file
         name: images
-        type: file
+        type: array
       produces:
       - application/json
       responses:

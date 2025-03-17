@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -54,6 +55,7 @@ func (app *application) BasicAuthMiddleware() func(http.Handler) http.Handler {
 
 func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			app.unauthorizedErrorResponse(w, r, fmt.Errorf("authorization header is missing"))
@@ -105,6 +107,9 @@ func (app *application) RequireGameAdminAssistant(next http.Handler) http.Handle
 			writeJSONError(w, http.StatusBadRequest, "Invalid game ID")
 			return
 		}
+		// TODO:remove later
+		log.Println("Checking gameID ⚽:", gameID)
+		log.Println("Checking userID 👷🏽‍♂️:", user.ID)
 
 		// Check if user is admin or assistant
 		isAdminAssistant, err := app.store.Games.IsAdminAssistant(r.Context(), gameID, user.ID)

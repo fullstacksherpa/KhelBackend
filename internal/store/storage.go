@@ -53,14 +53,15 @@ type Storage struct {
 	}
 	Games interface {
 		GetGames(ctx context.Context, q GameFilterQuery) ([]GameWithVenue, error)
-		Create(context.Context, *Game) error
+		Create(ctx context.Context, game *Game) (int64, error)
 		GetGameByID(ctx context.Context, gameID int64) (*Game, error)
 		CheckRequestExist(ctx context.Context, gameID int64, userID int64) (bool, error)
 		AddToGameRequest(ctx context.Context, gameID int64, UserID int64) error
 		IsAdminAssistant(ctx context.Context, gameID int64, userID int64) (bool, error)
 		IsAdmin(ctx context.Context, gameID, userID int64) (bool, error)
-		SetMatchFull(ctx context.Context, gameID int64) error
+		ToggleMatchFull(ctx context.Context, gameID int64) error
 		InsertNewPlayer(ctx context.Context, gameID int64, userID int64) error
+		InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error
 		UpdateRequestStatus(ctx context.Context, gameID, userID int64, status GameRequestStatus) error
 		GetJoinRequest(ctx context.Context, gameID, userID int64) (*GameRequest, error)
 		GetPlayerCount(ctx context.Context, gameID int) (int, error)

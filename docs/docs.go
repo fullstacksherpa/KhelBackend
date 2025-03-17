@@ -169,7 +169,7 @@ const docTemplate = `{
                 "tags": [
                     "authentication"
                 ],
-                "summary": "Creates a token",
+                "summary": "Login to get Token",
                 "parameters": [
                     {
                         "description": "User credentials",
@@ -245,123 +245,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/games": {
-            "get": {
-                "description": "Returns a list of games based on filters such as sport type, game level, venue, booking status, location, and time range. The response includes both raw game data and GeoJSON features for mapping.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Games"
-                ],
-                "summary": "Retrieve a list of games",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Sport type to filter games (e.g., basketball)",
-                        "name": "sport_type",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Game level (e.g., intermediate)",
-                        "name": "game_level",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Venue ID to filter games",
-                        "name": "venue_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "Filter games based on booking status",
-                        "name": "is_booked",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "User latitude for location filtering",
-                        "name": "lat",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "User longitude for location filtering",
-                        "name": "lon",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Radius in kilometers for location-based filtering (0 for no filter)",
-                        "name": "radius",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter games starting after this time (RFC3339 format)",
-                        "name": "start_after",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter games ending before this time (RFC3339 format)",
-                        "name": "end_before",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Minimum price",
-                        "name": "min_price",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Maximum price",
-                        "name": "max_price",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Maximum number of results to return",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Pagination offset",
-                        "name": "offset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Sort order, either 'asc' or 'desc'",
-                        "name": "sort",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "List of games and GeoJSON features",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request parameters",
-                        "schema": {}
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {}
-                    }
-                }
-            },
+        "/games/create": {
             "post": {
                 "security": [
                     {
@@ -541,6 +425,11 @@ const docTemplate = `{
         },
         "/games/{gameID}/players": {
             "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "description": "Fetches the list of players participating in a specific game. The game ID is provided in the URL path.",
                 "consumes": [
                     "application/json"
@@ -652,6 +541,11 @@ const docTemplate = `{
         },
         "/games/{gameID}/request": {
             "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "description": "Allows a user to send a request to join a specific game. The game ID is provided in the URL path.",
                 "consumes": [
                     "application/json"
@@ -813,6 +707,124 @@ const docTemplate = `{
                 }
             }
         },
+        "/get-games": {
+            "get": {
+                "description": "Returns a list of games based on filters such as sport type, game level, venue, booking status, location, and time range. The response includes both raw game data and GeoJSON features for mapping.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Retrieve a list of games",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Sport type to filter games (e.g., basketball)",
+                        "name": "sport_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Game level (e.g., intermediate)",
+                        "name": "game_level",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Venue ID to filter games",
+                        "name": "venue_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter games based on booking status",
+                        "name": "is_booked",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User latitude for location filtering",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude for location filtering",
+                        "name": "lon",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Radius in kilometers for location-based filtering (0 for no filter)",
+                        "name": "radius",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter games starting after this time (RFC3339 format)",
+                        "name": "start_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter games ending before this time (RFC3339 format)",
+                        "name": "end_before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum price",
+                        "name": "min_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum price",
+                        "name": "max_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of results to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pagination offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort order, either 'asc' or 'desc'",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of games and GeoJSON features",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request parameters",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "Healthcheck endpoint",
@@ -835,6 +847,11 @@ const docTemplate = `{
         },
         "/users": {
             "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "description": "Update user information such as first name, last name, skill level, and phone number",
                 "consumes": [
                     "application/json"
@@ -848,7 +865,7 @@ const docTemplate = `{
                 "summary": "Update user information",
                 "parameters": [
                     {
-                        "description": "Field name should be \tfirst_name,  last_name, skill_level, phone whichever who want to update",
+                        "description": "Request body containing fields to update: first_name, last_name, skill_level, phone",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -953,6 +970,11 @@ const docTemplate = `{
         },
         "/users/profile-picture": {
             "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "description": "Updates a user's profile picture, saves the new URL in the database, and deletes the old one from Cloudinary",
                 "consumes": [
                     "multipart/form-data"
@@ -991,6 +1013,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "description": "Uploads a user's profile picture and saves the URL in the database",
                 "consumes": [
                     "multipart/form-data"
@@ -1146,7 +1173,11 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "file",
+                        "type": "array",
+                        "items": {
+                            "type": "file"
+                        },
+                        "collectionFormat": "csv",
                         "description": "Venue images (up to 7 files)",
                         "name": "images",
                         "in": "formData"

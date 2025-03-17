@@ -2,6 +2,7 @@ package main
 
 import (
 	"expvar"
+	"fmt"
 	"khel/internal/auth"
 	"khel/internal/db"
 	"khel/internal/mailer"
@@ -17,7 +18,30 @@ import (
 
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
+
+// NewLogger creates a new zap logger with color.
+func NewLogger() (*zap.SugaredLogger, error) {
+	// Configure the encoder to be a console encoder with color
+	encoderCfg := zap.NewProductionEncoderConfig()
+	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder // This adds color to log levels (INFO, WARN, ERROR)
+
+	// Create a console encoder with the custom configuration
+	consoleEncoder := zapcore.NewConsoleEncoder(encoderCfg)
+
+	// Create a log level (you can set your own level here)
+	level := zapcore.InfoLevel
+
+	// Use zapcore.NewCore to write logs to standard output (stdout) with color
+	core := zapcore.NewCore(consoleEncoder, zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout)), level)
+
+	// Create and return a new logger instance
+	logger := zap.New(core)
+
+	return logger.Sugar(), nil
+}
 
 const version = "0.0.1"
 
@@ -89,7 +113,12 @@ func main() {
 	}
 
 	// Logger
-	logger := zap.Must(zap.NewProduction()).Sugar()
+	// Create the logger
+	logger, err := NewLogger()
+	if err != nil {
+		fmt.Println("Error creating logger:", err)
+		return
+	}
 	defer logger.Sync()
 
 	// Database
