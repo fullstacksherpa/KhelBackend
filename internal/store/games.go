@@ -89,10 +89,7 @@ type GameStore struct {
 	db *sql.DB
 }
 
-// Create creates a new game in the database
-func (s *GameStore) Create(ctx context.Context, game *Game) error {
-
-	// Proceed with insertion if no overlaps
+func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
 	query := `
 		INSERT INTO games (
 			sport_type, price, format, venue_id, admin_id, max_players, game_level,
@@ -105,7 +102,6 @@ func (s *GameStore) Create(ctx context.Context, game *Game) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	// Execute the query
 	err := s.db.QueryRowContext(
 		ctx, query,
 		game.SportType,
@@ -129,10 +125,10 @@ func (s *GameStore) Create(ctx context.Context, game *Game) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("error creating game: %w", err)
+		return 0, fmt.Errorf("error creating game: %w", err)
 	}
 
-	return nil
+	return game.ID, nil
 }
 
 func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error) {
@@ -236,16 +232,28 @@ func (s *GameStore) IsAdmin(ctx context.Context, gameID, userID int64) (bool, er
 	return isAdmin, nil
 }
 
-func (s *GameStore) SetMatchFull(ctx context.Context, gameID int64) error {
-	query := `
-                UPDATE games 
-                SET match_full = true 
-                WHERE id = $1`
-	_, err := s.db.ExecContext(ctx, query,
-		gameID)
+func (s *GameStore) ToggleMatchFull(ctx context.Context, gameID int64) error {
+	// First, check the current value of match_full
+	var currentValue bool
+	query := `SELECT match_full FROM games WHERE id = $1`
+	err := s.db.QueryRowContext(ctx, query, gameID).Scan(&currentValue)
 	if err != nil {
-		return err
+		return fmt.Errorf("error checking match_full: %w", err)
 	}
+
+	// Toggle the value
+	toggledValue := !currentValue
+
+	// Update the match_full field with the toggled value
+	updateQuery := `
+		UPDATE games 
+		SET match_full = $1 
+		WHERE id = $2`
+	_, err = s.db.ExecContext(ctx, updateQuery, toggledValue, gameID)
+	if err != nil {
+		return fmt.Errorf("error updating match_full: %w", err)
+	}
+
 	return nil
 }
 
@@ -253,6 +261,18 @@ func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID int64, userID in
 	query := `
             INSERT INTO game_players (game_id, user_id, role)
             VALUES ($1, $2, 'player')`
+	_, err := s.db.ExecContext(ctx, query,
+		gameID, userID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *GameStore) InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error {
+	query := `
+            INSERT INTO game_players (game_id, user_id, role)
+            VALUES ($1, $2, 'admin')`
 	_, err := s.db.ExecContext(ctx, query,
 		gameID, userID)
 	if err != nil {
