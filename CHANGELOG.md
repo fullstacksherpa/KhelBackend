@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.3.0...v1.4.0) (2025-03-18)
+
+
+### Features
+
+* added copy of .env to dockerfile ([55b5d46](https://github.com/fullstacksherpa/KhelBackend/commit/55b5d468634e28a803b4f39afc9fe42e028e8f60))
+* added port dynamically ([24d05d7](https://github.com/fullstacksherpa/KhelBackend/commit/24d05d78bb4a909d9d22166e493bf6cb4611dca2))
+
 ## [1.3.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.2.0...v1.3.0) (2025-03-18)
 
 
