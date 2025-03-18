@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.0...v1.4.1) (2025-03-18)
+
+
+### Bug Fixes
+
+* prevent build fail ([8d490f3](https://github.com/fullstacksherpa/KhelBackend/commit/8d490f3ffa0ab321231436dae77e799ffa1d2180))
+
 ## [1.4.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.3.0...v1.4.0) (2025-03-18)
 
 
