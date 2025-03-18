@@ -213,7 +213,7 @@ func main() {
 		rateLimiter:   rateLimiter,
 	}
 
-	//Metrics collected
+	//Metrics collected http://localhost:8080/v1/debug/vars
 	expvar.NewString("version").Set(version)
 	expvar.Publish("database", expvar.Func(func() any {
 		return db.Stats()
