@@ -195,13 +195,13 @@ func (app *application) run(mux http.Handler) error {
 	docs.SwaggerInfo.Host = app.config.apiURL
 	docs.SwaggerInfo.BasePath = "/v1"
 
-	port := os.Getenv("PORT")
+	port := os.Getenv("ADDR")
 	if port == "" {
 		port = "8080" // Fallback to 8080 if PORT is not set
 	}
 
 	srv := &http.Server{
-		Addr:         app.config.addr,
+		Addr:         ":" + port,
 		Handler:      mux,
 		WriteTimeout: time.Second * 30,
 		ReadTimeout:  time.Second * 10,
