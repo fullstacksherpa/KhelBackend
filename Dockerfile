@@ -15,6 +15,8 @@ WORKDIR /app
 
 # Copy CA certificates
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Copy the .env file into the container
+COPY .env .
 COPY --from=builder /app/api .
 
 EXPOSE 8080

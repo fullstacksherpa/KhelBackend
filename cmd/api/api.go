@@ -201,7 +201,7 @@ func (app *application) run(mux http.Handler) error {
 	}
 
 	srv := &http.Server{
-		Addr:         ":" + port,
+		Addr:         app.config.addr,
 		Handler:      mux,
 		WriteTimeout: time.Second * 30,
 		ReadTimeout:  time.Second * 10,
