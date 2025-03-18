@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.2.0...v1.3.0) (2025-03-18)
+
+
+### Features
+
+* added api address ([3c658f3](https://github.com/fullstacksherpa/KhelBackend/commit/3c658f3722f47ba11110e7711c02a28d8bf9c01a))
+
 ## [1.2.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.1.0...v1.2.0) (2025-03-18)
 
 
