@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.0.0...v1.1.0) (2025-03-18)
+
+
+### Features
+
+* update api version automatically ([e7e6adc](https://github.com/fullstacksherpa/KhelBackend/commit/e7e6adcd819ecd540fed03204f141427c90e2ef7))
+
 ## 1.0.0 (2025-03-18)
 
 
