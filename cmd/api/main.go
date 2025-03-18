@@ -114,7 +114,7 @@ func main() {
 	}
 
 	cfg := config{
-		addr:        os.Getenv("ADDR"),
+		addr:        os.Getenv("PORT"),
 		env:         os.Getenv("ENV"),
 		frontendURL: os.Getenv("FRONTEND_URL"),
 		apiURL:      os.Getenv("EXTERNAL_URL"),
