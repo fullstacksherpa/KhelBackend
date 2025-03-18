@@ -265,6 +265,39 @@ definitions:
         description: Visibility (public or private)
         type: string
     type: object
+  store.GameRequestStatus:
+    enum:
+    - pending
+    - accepted
+    - rejected
+    type: string
+    x-enum-varnames:
+    - GameRequestStatusPending
+    - GameRequestStatusAccepted
+    - GameRequestStatusRejected
+  store.GameRequestWithUser:
+    properties:
+      first_name:
+        type: string
+      game_id:
+        type: integer
+      id:
+        type: integer
+      phone:
+        type: string
+      profile_picture_url:
+        type: string
+      request_time:
+        type: string
+      skill_level:
+        type: string
+      status:
+        $ref: '#/definitions/store.GameRequestStatus'
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
   store.PricingSlot:
     properties:
       dayOfWeek:
@@ -610,6 +643,43 @@ paths:
       summary: Assign an assistant role to a player
       tags:
       - Games
+  /games/{gameID}/cancel:
+    patch:
+      consumes:
+      - application/json
+      description: Allows an admin to cancel a game
+      parameters:
+      - description: Game ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Game cancelled successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request payload
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Game not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Cancel a game
+      tags:
+      - Games
   /games/{gameID}/players:
     get:
       consumes:
@@ -726,41 +796,36 @@ paths:
       summary: Send a request to join a game
       tags:
       - Games
-  /games/{id}/cancel:
-    patch:
+  /games/{gameID}/requests:
+    get:
       consumes:
       - application/json
-      description: Allows an admin to cancel a game
+      description: Retrieve all join requests for a specific game by game ID, including
+        user details.
       parameters:
       - description: Game ID
         in: path
-        name: id
+        name: gameID
         required: true
         type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Game cancelled successfully
+          description: List of join requests with user details
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            items:
+              $ref: '#/definitions/store.GameRequestWithUser'
+            type: array
         "400":
-          description: Invalid request payload
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "404":
-          description: Game not found
+          description: Invalid game ID
           schema: {}
         "500":
           description: Internal server error
           schema: {}
       security:
       - ApiKeyAuth: []
-      summary: Cancel a game
+      summary: Get all join requests for a game
       tags:
       - Games
   /games/{id}/toggle-match-full:

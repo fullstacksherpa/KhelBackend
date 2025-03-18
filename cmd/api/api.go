@@ -8,6 +8,7 @@ import (
 	"khel/docs" //this is required to generate swagger docs
 	"khel/internal/auth"
 	"khel/internal/mailer"
+	"khel/internal/ratelimiter"
 	"khel/internal/store"
 	"log"
 
@@ -32,6 +33,7 @@ type application struct {
 	cld           *cloudinary.Cloudinary
 	mailer        mailer.Client
 	authenticator auth.Authenticator
+	rateLimiter   ratelimiter.Limiter
 }
 
 type config struct {
@@ -42,6 +44,7 @@ type config struct {
 	mail        mailConfig
 	frontendURL string
 	auth        authConfig
+	rateLimiter ratelimiter.Config
 }
 
 type authConfig struct {
@@ -79,6 +82,8 @@ type dbConfig struct {
 
 func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
+
+	//TODO:remove later
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Incoming request: %s %s\n", r.Method, r.URL.Path)
@@ -91,6 +96,7 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(app.RateLimiterMiddleware)
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
@@ -106,7 +112,7 @@ func (app *application) mount() http.Handler {
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/get-games", app.getGamesHandler)
-		r.With(app.BasicAuthMiddleware()).Get("/health", app.healthCheckHandler)
+		r.Get("/health", app.healthCheckHandler)
 		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
 		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
 
@@ -159,6 +165,7 @@ func (app *application) mount() http.Handler {
 				r.Get("/players", app.getGamePlayersHandler)
 				r.Post("/request", app.CreateJoinRequest)
 				r.With(app.RequireGameAdminAssistant).Post("/accept", app.AcceptJoinRequest)
+				r.With(app.RequireGameAdminAssistant).Get("/requests", app.getAllGameJoinRequestsHandler)
 				r.With(app.RequireGameAdminAssistant).Post("/reject", app.RejectJoinRequest)
 				r.With(app.RequireGameAdminAssistant).Patch("/toggle-match-full", app.toggleMatchFullHandler)
 				r.With(app.RequireGameAdminAssistant).Patch("/cancel-game", app.cancelGameHandler)

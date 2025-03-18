@@ -64,6 +64,7 @@ type Storage struct {
 		InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error
 		UpdateRequestStatus(ctx context.Context, gameID, userID int64, status GameRequestStatus) error
 		GetJoinRequest(ctx context.Context, gameID, userID int64) (*GameRequest, error)
+		GetAllJoinRequests(ctx context.Context, gameID int64) ([]*GameRequestWithUser, error)
 		GetPlayerCount(ctx context.Context, gameID int) (int, error)
 		GetGamePlayers(ctx context.Context, gameID int64) ([]*User, error)
 		AssignAssistant(ctx context.Context, gameID, playerID int64) error

@@ -48,3 +48,7 @@ func main() {
 		fmt.Printf("URL: %s\nPublic ID: %s\n\n", url, publicID)
 	}
 }
+
+// sherpa.personall Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJLaGVsIiwiZXhwIjoxNzQyNTEzODYxLCJpYXQiOjE3NDIyNTQ2NjEsImlzcyI6IktoZWwiLCJuYmYiOjE3NDIyNTQ2NjEsInN1YiI6MTF9.atkPJnh7qewGobFv2dKVHDJT960aVqlH0gl9Ng4_cnE
+
+// npx autocannon -r 8000 -d 2 -c 10 --renderStatusCodes http://localhost:8080/v1/health

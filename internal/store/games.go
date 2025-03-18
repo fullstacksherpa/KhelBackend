@@ -257,15 +257,38 @@ func (s *GameStore) ToggleMatchFull(ctx context.Context, gameID int64) error {
 	return nil
 }
 
-func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID int64, userID int64) error {
-	query := `
-            INSERT INTO game_players (game_id, user_id, role)
-            VALUES ($1, $2, 'player')`
-	_, err := s.db.ExecContext(ctx, query,
-		gameID, userID)
+func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) error {
+	// Step 1: Get the max players for the game
+	var maxPlayers int
+	query := `SELECT max_players FROM games WHERE id = $1`
+	err := s.db.QueryRowContext(ctx, query, gameID).Scan(&maxPlayers)
 	if err != nil {
-		return err
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("game not found")
+		}
+		return fmt.Errorf("error fetching game details: %w", err)
 	}
+
+	// Step 2: Count current players in the game
+	var currentPlayers int
+	query = `SELECT COUNT(*) FROM game_players WHERE game_id = $1`
+	err = s.db.QueryRowContext(ctx, query, gameID).Scan(&currentPlayers)
+	if err != nil {
+		return fmt.Errorf("error counting current players: %w", err)
+	}
+
+	// Step 3: Check if max players limit is reached
+	if currentPlayers >= maxPlayers {
+		return fmt.Errorf("cannot join: game is full")
+	}
+
+	// Step 4: Insert player if limit is not reached
+	insertQuery := `INSERT INTO game_players (game_id, user_id, role, joined_at) VALUES ($1, $2, 'player', NOW())`
+	_, err = s.db.ExecContext(ctx, insertQuery, gameID, userID)
+	if err != nil {
+		return fmt.Errorf("error inserting player into game: %w", err)
+	}
+
 	return nil
 }
 
@@ -563,4 +586,61 @@ func (s *GameStore) CancelGame(ctx context.Context, gameID int64) error {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+type GameRequestWithUser struct {
+	ID                int64             `json:"id"`
+	GameID            int64             `json:"game_id"`
+	UserID            int64             `json:"user_id"`
+	Status            GameRequestStatus `json:"status"`
+	RequestTime       time.Time         `json:"request_time"`
+	UpdatedAt         time.Time         `json:"updated_at"`
+	FirstName         string            `json:"first_name"`
+	Phone             string            `json:"phone"`
+	ProfilePictureURL sql.NullString    `json:"profile_picture_url" swaggertype:"string"`
+	SkillLevel        sql.NullString    `json:"skill_level" swaggertype:"string"`
+}
+
+func (s *GameStore) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*GameRequestWithUser, error) {
+	query := `
+        SELECT 
+			gr.id, gr.game_id, gr.user_id, gr.status, gr.request_time, gr.updated_at,
+			u.first_name, u.phone, u.profile_picture_url, u.skill_level
+		FROM game_join_requests gr
+		JOIN users u ON gr.user_id = u.id
+		WHERE gr.game_id = $1
+`
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+	rows, err := s.db.QueryContext(ctx, query, gameID)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving join requests: %w", err)
+	}
+	defer rows.Close()
+	var requests []*GameRequestWithUser
+	for rows.Next() {
+		var req GameRequestWithUser
+		if err := rows.Scan(
+			&req.ID,
+			&req.GameID,
+			&req.UserID,
+			&req.Status,
+			&req.RequestTime,
+			&req.UpdatedAt,
+			&req.FirstName,
+			&req.Phone,
+			&req.ProfilePictureURL,
+			&req.SkillLevel,
+		); err != nil {
+			return nil, fmt.Errorf("error scanning join request: %w", err)
+		}
+		requests = append(requests, &req)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over join requests: %w", err)
+	}
+
+	return requests, nil
 }
