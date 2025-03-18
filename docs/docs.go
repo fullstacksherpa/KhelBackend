@@ -423,6 +423,62 @@ const docTemplate = `{
                 }
             }
         },
+        "/games/{gameID}/cancel": {
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows an admin to cancel a game",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Cancel a game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Game cancelled successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Game not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/games/{gameID}/players": {
             "get": {
                 "security": [
@@ -595,14 +651,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/games/{id}/cancel": {
-            "patch": {
+        "/games/{gameID}/requests": {
+            "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Allows an admin to cancel a game",
+                "description": "Retrieve all join requests for a specific game by game ID, including user details.",
                 "consumes": [
                     "application/json"
                 ],
@@ -612,36 +668,28 @@ const docTemplate = `{
                 "tags": [
                     "Games"
                 ],
-                "summary": "Cancel a game",
+                "summary": "Get all join requests for a game",
                 "parameters": [
                     {
                         "type": "integer",
                         "description": "Game ID",
-                        "name": "id",
+                        "name": "gameID",
                         "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Game cancelled successfully",
+                        "description": "List of join requests with user details",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.GameRequestWithUser"
                             }
                         }
                     },
                     "400": {
-                        "description": "Invalid request payload",
-                        "schema": {}
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {}
-                    },
-                    "404": {
-                        "description": "Game not found",
+                        "description": "Invalid game ID",
                         "schema": {}
                     },
                     "500": {
@@ -2077,6 +2125,54 @@ const docTemplate = `{
                 "visibility": {
                     "description": "Visibility (public or private)",
                     "type": "string"
+                }
+            }
+        },
+        "store.GameRequestStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "accepted",
+                "rejected"
+            ],
+            "x-enum-varnames": [
+                "GameRequestStatusPending",
+                "GameRequestStatusAccepted",
+                "GameRequestStatusRejected"
+            ]
+        },
+        "store.GameRequestWithUser": {
+            "type": "object",
+            "properties": {
+                "first_name": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "profile_picture_url": {
+                    "type": "string"
+                },
+                "request_time": {
+                    "type": "string"
+                },
+                "skill_level": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/store.GameRequestStatus"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },

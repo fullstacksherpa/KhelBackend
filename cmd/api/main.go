@@ -6,6 +6,7 @@ import (
 	"khel/internal/auth"
 	"khel/internal/db"
 	"khel/internal/mailer"
+	"khel/internal/ratelimiter"
 	"khel/internal/store"
 	"log"
 	"os"
@@ -20,6 +21,39 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+// LoadRateLimiterConfig retrieves rate limiter settings from environment variables
+func LoadRateLimiterConfig() ratelimiter.Config {
+	// Default values
+	defaultRequests := 200
+	defaultEnabled := false
+
+	// Retrieve request count with error handling
+	requestsPerTimeFrame := defaultRequests
+	if val, exists := os.LookupEnv("RATELIMITER_REQUESTS_COUNT"); exists {
+		if parsedVal, err := strconv.Atoi(val); err == nil {
+			requestsPerTimeFrame = parsedVal
+		} else {
+			fmt.Println("Invalid RATELIMITER_REQUESTS_COUNT, defaulting to", defaultRequests)
+		}
+	}
+
+	// Retrieve enabled flag with error handling
+	enabled := defaultEnabled
+	if val, exists := os.LookupEnv("RATE_LIMITER_ENABLED"); exists {
+		if parsedVal, err := strconv.ParseBool(val); err == nil {
+			enabled = parsedVal
+		} else {
+			fmt.Println("Invalid RATE_LIMITER_ENABLED, defaulting to", defaultEnabled)
+		}
+	}
+
+	return ratelimiter.Config{
+		RequestsPerTimeFrame: requestsPerTimeFrame,
+		TimeFrame:            5 * time.Second,
+		Enabled:              enabled,
+	}
+}
 
 // NewLogger creates a new zap logger with color.
 func NewLogger() (*zap.SugaredLogger, error) {
@@ -110,6 +144,7 @@ func main() {
 				iss:             "Khel",
 			},
 		},
+		rateLimiter: LoadRateLimiterConfig(),
 	}
 
 	// Logger
@@ -154,6 +189,12 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	// Rate limiter
+	rateLimiter := ratelimiter.NewFixedWindowLimiter(
+		cfg.rateLimiter.RequestsPerTimeFrame,
+		cfg.rateLimiter.TimeFrame,
+	)
+
 	// Authenticator
 	jwtAuthenticator := auth.NewJWTAuthenticator(
 		cfg.auth.token.refreshSecret,
@@ -169,6 +210,7 @@ func main() {
 		cld:           cld,
 		mailer:        mailtrap,
 		authenticator: jwtAuthenticator,
+		rateLimiter:   rateLimiter,
 	}
 
 	//Metrics collected

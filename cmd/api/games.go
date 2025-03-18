@@ -541,7 +541,7 @@ func (app *application) toggleMatchFullHandler(w http.ResponseWriter, r *http.Re
 //	@Failure		404	{object}	error				"Game not found"
 //	@Failure		500	{object}	error				"Internal server error"
 //	@Security		ApiKeyAuth
-//	@Router			/games/{id}/cancel [patch]
+//	@Router			/games/{gameID}/cancel [patch]
 func (app *application) cancelGameHandler(w http.ResponseWriter, r *http.Request) {
 	gameIDStr := chi.URLParam(r, "gameID")
 	gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
@@ -561,4 +561,40 @@ func (app *application) cancelGameHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Game cancelled successfully"})
+}
+
+// GetAllGameJoinRequests godoc
+//
+//	@Summary		Get all join requests for a game
+//	@Description	Retrieve all join requests for a specific game by game ID, including user details.
+//	@Tags			Games
+//	@Accept			json
+//	@Produce		json
+//	@Param			gameID	path		int							true	"Game ID"
+//	@Success		200		{array}		store.GameRequestWithUser	"List of join requests with user details"
+//	@Failure		400		{object}	error						"Invalid game ID"
+//	@Failure		500		{object}	error						"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/games/{gameID}/requests [get]
+func (app *application) getAllGameJoinRequestsHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract game ID from URL params
+	gameIDStr := chi.URLParam(r, "gameID")
+	gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Invalid game ID")
+		return
+	}
+
+	// Fetch join requests from the store
+	requests, err := app.store.Games.GetAllJoinRequests(r.Context(), gameID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Respond with the join requests
+	if err := app.jsonResponse(w, http.StatusOK, requests); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
 }
