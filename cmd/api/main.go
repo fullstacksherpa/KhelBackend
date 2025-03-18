@@ -77,7 +77,7 @@ func NewLogger() (*zap.SugaredLogger, error) {
 	return logger.Sugar(), nil
 }
 
-var version = "1.1.0"
+var version = "1.2.0"
 
 //	@title			Khel API
 //	@description	API for Khel, a complete sport application.

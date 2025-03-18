@@ -204,7 +204,7 @@ func (app *application) run(mux http.Handler) error {
 	}
 
 	// Implementing graceful shutdown
-	shutdown := make(chan error)
+	shutdown := make(chan error, 1)
 
 	go func() {
 		quit := make(chan os.Signal, 1)
@@ -217,7 +217,11 @@ func (app *application) run(mux http.Handler) error {
 
 		app.logger.Infow("signal caught", "signal", s.String())
 
-		shutdown <- srv.Shutdown(ctx)
+		if err := srv.Shutdown(ctx); err != nil {
+			shutdown <- err
+		} else {
+			close(shutdown) // Close channel when done
+		}
 	}()
 
 	app.logger.Infow("server has started", "addr", app.config.addr, "env", app.config.env)
@@ -227,8 +231,9 @@ func (app *application) run(mux http.Handler) error {
 		return err
 	}
 
-	err = <-shutdown
-	if err != nil {
+	err = srv.ListenAndServe()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		app.logger.Errorw("server error", "error", err)
 		return err
 	}
 
