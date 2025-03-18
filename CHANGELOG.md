@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.1.0...v1.2.0) (2025-03-18)
+
+
+### Features
+
+* autoUpdate version number ([6a59ef6](https://github.com/fullstacksherpa/KhelBackend/commit/6a59ef6ccca22f1c6c5635d2487e488c3d5e1881))
+* dockerfile ([fa924fd](https://github.com/fullstacksherpa/KhelBackend/commit/fa924fdaef11543143094198caad11605e405dff))
+
 ## [1.1.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.0.0...v1.1.0) (2025-03-18)
 
 
