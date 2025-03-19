@@ -195,7 +195,7 @@ func (app *application) run(mux http.Handler) error {
 	docs.SwaggerInfo.Host = app.config.apiURL
 	docs.SwaggerInfo.BasePath = "/v1"
 
-	port := os.Getenv("ADDR")
+	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080" // Fallback to 8080 if PORT is not set
 	}
@@ -224,24 +224,21 @@ func (app *application) run(mux http.Handler) error {
 
 		if err := srv.Shutdown(ctx); err != nil {
 			shutdown <- err
-		} else {
-			close(shutdown) // Close channel when done
 		}
+
+		close(shutdown)
+
 	}()
 
 	app.logger.Infow("server has started", "addr", app.config.addr, "env", app.config.env)
 
 	err := srv.ListenAndServe()
-	if !errors.Is(err, http.ErrServerClosed) {
-		return err
-	}
-
-	err = srv.ListenAndServe()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		app.logger.Errorw("server error", "error", err)
 		return err
 	}
-
+	// Wait for shutdown
+	<-shutdown
 	app.logger.Infow("server has stopped", "addr", app.config.addr, "env", app.config.env)
 
 	return nil
