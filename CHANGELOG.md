@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.3](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.2...v1.4.3) (2025-03-19)
+
+
+### Bug Fixes
+
+* delete dockerfile ([25690ea](https://github.com/fullstacksherpa/KhelBackend/commit/25690ea4d01055b534c4f659bb561c6bc1e6c075))
+
 ## [1.4.2](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.1...v1.4.2) (2025-03-19)
 
 
