@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.1...v1.4.2) (2025-03-19)
+
+
+### Bug Fixes
+
+* google cloud run port issue ([521aa7a](https://github.com/fullstacksherpa/KhelBackend/commit/521aa7aa629c6fb0d584399fe320ec08cf9be180))
+
 ## [1.4.1](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.0...v1.4.1) (2025-03-18)
 
 
