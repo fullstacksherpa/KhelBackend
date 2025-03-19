@@ -1,23 +1,32 @@
-
 # The build stage
-FROM golang:1.24 AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
 
-# Install CA certificates
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install CA certificates and other dependencies
+RUN apk add --no-cache ca-certificates
 
+# Copy Go module files separately to leverage Docker's build cache
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy application source code
 COPY . .
+
+# Build the Go application for Linux with CGO disabled (static binary)
 RUN CGO_ENABLED=0 GOOS=linux go build -o api ./cmd/api
 
 # The run stage
-FROM scratch
+FROM alpine:latest
 WORKDIR /app
 
-# Copy CA certificates
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-# Copy the .env file into the container
-COPY .env .
+# Install CA certificates (Alpine base image doesn't have them by default)
+RUN apk add --no-cache ca-certificates
+
+# Copy the compiled binary from the builder stage
 COPY --from=builder /app/api .
 
+# Expose the port that the application will use
 EXPOSE 8080
+
+# Start the application
 CMD ["./api"]
