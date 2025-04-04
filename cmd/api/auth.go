@@ -15,13 +15,14 @@ import (
 )
 
 type RegisterUserPayload struct {
-	FirstName string `json:"first_name" validate:"required,max=100"`
-	LastName  string `json:"last_name" validate:"required,max=100"`
+	FirstName string `json:"first_name" validate:"required,max=50"`
+	LastName  string `json:"last_name" validate:"required,max=50"`
 	Email     string `json:"email" validate:"required,email,max=255"`
 	Phone     string `json:"phone" validate:"required,len=10,numeric"`
 	Password  string `json:"password" validate:"required,min=3,max=72"`
 }
 
+// TODO: remove Token from response
 type UserWithToken struct {
 	*store.User `json:"user"`
 	Token       string `json:"token"`
@@ -191,7 +192,10 @@ func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Reques
 	response := map[string]string{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
+		"profile_image": user.ProfilePictureURL.String,
+		"first_name":    user.FirstName,
 	}
+	fmt.Println(response)
 
 	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
 		app.internalServerError(w, r, err)
@@ -262,7 +266,14 @@ func (app *application) refreshTokenHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	userID := claims["sub"].(int64)
+	// Correctly handle sub claim
+	subClaim, ok := claims["sub"].(float64)
+	if !ok {
+		app.unauthorizedErrorResponse(w, r, fmt.Errorf("invalid sub claim"))
+		return
+	}
+
+	userID := int64(subClaim) // Convert float64 to int64
 
 	// Ensure refresh token exists in DB
 	savedToken, err := app.store.Users.GetRefreshToken(r.Context(), userID)
@@ -335,6 +346,7 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 	user, err := app.store.Users.GetByEmail(ctx, payload.Email)
 	if err != nil {
 		app.notFoundResponse(w, r, err)
+		return
 	}
 
 	// Update user with reset token and expiration time

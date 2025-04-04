@@ -112,10 +112,10 @@ definitions:
         maxLength: 255
         type: string
       first_name:
-        maxLength: 100
+        maxLength: 50
         type: string
       last_name:
-        maxLength: 100
+        maxLength: 50
         type: string
       password:
         maxLength: 72
