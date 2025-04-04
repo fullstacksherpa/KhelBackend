@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.4](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.3...v1.4.4) (2025-04-04)
+
+
+### Bug Fixes
+
+* update jwt claim type error ([474c84e](https://github.com/fullstacksherpa/KhelBackend/commit/474c84e1de9370c6d88fe69e00e24f73a35def0e))
+
 ## [1.4.3](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.2...v1.4.3) (2025-03-19)
 
 
