@@ -57,8 +57,8 @@ func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			app.unauthorizedErrorResponse(w, r, fmt.Errorf("authorization header is missing"))
+		if strings.TrimSpace(authHeader) == "" {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("authorization header is missing or blank"))
 			return
 		}
 

@@ -174,7 +174,8 @@ func (app *application) mount() http.Handler {
 		})
 
 		//secure routes
-		r.With(app.AuthTokenMiddleware).Post("/authentication/refresh", app.refreshTokenHandler)
+		//TODO: Add with(authtokenmiddleware)
+		r.Post("/authentication/refresh", app.refreshTokenHandler)
 		r.Post("/authentication/reset-password", app.requestResetPasswordHandler)
 		r.Patch("/authentication/reset-password", app.resetPasswordHandler)
 

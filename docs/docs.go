@@ -1919,11 +1919,11 @@ const docTemplate = `{
                 },
                 "first_name": {
                     "type": "string",
-                    "maxLength": 100
+                    "maxLength": 50
                 },
                 "last_name": {
                     "type": "string",
-                    "maxLength": 100
+                    "maxLength": 50
                 },
                 "password": {
                     "type": "string",
