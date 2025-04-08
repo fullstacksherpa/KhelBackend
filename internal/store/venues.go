@@ -19,8 +19,10 @@ type Venue struct {
 	Address     string    `json:"address"`
 	Location    []float64 `json:"location"` // PostGIS point (longitude, latitude)
 	Description *string   `json:"description,omitempty"`
+	PhoneNumber string    `json:"phone_number"`
 	Amenities   []string  `json:"amenities,omitempty"` // Array of strings
 	OpenTime    *string   `json:"open_time,omitempty"`
+	Sport       string    `json:"sport"`
 	ImageURLs   []string  `json:"image_urls,omitempty"` // Array of image URLs
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -66,10 +68,10 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 
 	// Proceed with insertion if venue does not exist
 	query := `
-		INSERT INTO venues (owner_id, name, address, location, description, amenities, open_time, image_urls)
-		VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6, $7, $8, $9)
-		RETURNING id, created_at, updated_at
-	`
+	INSERT INTO venues (owner_id, name, address, location, description, amenities, open_time, image_urls, sport, phone_number)
+	VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6, $7, $8, $9, $10, $11)
+	RETURNING id, created_at, updated_at
+`
 
 	// Create a pgtype.Point for PostGIS geography
 	point := pgtype.Point{
@@ -91,6 +93,8 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 		pq.Array(venue.Amenities),
 		venue.OpenTime,
 		pq.Array(venue.ImageURLs),
+		venue.Sport,
+		venue.PhoneNumber,
 	).Scan(
 		&venue.ID,
 		&venue.CreatedAt,
@@ -175,6 +179,14 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 			query += fmt.Sprintf("open_time = $%d, ", argCounter)
 			args = append(args, value)
 			argCounter++
+		case "sport":
+			query += fmt.Sprintf("sport = $%d, ", argCounter)
+			args = append(args, value)
+			argCounter++
+		case "phone_number":
+			query += fmt.Sprintf("phone_number = $%d, ", argCounter)
+			args = append(args, value)
+			argCounter++
 		default:
 			return fmt.Errorf("unsupported field: %s", key)
 		}
@@ -218,17 +230,28 @@ func (s *VenuesStore) IsOwner(ctx context.Context, venueID int64, userID int64) 
 	return false, nil
 }
 
+// IsOwnerOfAnyVenue checks if the user owns any venue
+func (s *VenuesStore) IsOwnerOfAnyVenue(ctx context.Context, userID int64) (bool, error) {
+	query := `SELECT 1 FROM venues WHERE owner_id = $1 LIMIT 1`
+	var dummy int
+	err := s.db.QueryRowContext(ctx, query, userID).Scan(&dummy)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // GetVenueByID retrieves a venue by its ID.
 func (s *VenuesStore) GetVenueByID(ctx context.Context, venueID int64) (*Venue, error) {
 	query := `
-		SELECT id, owner_id, name, address, description, amenities, open_time, image_urls, created_at, updated_at 
-		FROM venues 
-		WHERE id = $1`
+	SELECT id, owner_id, name, address, description, amenities, open_time, image_urls, sport, phone_number, created_at, updated_at 
+	FROM venues 
+	WHERE id = $1`
 	row := s.db.QueryRowContext(ctx, query, venueID)
 	var v Venue
 	var amenitiesJSON []byte
 	var imageURLsJSON []byte
-	if err := row.Scan(&v.ID, &v.OwnerID, &v.Name, &v.Address, &v.Description, &amenitiesJSON, &v.OpenTime, &imageURLsJSON, &v.CreatedAt, &v.UpdatedAt); err != nil {
+	if err := row.Scan(&v.ID, &v.OwnerID, &v.Name, &v.Address, &v.Description, &amenitiesJSON, &v.OpenTime, &imageURLsJSON, &v.Sport, &v.PhoneNumber, &v.CreatedAt, &v.UpdatedAt); err != nil {
 		return nil, err
 	}
 	// Unmarshal JSON arrays.

@@ -1,0 +1,2 @@
+ALTER TABLE venues
+ADD COLUMN sport TEXT NOT NULL DEFAULT 'futsal';

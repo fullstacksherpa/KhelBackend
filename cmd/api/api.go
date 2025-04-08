@@ -120,14 +120,18 @@ func (app *application) mount() http.Handler {
 
 		r.Route("/venues", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
+			r.Get("/favorites", app.listFavoritesHandler)
 
 			// Public or user-accessible routes
 			// Expects URL: /venues/{venueID}/available-times?date=YYYY-MM-DD
 			r.Get("/{venueID}/available-times", app.availableTimesHandler)
+			r.Get("/is-venue-owner", app.isVenueOwnerHandler)
 			r.Post("/", app.createVenueHandler)
 			r.Post("/{venueID}/reviews", app.createVenueReviewHandler)
 			r.Post("/{venueID}/bookings", app.bookVenueHandler)
 			r.Get("/{venueID}/reviews", app.getVenueReviewsHandler)
+			r.Post("/{venueID}/favorite", app.addFavoriteHandler)      // Add favorite
+			r.Delete("/{venueID}/favorite", app.removeFavoriteHandler) // Remove favorite
 
 			// Routes that require venue ownership
 			r.Route("/{venueID}", func(r chi.Router) {
@@ -159,8 +163,11 @@ func (app *application) mount() http.Handler {
 
 		r.Route("/games", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
+			r.Get("/shortlist", app.listShortlistedGamesHandler)
 			r.Post("/create", app.createGameHandler)
 			r.Route("/{gameID}", func(r chi.Router) {
+				r.Post("/shortlist", app.addShortlistedGameHandler)      // Add game to shortlist
+				r.Delete("/shortlist", app.removeShortlistedGameHandler) // Remove game from shortlist
 				r.With(app.CheckAdmin).Post("/assign-assistant/{playerID}", app.AssignAssistantHandler)
 				r.Get("/players", app.getGamePlayersHandler)
 				r.Post("/request", app.CreateJoinRequest)

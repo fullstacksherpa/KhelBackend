@@ -39,6 +39,7 @@ type Storage struct {
 		AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error
 		IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error)
 		GetVenueByID(ctx context.Context, venueID int64) (*Venue, error)
+		IsOwnerOfAnyVenue(ctx context.Context, userID int64) (bool, error)
 	}
 	Reviews interface {
 		CreateReview(context.Context, *Review) error
@@ -76,16 +77,28 @@ type Storage struct {
 		CreateBooking(ctx context.Context, booking *Booking) error
 		UpdatePricing(ctx context.Context, p *PricingSlot) error
 	}
+	FavoriteVenues interface {
+		AddFavorite(ctx context.Context, userID, venueID int64) error
+		RemoveFavorite(ctx context.Context, userID, venueID int64) error
+		GetFavoritesByUser(ctx context.Context, userID int64) ([]Venue, error)
+	}
+	ShortlistedGames interface {
+		AddShortlist(ctx context.Context, userID, gameID int64) error
+		RemoveShortlist(ctx context.Context, userID, gameID int64) error
+		GetShortlistedGamesByUser(ctx context.Context, userID int64) ([]Game, error)
+	}
 }
 
 func NewStorage(db *sql.DB) Storage {
 	return Storage{
-		Users:     &UsersStore{db},
-		Venues:    &VenuesStore{db},
-		Reviews:   &ReviewStore{db},
-		Followers: &FollowerStore{db},
-		Games:     &GameStore{db},
-		Bookings:  &BookingStore{db},
+		Users:            &UsersStore{db},
+		Venues:           &VenuesStore{db},
+		Reviews:          &ReviewStore{db},
+		Followers:        &FollowerStore{db},
+		Games:            &GameStore{db},
+		Bookings:         &BookingStore{db},
+		FavoriteVenues:   &FavoriteVenuesStore{db},
+		ShortlistedGames: &ShortlistGamesStore{db},
 	}
 }
 
