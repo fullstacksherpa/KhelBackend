@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.4...v1.5.0) (2025-04-08)
+
+
+### Features
+
+* added favorite venue and shortlisted_games endpoint ([18d5b32](https://github.com/fullstacksherpa/KhelBackend/commit/18d5b32fb98d621eba537783ed71cac9f1589bea))
+
+
+### Bug Fixes
+
+* merge conflict ([a8cf4e9](https://github.com/fullstacksherpa/KhelBackend/commit/a8cf4e913a7f2a0b4926a05d54ebcf5351e39117))
+
 ## [1.4.4](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.3...v1.4.4) (2025-04-04)
 
 
