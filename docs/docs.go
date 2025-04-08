@@ -300,6 +300,45 @@ const docTemplate = `{
                 }
             }
         },
+        "/games/shortlist": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a list of games that the authenticated user has shortlisted.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Shortlist_Games"
+                ],
+                "summary": "Retrieve shortlisted games for the authenticated user",
+                "responses": {
+                    "200": {
+                        "description": "List of shortlisted games",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.Game"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Unauthenticated request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not retrieve shortlist",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/games/{gameID}/accept": {
             "post": {
                 "security": [
@@ -694,6 +733,100 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/shortlist": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows authenticated users to add a game to their shortlist.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Shortlist_Games"
+                ],
+                "summary": "Add a game to shortlist",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Game added to shortlist",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid game ID or unauthenticated request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not add shortlist",
+                        "schema": {}
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows authenticated users to remove a game from their shortlist.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Shortlist_Games"
+                ],
+                "summary": "Remove a game from shortlist",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Game removed from shortlist",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid game ID or unauthenticated request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not remove shortlist",
                         "schema": {}
                     }
                 }
@@ -1253,6 +1386,78 @@ const docTemplate = `{
                 }
             }
         },
+        "/venues/favorites": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a list of venues that the authenticated user has marked as favorites.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Favorite_Venues"
+                ],
+                "summary": "Retrieve user's favorite venues",
+                "responses": {
+                    "200": {
+                        "description": "List of favorite venues",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.Venue"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Unauthenticated request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not retrieve favorites",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/is-venue-owner": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Determines whether the authenticated user owns at least one venue",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Check if user is a venue owner",
+                "responses": {
+                    "200": {
+                        "description": "Ownership check result",
+                        "schema": {
+                            "$ref": "#/definitions/main.isOwnerResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venues/{venueID}": {
             "patch": {
                 "security": [
@@ -1419,6 +1624,100 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error: Could not create booking",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/favorite": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows authenticated users to add a venue to their favorites list.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Favorite_Venues"
+                ],
+                "summary": "Add a venue to favorites",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Venue added to favorites",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid venue ID or unauthenticated request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not add favorite",
+                        "schema": {}
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows authenticated users to remove a venue from their favorites list.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Favorite_Venues"
+                ],
+                "summary": "Remove a venue from favorites",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Venue removed from favorites",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid venue ID or unauthenticated request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not remove favorite",
                         "schema": {}
                     }
                 }
@@ -2023,6 +2322,14 @@ const docTemplate = `{
                 }
             }
         },
+        "main.isOwnerResponse": {
+            "type": "object",
+            "properties": {
+                "is_owner": {
+                    "type": "boolean"
+                }
+            }
+        },
         "store.Booking": {
             "type": "object",
             "properties": {
@@ -2313,6 +2620,12 @@ const docTemplate = `{
                 },
                 "owner_id": {
                     "type": "integer"
+                },
+                "phone_number": {
+                    "type": "string"
+                },
+                "sport": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"

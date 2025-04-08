@@ -1,0 +1,2 @@
+ALTER TABLE venues
+ADD COLUMN phone_number TEXT NOT NULL;

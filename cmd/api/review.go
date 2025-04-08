@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"khel/internal/store"
 	"math"
 	"net/http"
@@ -34,6 +35,7 @@ type createReviewPayload struct {
 func (app *application) createVenueReviewHandler(w http.ResponseWriter, r *http.Request) {
 	venueID := chi.URLParam(r, "venueID")
 	vID, err := strconv.ParseInt(venueID, 10, 64)
+	fmt.Printf("I got this venue id on review %v", vID)
 	if err != nil {
 		app.badRequestResponse(w, r, errors.New("invalid venue ID"))
 		return

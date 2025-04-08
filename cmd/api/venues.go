@@ -10,13 +10,49 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+type isOwnerResponse struct {
+	IsOwner bool `json:"is_owner"`
+}
+
+// IsVenueOwner godoc
+//
+//	@Summary		Check if user is a venue owner
+//	@Description	Determines whether the authenticated user owns at least one venue
+//	@Tags			Venue
+//	@Produce		json
+//	@Success		200	{object}	isOwnerResponse	"Ownership check result"
+//	@Failure		401	{object}	error			"Unauthorized"
+//	@Failure		500	{object}	error			"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/is-venue-owner [get]
+func (app *application) isVenueOwnerHandler(w http.ResponseWriter, r *http.Request) {
+	user := getUserFromContext(r)
+
+	isOwner, err := app.store.Venues.IsOwnerOfAnyVenue(r.Context(), user.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	resp := isOwnerResponse{
+		IsOwner: isOwner,
+	}
+
+	if err := app.jsonResponse(w, http.StatusOK, resp); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+}
+
 type CreateVenuePayload struct {
 	Name        string    `json:"name" validate:"required,max=100"`
 	Address     string    `json:"address" validate:"required,max=255"`
 	Location    []float64 `json:"location" validate:"required,len=2"` // [longitude, latitude]
 	Description *string   `json:"description,omitempty" validate:"max=500"`
 	Amenities   []string  `json:"amenities,omitempty" validate:"max=100"` // Example validation for amenity count
-	OpenTime    *string   `json:"open_time,omitempty" validate:"max=50"`  // Store operating hours (optional)
+	PhoneNumber string    `json:"phone_number" validate:"required,max=13,min=10"`
+	OpenTime    *string   `json:"open_time,omitempty" validate:"max=50"` // Store operating hours (optional)
+	Sport       string    `json:"sport" validate:"required,max=50"`
 }
 
 // CreateVenue godoc
@@ -73,6 +109,8 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 		Description: payload.Description,
 		Amenities:   payload.Amenities,
 		OpenTime:    payload.OpenTime,
+		Sport:       payload.Sport,
+		PhoneNumber: payload.PhoneNumber,
 		ImageURLs:   imageUrls,
 	}
 

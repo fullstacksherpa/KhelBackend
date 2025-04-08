@@ -25,7 +25,7 @@ type ReviewStore struct {
 
 func (s *ReviewStore) CreateReview(ctx context.Context, review *Review) error {
 	query := `
-        INSERT INTO venue_reviews (venue_id, user_id, rating, comment)
+        INSERT INTO reviews (venue_id, user_id, rating, comment)
         VALUES ($1, $2, $3, $4)
         RETURNING id, created_at, updated_at
     `
@@ -41,7 +41,7 @@ func (s *ReviewStore) GetReviews(ctx context.Context, venueID int64) ([]Review, 
 	query := `
         SELECT vr.id, vr.venue_id, vr.user_id, vr.rating, vr.comment, 
                vr.created_at, vr.updated_at, u.name, u.avatar_url
-        FROM venue_reviews vr
+        FROM reviews vr
         JOIN users u ON u.id = vr.user_id
         WHERE vr.venue_id = $1
         ORDER BY vr.created_at DESC
@@ -76,7 +76,7 @@ func (s *ReviewStore) GetReviews(ctx context.Context, venueID int64) ([]Review, 
 
 func (s *ReviewStore) DeleteReview(ctx context.Context, reviewID, userID int64) error {
 	query := `
-        DELETE FROM venue_reviews 
+        DELETE FROM reviews 
         WHERE id = $1 AND user_id = $2
     `
 	result, err := s.db.ExecContext(ctx, query, reviewID, userID)
@@ -96,7 +96,7 @@ func (s *ReviewStore) GetReviewStats(ctx context.Context, venueID int64) (total 
         SELECT 
             COUNT(id) as total_reviews,
             COALESCE(AVG(rating), 0) as average_rating
-        FROM venue_reviews
+        FROM reviews
         WHERE venue_id = $1
     `
 	err = s.db.QueryRowContext(ctx, query, venueID).Scan(&total, &average)

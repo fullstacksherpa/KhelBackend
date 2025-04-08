@@ -190,6 +190,11 @@ definitions:
     - comment
     - rating
     type: object
+  main.isOwnerResponse:
+    properties:
+      is_owner:
+        type: boolean
+    type: object
   store.Booking:
     properties:
       created_at:
@@ -393,6 +398,10 @@ definitions:
         type: string
       owner_id:
         type: integer
+      phone_number:
+        type: string
+      sport:
+        type: string
       updated_at:
         type: string
     type: object
@@ -828,6 +837,67 @@ paths:
       summary: Get all join requests for a game
       tags:
       - Games
+  /games/{gameID}/shortlist:
+    delete:
+      consumes:
+      - application/json
+      description: Allows authenticated users to remove a game from their shortlist.
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Game removed from shortlist
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid game ID or unauthenticated request'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not remove shortlist'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Remove a game from shortlist
+      tags:
+      - Shortlist_Games
+    post:
+      consumes:
+      - application/json
+      description: Allows authenticated users to add a game to their shortlist.
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Game added to shortlist
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid game ID or unauthenticated request'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not add shortlist'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Add a game to shortlist
+      tags:
+      - Shortlist_Games
   /games/{id}/toggle-match-full:
     patch:
       consumes:
@@ -902,6 +972,31 @@ paths:
       summary: Create a new game
       tags:
       - Games
+  /games/shortlist:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of games that the authenticated user has shortlisted.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of shortlisted games
+          schema:
+            items:
+              $ref: '#/definitions/store.Game'
+            type: array
+        "400":
+          description: 'Bad Request: Unauthenticated request'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not retrieve shortlist'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve shortlisted games for the authenticated user
+      tags:
+      - Shortlist_Games
   /get-games:
     get:
       consumes:
@@ -1350,6 +1445,68 @@ paths:
       summary: Book a venue time slot
       tags:
       - Venue
+  /venues/{venueID}/favorite:
+    delete:
+      consumes:
+      - application/json
+      description: Allows authenticated users to remove a venue from their favorites
+        list.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Venue removed from favorites
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid venue ID or unauthenticated request'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not remove favorite'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Remove a venue from favorites
+      tags:
+      - Favorite_Venues
+    post:
+      consumes:
+      - application/json
+      description: Allows authenticated users to add a venue to their favorites list.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Venue added to favorites
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid venue ID or unauthenticated request'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not add favorite'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Add a venue to favorites
+      tags:
+      - Favorite_Venues
   /venues/{venueID}/photos:
     delete:
       consumes:
@@ -1568,6 +1725,53 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Delete a venue review
+      tags:
+      - Venue
+  /venues/favorites:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of venues that the authenticated user has marked
+        as favorites.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of favorite venues
+          schema:
+            items:
+              $ref: '#/definitions/store.Venue'
+            type: array
+        "400":
+          description: 'Bad Request: Unauthenticated request'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not retrieve favorites'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve user's favorite venues
+      tags:
+      - Favorite_Venues
+  /venues/is-venue-owner:
+    get:
+      description: Determines whether the authenticated user owns at least one venue
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ownership check result
+          schema:
+            $ref: '#/definitions/main.isOwnerResponse'
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Check if user is a venue owner
       tags:
       - Venue
 securityDefinitions:
