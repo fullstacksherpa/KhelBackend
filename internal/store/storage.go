@@ -40,6 +40,7 @@ type Storage struct {
 		IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error)
 		GetVenueByID(ctx context.Context, venueID int64) (*Venue, error)
 		IsOwnerOfAnyVenue(ctx context.Context, userID int64) (bool, error)
+		List(ctx context.Context, filter VenueFilter) ([]VenueListing, error)
 	}
 	Reviews interface {
 		CreateReview(context.Context, *Review) error

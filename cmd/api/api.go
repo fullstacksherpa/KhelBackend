@@ -111,6 +111,14 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Route("/v1", func(r chi.Router) {
+		r.Get("/venues", func(w http.ResponseWriter, r *http.Request) {
+			// Only apply auth middleware if favorite=true is in query
+			if r.URL.Query().Get("favorite") == "true" {
+				app.AuthTokenMiddleware(http.HandlerFunc(app.listVenuesHandler)).ServeHTTP(w, r)
+			} else {
+				app.listVenuesHandler(w, r)
+			}
+		})
 		r.Get("/get-games", app.getGamesHandler)
 		r.Get("/health", app.healthCheckHandler)
 		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
@@ -119,6 +127,7 @@ func (app *application) mount() http.Handler {
 		r.With(app.BasicAuthMiddleware()).Get("/debug/vars", expvar.Handler().ServeHTTP)
 
 		r.Route("/venues", func(r chi.Router) {
+
 			r.Use(app.AuthTokenMiddleware)
 			r.Get("/favorites", app.listFavoritesHandler)
 
