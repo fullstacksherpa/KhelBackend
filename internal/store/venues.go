@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype" // For PostGIS GEOGRAPHY
@@ -262,4 +263,121 @@ func (s *VenuesStore) GetVenueByID(ctx context.Context, venueID int64) (*Venue, 
 		return nil, err
 	}
 	return &v, nil
+}
+
+type VenueFilter struct {
+	Sport          *string
+	Latitude       *float64
+	Longitude      *float64
+	Distance       *float64 // meters
+	FavoriteUserID *int64
+	Page           int
+	Limit          int
+}
+
+type VenueListing struct {
+	ID            int64
+	Name          string
+	Address       string
+	Longitude     float64
+	Latitude      float64
+	ImageURLs     []string
+	OpenTime      *string
+	PhoneNumber   string
+	Sport         string
+	TotalReviews  int
+	AverageRating float64
+}
+
+func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueListing, error) {
+	baseQuery := `
+        SELECT 
+            v.id,
+            v.name,
+            v.address,
+            ST_X(v.location) as longitude,
+            ST_Y(v.location) as latitude,
+            v.image_urls,
+            v.open_time,
+            v.phone_number,
+            v.sport,
+            COUNT(r.id) as total_reviews,
+            COALESCE(AVG(r.rating), 0) as average_rating
+        FROM venues v
+        LEFT JOIN reviews r ON v.id = r.venue_id
+    `
+
+	var where []string
+	var args []interface{}
+	argCounter := 1
+
+	// Sport filter
+	if filter.Sport != nil {
+		where = append(where, fmt.Sprintf("v.sport = $%d", argCounter))
+		args = append(args, *filter.Sport)
+		argCounter++
+	}
+
+	// Location filter
+	if filter.Latitude != nil && filter.Longitude != nil && filter.Distance != nil {
+		where = append(where,
+			fmt.Sprintf("ST_DWithin(v.location::geography, ST_MakePoint($%d, $%d)::geography, $%d)",
+				argCounter, argCounter+1, argCounter+2))
+		args = append(args, *filter.Longitude, *filter.Latitude, *filter.Distance)
+		argCounter += 3
+	}
+
+	// Favorite filter
+	if filter.FavoriteUserID != nil {
+		where = append(where,
+			fmt.Sprintf("EXISTS (SELECT 1 FROM favorites f WHERE f.venue_id = v.id AND f.user_id = $%d)",
+				argCounter))
+		args = append(args, *filter.FavoriteUserID)
+		argCounter++
+	}
+
+	// Build final query
+	query := baseQuery
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " GROUP BY v.id"
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error querying venues: %w", err)
+	}
+	defer rows.Close()
+
+	var venues []VenueListing
+	for rows.Next() {
+		var v VenueListing
+		var openTime sql.NullString
+
+		err := rows.Scan(
+			&v.ID,
+			&v.Name,
+			&v.Address,
+			&v.Longitude,
+			&v.Latitude,
+			pq.Array(&v.ImageURLs),
+			&openTime,
+			&v.PhoneNumber,
+			&v.Sport,
+			&v.TotalReviews,
+			&v.AverageRating,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("error scanning venue row: %w", err)
+		}
+
+		if openTime.Valid {
+			v.OpenTime = &openTime.String
+		}
+
+		venues = append(venues, v)
+	}
+
+	return venues, nil
 }

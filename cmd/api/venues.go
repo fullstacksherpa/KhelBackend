@@ -277,3 +277,101 @@ func (app *application) updateVenueInfo(w http.ResponseWriter, r *http.Request) 
 	// Respond with success
 	app.jsonResponse(w, http.StatusOK, map[string]string{"message": "venue updated successfully"})
 }
+
+// VenueListResponse represents the trimmed venue response
+type VenueListResponse struct {
+	Address       string    `json:"address"`
+	ID            int64     `json:"id"`
+	ImageURLs     []string  `json:"image_urls"`
+	Location      []float64 `json:"location"` // [longitude, latitude]
+	Name          string    `json:"name"`
+	OpenTime      *string   `json:"open_time,omitempty"`
+	PhoneNumber   string    `json:"phone_number"`
+	Sport         string    `json:"sport"`
+	TotalReviews  int       `json:"total_reviews"`
+	AverageRating float64   `json:"average_rating"`
+}
+
+// GET /venues?sport=tennis&lat=40.7128&lng=-74.0060&distance=10000
+
+// @Summary		List venues with filters
+// @Description	Get paginated list of venues with optional filters
+// @Tags			Venue
+// @Accept			json
+// @Produce		json
+// @Param			sport		query	string	false	"Filter by sport type"
+// @Param			lat			query	number	false	"Latitude for location filter"
+// @Param			lng			query	number	false	"Longitude for location filter"
+// @Param			distance	query	number	false	"Distance in meters from location"
+// @Param			favorite	query	bool	false	"Filter by user favorites"
+// @Param			page		query	int		false	"Page number"		default(1)
+// @Param			limit		query	int		false	"Items per page"	default(20)
+// @Success		200			{array}	VenueListResponse
+// @Router			/venues [get]
+func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	q := r.URL.Query()
+
+	filter := store.VenueFilter{
+		Sport: nullString(q.Get("sport")),
+	}
+
+	// Parse location filter
+	if lat := q.Get("lat"); lat != "" {
+		if lng := q.Get("lng"); lng != "" {
+			if distance := q.Get("distance"); distance != "" {
+				parsedLat, _ := strconv.ParseFloat(lat, 64)
+				parsedLng, _ := strconv.ParseFloat(lng, 64)
+				parsedDistance, _ := strconv.ParseFloat(distance, 64)
+
+				filter.Latitude = &parsedLat
+				filter.Longitude = &parsedLng
+				filter.Distance = &parsedDistance
+			}
+		}
+	}
+
+	// Handle favorite filter
+	if favorite := q.Get("favorite"); favorite == "true" {
+		user := getUserFromContext(r)
+		//TODO: modify error message later
+		if user == nil {
+			app.unauthorizedErrorResponse(w, r, errors.New("unauthorized user. can't get user from context"))
+			return
+		}
+		filter.FavoriteUserID = &user.ID
+	}
+
+	// Get venues from store
+	venues, err := app.store.Venues.List(r.Context(), filter)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Convert to response format
+	response := make([]VenueListResponse, len(venues))
+	for i, v := range venues {
+		response[i] = VenueListResponse{
+			ID:            v.ID,
+			Name:          v.Name,
+			Address:       v.Address,
+			Location:      []float64{v.Longitude, v.Latitude},
+			ImageURLs:     v.ImageURLs,
+			OpenTime:      v.OpenTime,
+			PhoneNumber:   v.PhoneNumber,
+			Sport:         v.Sport,
+			TotalReviews:  v.TotalReviews,
+			AverageRating: v.AverageRating,
+		}
+	}
+
+	app.jsonResponse(w, http.StatusOK, response)
+}
+
+func nullString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}

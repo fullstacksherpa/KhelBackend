@@ -177,6 +177,34 @@ definitions:
       user:
         $ref: '#/definitions/store.User'
     type: object
+  main.VenueListResponse:
+    properties:
+      address:
+        type: string
+      average_rating:
+        type: number
+      id:
+        type: integer
+      image_urls:
+        items:
+          type: string
+        type: array
+      location:
+        description: '[longitude, latitude]'
+        items:
+          type: number
+        type: array
+      name:
+        type: string
+      open_time:
+        type: string
+      phone_number:
+        type: string
+      sport:
+        type: string
+      total_reviews:
+        type: integer
+    type: object
   main.createReviewPayload:
     properties:
       comment:
@@ -1292,6 +1320,53 @@ paths:
       tags:
       - users
   /venues:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of venues with optional filters
+      parameters:
+      - description: Filter by sport type
+        in: query
+        name: sport
+        type: string
+      - description: Latitude for location filter
+        in: query
+        name: lat
+        type: number
+      - description: Longitude for location filter
+        in: query
+        name: lng
+        type: number
+      - description: Distance in meters from location
+        in: query
+        name: distance
+        type: number
+      - description: Filter by user favorites
+        in: query
+        name: favorite
+        type: boolean
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.VenueListResponse'
+            type: array
+      summary: List venues with filters
+      tags:
+      - Venue
     post:
       consumes:
       - multipart/form-data
