@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.5.0...v1.6.0) (2025-04-10)
+
+
+### Features
+
+* added venue list with filter and custom image url to cloudinary ([30619a8](https://github.com/fullstacksherpa/KhelBackend/commit/30619a819eee9cc7ad54188406eff9301066eb9c))
+* added venue list with filtering features ([a73854e](https://github.com/fullstacksherpa/KhelBackend/commit/a73854e174843a2fb5503f335c8ba731adef31c0))
+
 ## [1.5.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.4...v1.5.0) (2025-04-08)
 
 
