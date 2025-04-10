@@ -77,8 +77,9 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 	// Create a pgtype.Point for PostGIS geography
 	point := pgtype.Point{
 		P: pgtype.Vec2{
-			X: venue.Location[0], // Longitude
-			Y: venue.Location[1], // Latitude
+			// Client sends [lat, long], PostGIS needs (long, lat) so i swap the value
+			X: venue.Location[1], // long
+			Y: venue.Location[0], // Latitude
 		},
 		Valid: true, // Make sure the point is valid
 	}
@@ -93,7 +94,7 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 		venue.Description,
 		pq.Array(venue.Amenities),
 		venue.OpenTime,
-		pq.Array(venue.ImageURLs),
+		pq.Array([]string{}), // no images at first
 		venue.Sport,
 		venue.PhoneNumber,
 	).Scan(
@@ -266,13 +267,12 @@ func (s *VenuesStore) GetVenueByID(ctx context.Context, venueID int64) (*Venue, 
 }
 
 type VenueFilter struct {
-	Sport          *string
-	Latitude       *float64
-	Longitude      *float64
-	Distance       *float64 // meters
-	FavoriteUserID *int64
-	Page           int
-	Limit          int
+	Sport     *string
+	Latitude  *float64
+	Longitude *float64
+	Distance  *float64 // meters
+	Page      int
+	Limit     int
 }
 
 type VenueListing struct {
@@ -290,13 +290,14 @@ type VenueListing struct {
 }
 
 func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueListing, error) {
+	// Base query without inline comments
 	baseQuery := `
         SELECT 
             v.id,
             v.name,
             v.address,
-            ST_X(v.location) as longitude,
-            ST_Y(v.location) as latitude,
+            ST_X(v.location::geometry) as longitude,
+            ST_Y(v.location::geometry) as latitude,
             v.image_urls,
             v.open_time,
             v.phone_number,
@@ -305,6 +306,7 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
             COALESCE(AVG(r.rating), 0) as average_rating
         FROM venues v
         LEFT JOIN reviews r ON v.id = r.venue_id
+        WHERE 1=1
     `
 
 	var where []string
@@ -327,21 +329,16 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
 		argCounter += 3
 	}
 
-	// Favorite filter
-	if filter.FavoriteUserID != nil {
-		where = append(where,
-			fmt.Sprintf("EXISTS (SELECT 1 FROM favorites f WHERE f.venue_id = v.id AND f.user_id = $%d)",
-				argCounter))
-		args = append(args, *filter.FavoriteUserID)
-		argCounter++
-	}
-
 	// Build final query
 	query := baseQuery
 	if len(where) > 0 {
-		query += " WHERE " + strings.Join(where, " AND ")
+		query += " AND " + strings.Join(where, " AND ")
 	}
+
+	// Add pagination
 	query += " GROUP BY v.id"
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argCounter, argCounter+1)
+	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -380,4 +377,18 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
 	}
 
 	return venues, nil
+}
+
+// UpdateImageURLs updates the venue record with the provided image URLs.
+func (s *VenuesStore) UpdateImageURLs(ctx context.Context, venueID int64, urls []string) error {
+	query := `UPDATE venues SET image_urls = $1 WHERE id = $2`
+	_, err := s.db.ExecContext(ctx, query, pq.Array(urls), venueID)
+	return err
+}
+
+// Delete removes the venue with the given ID from the database.
+func (s *VenuesStore) Delete(ctx context.Context, venueID int64) error {
+	query := `DELETE FROM venues WHERE id = $1`
+	_, err := s.db.ExecContext(ctx, query, venueID)
+	return err
 }

@@ -33,6 +33,8 @@ type Storage struct {
 	}
 	Venues interface {
 		Create(context.Context, *Venue) error
+		UpdateImageURLs(ctx context.Context, venueID int64, urls []string) error
+		Delete(ctx context.Context, venueID int64) error
 		Update(ctx context.Context, venueID int64, updateData map[string]interface{}) error
 		CheckIfVenueExists(context.Context, string, int64) (bool, error)
 		RemovePhotoURL(ctx context.Context, venueID int64, photoURL string) error

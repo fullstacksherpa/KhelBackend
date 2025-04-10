@@ -1026,6 +1026,72 @@ const docTemplate = `{
                 }
             }
         },
+        "/list-venues": {
+            "get": {
+                "description": "Get paginated list of venues with filters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "List venues",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by sport type",
+                        "name": "sport",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Latitude for location filter",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Longitude for location filter",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Distance in meters from location",
+                        "name": "distance",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.VenueListResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/users": {
             "put": {
                 "security": [
@@ -1328,76 +1394,6 @@ const docTemplate = `{
             }
         },
         "/venues": {
-            "get": {
-                "description": "Get paginated list of venues with optional filters",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Venue"
-                ],
-                "summary": "List venues with filters",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Filter by sport type",
-                        "name": "sport",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "Latitude for location filter",
-                        "name": "lat",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "Longitude for location filter",
-                        "name": "lng",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "Distance in meters from location",
-                        "name": "distance",
-                        "in": "query"
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "Filter by user favorites",
-                        "name": "favorite",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Items per page",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.VenueListResponse"
-                            }
-                        }
-                    }
-                }
-            },
             "post": {
                 "security": [
                     {
