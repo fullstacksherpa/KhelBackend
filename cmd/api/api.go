@@ -111,14 +111,7 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Route("/v1", func(r chi.Router) {
-		r.Get("/venues", func(w http.ResponseWriter, r *http.Request) {
-			// Only apply auth middleware if favorite=true is in query
-			if r.URL.Query().Get("favorite") == "true" {
-				app.AuthTokenMiddleware(http.HandlerFunc(app.listVenuesHandler)).ServeHTTP(w, r)
-			} else {
-				app.listVenuesHandler(w, r)
-			}
-		})
+		r.Get("/list-venues", app.listVenuesHandler)
 		r.Get("/get-games", app.getGamesHandler)
 		r.Get("/health", app.healthCheckHandler)
 		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
@@ -130,8 +123,6 @@ func (app *application) mount() http.Handler {
 
 			r.Use(app.AuthTokenMiddleware)
 			r.Get("/favorites", app.listFavoritesHandler)
-
-			// Public or user-accessible routes
 			// Expects URL: /venues/{venueID}/available-times?date=YYYY-MM-DD
 			r.Get("/{venueID}/available-times", app.availableTimesHandler)
 			r.Get("/is-venue-owner", app.isVenueOwnerHandler)

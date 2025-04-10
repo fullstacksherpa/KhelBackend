@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"khel/internal/store"
+	"mime/multipart"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -53,76 +56,6 @@ type CreateVenuePayload struct {
 	PhoneNumber string    `json:"phone_number" validate:"required,max=13,min=10"`
 	OpenTime    *string   `json:"open_time,omitempty" validate:"max=50"` // Store operating hours (optional)
 	Sport       string    `json:"sport" validate:"required,max=50"`
-}
-
-// CreateVenue godoc
-//
-//	@Summary		Register a venue in our system
-//	@Description	Register a new venue with details such as name, address, location, and amenities.
-//	@Tags			Venue
-//	@Accept			multipart/form-data
-//	@Produce		json
-//	@Param			venue	formData	string		true	"Venue details (JSON string)"
-//	@Param			images	formData	[]file		false	"Venue images (up to 7 files)"
-//	@Success		201		{object}	store.Venue	"Venue created successfully"
-//	@Failure		400		{object}	error		"Invalid request payload"
-//	@Failure		401		{object}	error		"Unauthorized"
-//	@Failure		500		{object}	error		"Internal server error"
-//	@Security		ApiKeyAuth
-//	@Router			/venues [post]
-func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Request) {
-	var payload CreateVenuePayload
-
-	// 1. Parse form  and get files without uploading
-	files, err := app.parseVenueForm(w, r, &payload)
-	if err != nil {
-		app.badRequestResponse(w, r, err) // Unified error handling
-		return
-	}
-
-	user := getUserFromContext(r)
-
-	// 3. Check for existing venue before uploading images
-	exists, err := app.store.Venues.CheckIfVenueExists(r.Context(), payload.Name, user.ID)
-	if err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
-	if exists {
-		app.alreadyExistVenue(w, r, errors.New("a venue with this name already exists for this owner"))
-		return
-	}
-
-	// 4. Upload images only if venue doesn't exist
-	imageUrls, err := app.uploadImages(w, r, files)
-	if err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
-
-	// Proceed with venue creation
-	venue := &store.Venue{
-		OwnerID:     user.ID,
-		Name:        payload.Name,
-		Address:     payload.Address,
-		Location:    payload.Location,
-		Description: payload.Description,
-		Amenities:   payload.Amenities,
-		OpenTime:    payload.OpenTime,
-		Sport:       payload.Sport,
-		PhoneNumber: payload.PhoneNumber,
-		ImageURLs:   imageUrls,
-	}
-
-	if err := app.store.Venues.Create(r.Context(), venue); err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
-
-	if err := app.jsonResponse(w, http.StatusCreated, venue); err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
 }
 
 // DeleteVenuePhoto godoc
@@ -214,10 +147,10 @@ func (app *application) uploadVenuePhotoHandler(w http.ResponseWriter, r *http.R
 	}
 	defer file.Close()
 
-	// Upload the new photo to Cloudinary
-	newPhotoURL, err := app.uploadVenuesToCloudinary(file)
+	// Generate a custom Cloudinary public ID using the venue ID and image number.
+	publicID := fmt.Sprintf("venue_%d_image_%d", venueID, time.Now().UnixNano())
+	newPhotoURL, err := app.uploadToCloudinaryWithID(file, publicID)
 	if err != nil {
-		app.internalServerError(w, r, err)
 		return
 	}
 
@@ -292,10 +225,8 @@ type VenueListResponse struct {
 	AverageRating float64   `json:"average_rating"`
 }
 
-// GET /venues?sport=tennis&lat=40.7128&lng=-74.0060&distance=10000
-
-// @Summary		List venues with filters
-// @Description	Get paginated list of venues with optional filters
+// @Summary		List venues
+// @Description	Get paginated list of venues with filters
 // @Tags			Venue
 // @Accept			json
 // @Produce		json
@@ -303,17 +234,29 @@ type VenueListResponse struct {
 // @Param			lat			query	number	false	"Latitude for location filter"
 // @Param			lng			query	number	false	"Longitude for location filter"
 // @Param			distance	query	number	false	"Distance in meters from location"
-// @Param			favorite	query	bool	false	"Filter by user favorites"
 // @Param			page		query	int		false	"Page number"		default(1)
 // @Param			limit		query	int		false	"Items per page"	default(20)
 // @Success		200			{array}	VenueListResponse
-// @Router			/venues [get]
+// @Router			/list-venues [get]
 func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	q := r.URL.Query()
+	// Parse pagination parameters
+	page, _ := strconv.Atoi(q.Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit < 1 || limit > 25 {
+		limit = 12
+	}
+
+	fmt.Printf("the query object of listVenuesHandler is %v", q)
 
 	filter := store.VenueFilter{
 		Sport: nullString(q.Get("sport")),
+		Page:  page,
+		Limit: limit,
 	}
 
 	// Parse location filter
@@ -329,17 +272,6 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 				filter.Distance = &parsedDistance
 			}
 		}
-	}
-
-	// Handle favorite filter
-	if favorite := q.Get("favorite"); favorite == "true" {
-		user := getUserFromContext(r)
-		//TODO: modify error message later
-		if user == nil {
-			app.unauthorizedErrorResponse(w, r, errors.New("unauthorized user. can't get user from context"))
-			return
-		}
-		filter.FavoriteUserID = &user.ID
 	}
 
 	// Get venues from store
@@ -374,4 +306,113 @@ func nullString(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// CreateAndUploadVenue implements the SAGA pattern.
+// 1. Create a venue record in the database (without images).
+// 2. Upload images externally to Cloudinary using custom public IDs.
+// 3. Update the venue record with the returned image URLs.
+// If an error occurs at any external step, the venue is deleted to ensure consistency.
+func (app *application) CreateAndUploadVenue(ctx context.Context, venue *store.Venue, files []*multipart.FileHeader, w http.ResponseWriter, r *http.Request) error {
+	// Step 1: Create the venue in the database (without images).
+	fmt.Print("calling database for Create")
+	if err := app.store.Venues.Create(ctx, venue); err != nil {
+		return fmt.Errorf("error creating venue: %w", err)
+	}
+	fmt.Printf("venue created, id is %v", venue.ID)
+	// Step 2: Upload images using the venue ID.
+	imageUrls, err := app.uploadImagesWithVenueID(files, venue.ID)
+	if err != nil {
+		// Compensate: Delete the venue if image upload fails.
+		if delErr := app.store.Venues.Delete(ctx, venue.ID); delErr != nil {
+			app.logger.Errorw("failed to delete venue after image upload failure", "venueID", venue.ID, "delete_error", delErr)
+		}
+		return fmt.Errorf("error uploading images: %w", err)
+	}
+
+	fmt.Print("calling database to updateImageURLs")
+	// Step 3: Update the venue with the uploaded image URLs.
+	if err := app.store.Venues.UpdateImageURLs(ctx, venue.ID, imageUrls); err != nil {
+		// Compensate: Delete the venue if updating image URLs fails.
+		if delErr := app.store.Venues.Delete(ctx, venue.ID); delErr != nil {
+			app.logger.Errorw("failed to delete venue after update image URLs failure", "venueID", venue.ID, "delete_error", delErr)
+		}
+		return fmt.Errorf("error updating venue images: %w", err)
+	}
+
+	// Optionally update the venue struct with URLs.
+	venue.ImageURLs = imageUrls
+	return nil
+}
+
+// -----------------------------------------------
+// HTTP Handler for Venue Creation
+// -----------------------------------------------
+
+// createVenueHandler processes the HTTP request to create a venue.
+// It parses the form data, checks for duplicate venues, and then uses the SAGA pattern.
+
+// CreateVenue godoc
+//
+//	@Summary		Register a venue in our system
+//	@Description	Register a new venue with details such as name, address, location, and amenities.
+//	@Tags			Venue
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			venue	formData	string		true	"Venue details (JSON string)"
+//	@Param			images	formData	[]file		false	"Venue images (up to 7 files)"
+//	@Success		201		{object}	store.Venue	"Venue created successfully"
+//	@Failure		400		{object}	error		"Invalid request payload"
+//	@Failure		401		{object}	error		"Unauthorized"
+//	@Failure		500		{object}	error		"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues [post]
+func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Request) {
+	var payload CreateVenuePayload
+
+	// Parse form and JSON payload from multipart form.
+	files, err := app.parseVenueForm(w, r, &payload)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// Retrieve the current user (owner) from the request context.
+	user := getUserFromContext(r)
+
+	// Check for an existing venue with the same name for this owner.
+	exists, err := app.store.Venues.CheckIfVenueExists(r.Context(), payload.Name, user.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+	if exists {
+		app.alreadyExistVenue(w, r, fmt.Errorf("a venue with this name already exists for this owner"))
+		return
+	}
+
+	// Prepare the venue model without image URLs initially.
+	venue := &store.Venue{
+		OwnerID:     user.ID,
+		Name:        payload.Name,
+		Address:     payload.Address,
+		Location:    payload.Location,
+		Description: payload.Description,
+		Amenities:   payload.Amenities,
+		OpenTime:    payload.OpenTime,
+		Sport:       payload.Sport,
+		PhoneNumber: payload.PhoneNumber,
+		// ImageURLs field remains empty until updated.
+	}
+
+	// Use the SAGA pattern to create the venue record and upload images externally.
+	if err := app.CreateAndUploadVenue(r.Context(), venue, files, w, r); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Return a JSON response with the created venue details.
+	if err := app.jsonResponse(w, http.StatusCreated, venue); err != nil {
+		app.internalServerError(w, r, err)
+	}
 }
