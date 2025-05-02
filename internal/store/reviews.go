@@ -112,3 +112,16 @@ func (s *ReviewStore) IsReviewOwner(ctx context.Context, reviewID int64, userID 
 
 	return reviewUserID == userID, nil
 }
+
+// HasReview returns true if a review by this user on this venue already exists.
+func (s *ReviewStore) HasReview(ctx context.Context, venueID, userID int64) (bool, error) {
+	var exists bool
+	query := `
+        SELECT EXISTS (
+          SELECT 1 FROM reviews
+          WHERE venue_id = $1 AND user_id = $2
+        )
+    `
+	err := s.db.QueryRowContext(ctx, query, venueID, userID).Scan(&exists)
+	return exists, err
+}

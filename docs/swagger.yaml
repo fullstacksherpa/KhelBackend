@@ -1,5 +1,12 @@
 basePath: /v1
 definitions:
+  main.AppReviewPayload:
+    properties:
+      feedback:
+        type: string
+      rating:
+        type: integer
+    type: object
   main.AvailableTimeSlot:
     properties:
       end_time:
@@ -99,6 +106,14 @@ definitions:
       skill_level:
         type: string
     type: object
+  main.QuestionPayload:
+    properties:
+      question:
+        maxLength: 120
+        type: string
+    required:
+    - question
+    type: object
   main.RefreshPayload:
     properties:
       refresh_token:
@@ -130,6 +145,14 @@ definitions:
     - password
     - phone
     type: object
+  main.ReplyPayload:
+    properties:
+      reply:
+        maxLength: 120
+        type: string
+    required:
+    - reply
+    type: object
   main.RequestResetPasswordPayload:
     properties:
       email:
@@ -156,6 +179,8 @@ definitions:
         type: string
       refresh_token:
         type: string
+      user_id:
+        type: string
     type: object
   main.UpdatePricingPayload:
     properties:
@@ -176,6 +201,50 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/store.User'
+    type: object
+  main.VenueDetailResponse:
+    properties:
+      address:
+        type: string
+      amenities:
+        items:
+          type: string
+        type: array
+      average_rating:
+        type: number
+      completed_games:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image_urls:
+        items:
+          type: string
+        type: array
+      location:
+        description: '[latitude, longitude]'
+        items:
+          type: number
+        type: array
+      name:
+        type: string
+      open_time:
+        type: string
+      owner_id:
+        type: integer
+      phone_number:
+        type: string
+      sport:
+        type: string
+      total_reviews:
+        type: integer
+      upcoming_games:
+        type: integer
+      updated_at:
+        type: string
     type: object
   main.VenueListResponse:
     properties:
@@ -222,6 +291,19 @@ definitions:
     properties:
       is_owner:
         type: boolean
+    type: object
+  store.AppReview:
+    properties:
+      created_at:
+        type: string
+      feedback:
+        type: string
+      id:
+        type: integer
+      rating:
+        type: integer
+      user_id:
+        type: integer
     type: object
   store.Booking:
     properties:
@@ -298,6 +380,55 @@ definitions:
         description: Visibility (public or private)
         type: string
     type: object
+  store.GameDetails:
+    properties:
+      admin_id:
+        type: integer
+      current_player:
+        type: integer
+      end_time:
+        type: string
+      format:
+        type: string
+      game_admin_name:
+        type: string
+      game_id:
+        type: integer
+      game_level:
+        type: string
+      is_booked:
+        type: boolean
+      max_players:
+        type: integer
+      player_ids:
+        description: all joined player user IDs
+        items:
+          type: integer
+        type: array
+      player_images:
+        items:
+          type: string
+        type: array
+      price:
+        type: integer
+      requested_player_ids:
+        description: pending request user IDs
+        items:
+          type: integer
+        type: array
+      sport_type:
+        type: string
+      start_time:
+        type: string
+      venue_id:
+        type: integer
+      venue_lat:
+        type: number
+      venue_lon:
+        type: number
+      venue_name:
+        type: string
+    type: object
   store.GameRequestStatus:
     enum:
     - pending
@@ -348,6 +479,49 @@ definitions:
         type: string
       venueID:
         type: integer
+    type: object
+  store.Question:
+    properties:
+      created_at:
+        type: string
+      game_id:
+        type: integer
+      id:
+        type: integer
+      question:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  store.QuestionWithReplies:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      question:
+        type: string
+      replies:
+        items:
+          $ref: '#/definitions/store.Reply'
+        type: array
+    type: object
+  store.Reply:
+    properties:
+      admin_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      question_id:
+        type: integer
+      reply:
+        type: string
+      updated_at:
+        type: string
     type: object
   store.Review:
     properties:
@@ -444,6 +618,61 @@ info:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   title: Khel API
 paths:
+  /app-reviews:
+    get:
+      consumes:
+      - application/json
+      description: Returns all app reviews from all users.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of all reviews
+          schema:
+            items:
+              $ref: '#/definitions/store.AppReview'
+            type: array
+        "401":
+          description: unauthorized route
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List All App Reviews
+      tags:
+      - App_Reviews
+    post:
+      consumes:
+      - application/json
+      description: Allows authenticated users to submit a rating and feedback for
+        the app.
+      parameters:
+      - description: Review payload
+        in: body
+        name: review
+        required: true
+        schema:
+          $ref: '#/definitions/main.AppReviewPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Review submitted
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Submit App Review
+      tags:
+      - App_Reviews
   /authentication/refresh:
     post:
       consumes:
@@ -594,6 +823,39 @@ paths:
       summary: Registers a user
       tags:
       - authentication
+  /games/{gameID}:
+    get:
+      consumes:
+      - application/json
+      description: Returns detailed information for a specific game including venue
+        details and player images
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/store.GameDetails'
+        "400":
+          description: Invalid game ID
+          schema: {}
+        "404":
+          description: Game not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get detailed game information
+      tags:
+      - Games
   /games/{gameID}/accept:
     post:
       consumes:
@@ -752,6 +1014,174 @@ paths:
       summary: Retrieve players for a game
       tags:
       - Games
+  /games/{gameID}/qa:
+    get:
+      consumes:
+      - application/json
+      description: Get all questions with replies for a game
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.QuestionWithReplies'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get all Q&A for a game
+      tags:
+      - Questions
+  /games/{gameID}/questions:
+    get:
+      consumes:
+      - application/json
+      description: Get all questions for a game
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.Question'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get game questions
+      tags:
+      - Questions
+    post:
+      consumes:
+      - application/json
+      description: Create a new question for a game
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      - description: Question payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.QuestionPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/store.Question'
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create a game question
+      tags:
+      - Questions
+  /games/{gameID}/questions/{questionID}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a question (only by author)
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      - description: Question ID
+        in: path
+        name: questionID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a question
+      tags:
+      - Questions
+  /games/{gameID}/questions/{questionID}/replies:
+    post:
+      consumes:
+      - application/json
+      description: Create a reply to a question (admin only)
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      - description: Question ID
+        in: path
+        name: questionID
+        required: true
+        type: integer
+      - description: Reply payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.ReplyPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/store.Reply'
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create a reply
+      tags:
+      - Questions
   /games/{gameID}/reject:
     post:
       consumes:
@@ -1363,6 +1793,35 @@ paths:
       summary: Update profile picture
       tags:
       - users
+  /venue/{id}:
+    get:
+      description: Retrieve detailed information for a venue including aggregated
+        review and game statistics.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response with venue details
+          schema:
+            $ref: '#/definitions/main.VenueDetailResponse'
+        "400":
+          description: 'Bad Request: Invalid venue id'
+          schema: {}
+        "404":
+          description: 'Not Found: Venue not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get venue details
+      tags:
+      - Venue
   /venues:
     post:
       consumes:

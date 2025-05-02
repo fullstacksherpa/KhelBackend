@@ -29,6 +29,15 @@ type Venue struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// VenueDetail extends Venue with aggregation fields from reviews and games.
+type VenueDetail struct {
+	Venue
+	TotalReviews   int     `json:"total_reviews"`
+	AverageRating  float64 `json:"average_rating"`
+	UpcomingGames  int     `json:"upcoming_games"`
+	CompletedGames int     `json:"completed_games"`
+}
+
 type VenuesStore struct {
 	db *sql.DB
 }
@@ -391,4 +400,72 @@ func (s *VenuesStore) Delete(ctx context.Context, venueID int64) error {
 	query := `DELETE FROM venues WHERE id = $1`
 	_, err := s.db.ExecContext(ctx, query, venueID)
 	return err
+}
+
+// GetVenueDetail retrieves a venue by its ID while joining reviews and games
+// to aggregate total_reviews, average_rating, upcoming_games, and completed_games.
+func (s *VenuesStore) GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error) {
+	query := `
+	SELECT 
+		v.id,
+		v.owner_id,
+		v.name,
+		v.address,
+		ST_X(v.location::geometry) as longitude,
+		ST_Y(v.location::geometry) as latitude,
+		v.description,
+		v.phone_number,
+		v.amenities,
+		v.open_time,
+		v.sport,
+		v.image_urls,
+		v.created_at,
+		v.updated_at,
+		COUNT(DISTINCT r.id) AS total_reviews,
+		COALESCE(AVG(r.rating), 0) AS average_rating,
+		COUNT(DISTINCT CASE WHEN g.start_time > NOW() THEN g.id END) AS upcoming_games,
+		COUNT(DISTINCT CASE WHEN g.status = 'completed' THEN g.id END) AS completed_games
+	FROM venues v
+	LEFT JOIN reviews r ON v.id = r.venue_id
+	LEFT JOIN games g ON v.id = g.venue_id
+	WHERE v.id = $1
+	GROUP BY 
+		v.id, v.owner_id, v.name, v.address, v.location, v.description,
+		v.phone_number, v.amenities, v.open_time, v.sport, v.image_urls, v.created_at, v.updated_at
+	`
+
+	var vd VenueDetail
+	var longitude, latitude float64
+
+	err := s.db.QueryRowContext(ctx, query, venueID).Scan(
+		&vd.ID,
+		&vd.OwnerID,
+		&vd.Name,
+		&vd.Address,
+		&longitude,
+		&latitude,
+		&vd.Description,
+		&vd.PhoneNumber,
+		pq.Array(&vd.Amenities),
+		&vd.OpenTime,
+		&vd.Sport,
+		pq.Array(&vd.ImageURLs),
+		&vd.CreatedAt,
+		&vd.UpdatedAt,
+		&vd.TotalReviews,
+		&vd.AverageRating,
+		&vd.UpcomingGames,
+		&vd.CompletedGames,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("venue not found")
+		}
+		return nil, err
+	}
+
+	// Set the Location slice with [latitude, longitude]. Adjust the order if necessary.
+	vd.Location = []float64{latitude, longitude}
+
+	return &vd, nil
 }

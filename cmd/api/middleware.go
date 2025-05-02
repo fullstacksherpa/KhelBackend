@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"khel/internal/auth"
 	"log"
 	"net/http"
 	"strconv"
@@ -90,6 +91,8 @@ func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 			app.unauthorizedErrorResponse(w, r, err)
 			return
 		}
+
+		fmt.Println("AuthTokenMiddleware running .....🔐🔐")
 
 		ctx = context.WithValue(ctx, userCtx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -224,5 +227,67 @@ func (app *application) RateLimiterMiddleware(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(w, r)
+	})
+}
+
+// Only use this middleware for routes like /logout where token expiry should be ignored
+
+func (app *application) AuthTokenIgnoreExpiryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if strings.TrimSpace(authHeader) == "" {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("authorization header is missing or blank"))
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("authorization header is malformed"))
+			return
+		}
+
+		tokenStr := parts[1]
+
+		// ✅ Get secret by casting the authenticator
+		jwtAuth, ok := app.authenticator.(*auth.JWTAuthenticator)
+		if !ok {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("invalid authenticator type"))
+			return
+		}
+
+		// Allow expired tokens to be parsed
+		jwtToken, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method %v", t.Header["alg"])
+			}
+			return []byte(jwtAuth.Secret()), nil
+		}, jwt.WithLeeway(0), jwt.WithoutClaimsValidation())
+
+		if err != nil && !errors.Is(err, jwt.ErrTokenExpired) {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("invalid token: %w", err))
+			return
+		}
+
+		claims, ok := jwtToken.Claims.(jwt.MapClaims)
+		if !ok {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("invalid claims"))
+			return
+		}
+
+		userIDFloat, ok := claims["sub"].(float64)
+		if !ok {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("missing or invalid sub in token"))
+			return
+		}
+		userID := int64(userIDFloat)
+
+		user, err := app.store.Users.GetByID(r.Context(), userID)
+		if err != nil {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("user not found: %w", err))
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), userCtx, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

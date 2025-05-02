@@ -43,6 +43,7 @@ type Storage struct {
 		GetVenueByID(ctx context.Context, venueID int64) (*Venue, error)
 		IsOwnerOfAnyVenue(ctx context.Context, userID int64) (bool, error)
 		List(ctx context.Context, filter VenueFilter) ([]VenueListing, error)
+		GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error)
 	}
 	Reviews interface {
 		CreateReview(context.Context, *Review) error
@@ -50,13 +51,14 @@ type Storage struct {
 		DeleteReview(context.Context, int64, int64) error
 		GetReviewStats(context.Context, int64) (int, float64, error)
 		IsReviewOwner(ctx context.Context, reviewID int64, userID int64) (bool, error)
+		HasReview(ctx context.Context, venueID, userID int64) (bool, error)
 	}
 	Followers interface {
 		Follow(ctx context.Context, followerID, userID int64) error
 		Unfollow(ctx context.Context, followerID, userID int64) error
 	}
 	Games interface {
-		GetGames(ctx context.Context, q GameFilterQuery) ([]GameWithVenue, error)
+		GetGames(ctx context.Context, q GameFilterQuery) ([]GameSummary, error)
 		Create(ctx context.Context, game *Game) (int64, error)
 		GetGameByID(ctx context.Context, gameID int64) (*Game, error)
 		CheckRequestExist(ctx context.Context, gameID int64, userID int64) (bool, error)
@@ -73,6 +75,7 @@ type Storage struct {
 		GetGamePlayers(ctx context.Context, gameID int64) ([]*User, error)
 		AssignAssistant(ctx context.Context, gameID, playerID int64) error
 		CancelGame(ctx context.Context, gameID int64) error
+		GetGameDetailsWithID(ctx context.Context, gameID int64) (*GameDetails, error)
 	}
 	Bookings interface {
 		GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error)
@@ -90,6 +93,18 @@ type Storage struct {
 		RemoveShortlist(ctx context.Context, userID, gameID int64) error
 		GetShortlistedGamesByUser(ctx context.Context, userID int64) ([]Game, error)
 	}
+	GameQA interface {
+		CreateQuestion(ctx context.Context, question *Question) error
+		GetQuestionsByGame(ctx context.Context, gameID int64) ([]Question, error)
+		CreateReply(ctx context.Context, reply *Reply) error
+		GetRepliesByQuestion(ctx context.Context, questionID int64) ([]Reply, error)
+		DeleteQuestion(ctx context.Context, questionID, userID int64) error
+		GetQuestionsWithReplies(ctx context.Context, gameID int64) ([]QuestionWithReplies, error)
+	}
+	AppReviews interface {
+		AddReview(ctx context.Context, userID int64, rating int, feedback string) error
+		GetAllReviews(ctx context.Context) ([]AppReview, error)
+	}
 }
 
 func NewStorage(db *sql.DB) Storage {
@@ -102,6 +117,8 @@ func NewStorage(db *sql.DB) Storage {
 		Bookings:         &BookingStore{db},
 		FavoriteVenues:   &FavoriteVenuesStore{db},
 		ShortlistedGames: &ShortlistGamesStore{db},
+		GameQA:           &QuestionStore{db},
+		AppReviews:       &AppReviewStore{db},
 	}
 }
 

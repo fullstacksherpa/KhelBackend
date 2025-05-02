@@ -47,8 +47,21 @@ func (app *application) createVenueReviewHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	fmt.Printf("the parsed payload rating is: %d and comment is: %s", payload.Rating, payload.Comment)
+
 	user := getUserFromContext(r)
 	userID := user.ID
+
+	already, err := app.store.Reviews.HasReview(r.Context(), vID, userID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+	if already {
+		// 409 Conflict is the usual HTTP response when the resource already exists
+		app.conflictResponse(w, r, errors.New("you have already reviewed this venue"))
+		return
+	}
 
 	review := &store.Review{
 		VenueID: vID,
