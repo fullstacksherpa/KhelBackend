@@ -57,6 +57,23 @@ type GamePlayer struct {
 	Role     string    `json:"role"`
 	JoinedAt time.Time `json:"joined_at"`
 }
+type GameSummary struct {
+	GameID        int64     `json:"game_id"`
+	VenueID       int64     `json:"venue_id"`
+	VenueName     string    `json:"venue_name"`
+	SportType     string    `json:"sport_type"`
+	Price         *int      `json:"price,omitempty"`
+	Format        *string   `json:"format,omitempty"`
+	GameAdminName string    `json:"game_admin_name"`
+	GameLevel     *string   `json:"game_level,omitempty"`
+	StartTime     time.Time `json:"start_time"`
+	EndTime       time.Time `json:"end_time"`
+	MaxPlayers    int       `json:"max_players"`
+	CurrentPlayer int       `json:"current_player"`
+	PlayerImages  []string  `json:"player_images"`
+	VenueLat      float64   `json:"venue_lat"` // Venue latitude
+	VenueLon      float64   `json:"venue_lon"` // Venue longitude
+}
 
 type GameWithVenue struct {
 	ID         int64
@@ -83,6 +100,29 @@ type GameWithVenue struct {
 	Longitude float64
 	Amenities []string
 	ImageURLs []string
+}
+
+// GameDetails holds full info for a single game, including admin, booking and player lists.
+type GameDetails struct {
+	GameID             int64     `json:"game_id"`
+	VenueID            int64     `json:"venue_id"`
+	VenueName          string    `json:"venue_name"`
+	SportType          string    `json:"sport_type"`
+	Price              *int      `json:"price,omitempty"`
+	Format             *string   `json:"format,omitempty"`
+	GameLevel          *string   `json:"game_level,omitempty"`
+	AdminID            int64     `json:"admin_id"`
+	GameAdminName      string    `json:"game_admin_name"`
+	IsBooked           bool      `json:"is_booked"`
+	StartTime          time.Time `json:"start_time"`
+	EndTime            time.Time `json:"end_time"`
+	MaxPlayers         int       `json:"max_players"`
+	CurrentPlayer      int       `json:"current_player"`
+	PlayerImages       []string  `json:"player_images"`
+	PlayerIDs          []int64   `json:"player_ids"`           // all joined player user IDs
+	RequestedPlayerIDs []int64   `json:"requested_player_ids"` // pending request user IDs
+	VenueLat           float64   `json:"venue_lat"`
+	VenueLon           float64   `json:"venue_lon"`
 }
 
 type GameStore struct {
@@ -292,14 +332,14 @@ func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) e
 	return nil
 }
 
+// TODO: delete later
 func (s *GameStore) InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error {
 	query := `
-            INSERT INTO game_players (game_id, user_id, role)
-            VALUES ($1, $2, 'admin')`
-	_, err := s.db.ExecContext(ctx, query,
-		gameID, userID)
+		INSERT INTO game_players (game_id, user_id, role)
+		VALUES ($1, $2, 'admin')`
+	_, err := s.db.ExecContext(ctx, query, gameID, userID)
 	if err != nil {
-		return err
+		return fmt.Errorf("InsertAdminInPlayer error (gameID=%d, userID=%d): %w", gameID, userID, err)
 	}
 	return nil
 }
@@ -448,106 +488,106 @@ func (s *GameStore) AssignAssistant(ctx context.Context, gameID, playerID int64)
 }
 
 // GetGames queries the database for games that match the provided filters.
-func (s *GameStore) GetGames(ctx context.Context, q GameFilterQuery) ([]GameWithVenue, error) {
+func (s *GameStore) GetGames(ctx context.Context, q GameFilterQuery) ([]GameSummary, error) {
+	// Updated SQL query filtering out null profile_picture_url values.
 	query := `
-        SELECT 
-            g.id,
-            g.sport_type,
-            g.price,
-            g.format,
-            g.venue_id,
-            g.admin_id,
-            g.max_players,
-            g.game_level,
-            g.start_time,
-            g.end_time,
-            g.visibility,
-            g.status,
-            g.is_booked,
-            g.match_full,
-            g.created_at,
-            g.updated_at,
-            v.name AS venue_name,
-            v.address,
-            ST_Y(v.location::geometry) AS latitude,
-            ST_X(v.location::geometry) AS longitude,
-            v.amenities,
-            v.image_urls
-        FROM games g
-        JOIN venues v ON g.venue_id = v.id
-        WHERE 1=1
-            AND ($1::varchar IS NULL OR g.sport_type = $1)
-            AND ($2::varchar IS NULL OR g.game_level = $2)
-            AND ($3::int IS NULL OR g.venue_id = $3)
-            AND ($4::bool IS NULL OR g.is_booked = $4)
-            AND ($5::timestamp IS NULL OR g.start_time >= $5)
-            AND ($6::timestamp IS NULL OR g.end_time <= $6)
-            AND ($7::int IS NULL OR g.price >= $7)
-            AND ($8::int IS NULL OR g.price <= $8)
-            AND ($9::int = 0 OR ST_DWithin(
+SELECT 
+    g.id AS game_id,
+    g.venue_id,
+    v.name AS venue_name,
+    g.sport_type,
+    g.price,
+    g.format,
+    u.first_name AS game_admin_name,
+    g.game_level,
+    g.start_time,
+    g.end_time,
+    g.max_players,
+    (SELECT COUNT(*) FROM game_players gp WHERE gp.game_id = g.id) AS current_player,
+    COALESCE(
+      (
+        SELECT array_agg(t.profile_picture_url)
+        FROM (
+           SELECT u2.profile_picture_url
+           FROM game_players gp2
+           JOIN users u2 ON gp2.user_id = u2.id
+           WHERE gp2.game_id = g.id
+             AND u2.profile_picture_url IS NOT NULL
+           ORDER BY gp2.joined_at
+           LIMIT 4
+        ) AS t
+      ),
+      '{}'
+    ) AS player_images,
+    ST_Y(v.location::geometry) AS venue_lat,
+    ST_X(v.location::geometry) AS venue_lon
+FROM games g
+JOIN venues v ON g.venue_id = v.id
+JOIN users u ON g.admin_id = u.id
+WHERE 1 = 1
+    AND ($1::varchar IS NULL OR g.sport_type = $1)
+    AND ($2::varchar IS NULL OR g.game_level = $2)
+    AND ($3::int IS NULL OR g.venue_id = $3)
+    AND ($4::bool IS NULL OR g.is_booked = $4)
+    AND ($5::timestamp IS NULL OR g.start_time >= $5)
+    AND ($6::timestamp IS NULL OR g.end_time <= $6)
+    AND ($7::int IS NULL OR g.price >= $7)
+    AND ($8::int IS NULL OR g.price <= $8)
+    AND ($9::int = 0 OR ST_DWithin(
                 v.location, 
                 ST_MakePoint($10, $11)::geography, 
-                $9 * 1000)  -- Convert km to meters
-            )
-        ORDER BY g.start_time ` + q.Sort + `
-        LIMIT $12 OFFSET $13`
+                $9 * 1000
+    ))
+ORDER BY g.start_time ` + q.Sort + `
+LIMIT $12 OFFSET $13`
 
-	// Create a timeout context for the query.
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	// We use helper functions to substitute nil values when defaults apply.
 	rows, err := s.db.QueryContext(ctx, query,
-		nullIfEmpty(q.SportType),
-		nullIfEmpty(q.GameLevel),
-		nullIfZero(q.VenueID),
-		q.IsBooked, // pointer; nil if not filtered
-		nullTime(q.StartAfter),
-		nullTime(q.EndBefore),
-		nullIfZero(q.MinPrice),
-		nullIfZero(q.MaxPrice),
-		q.Radius,
-		q.UserLon, // Note: longitude (X coordinate)
-		q.UserLat, // Note: latitude (Y coordinate)
-		q.Limit,
-		q.Offset,
+		nullIfEmpty(q.SportType), // $1: sport_type
+		nullIfEmpty(q.GameLevel), // $2: game_level
+		nullIfZero(q.VenueID),    // $3: venue_id
+		q.IsBooked,               // $4: is_booked
+		nullTime(q.StartAfter),   // $5: start_after
+		nullTime(q.EndBefore),    // $6: end_before
+		nullIfZero(q.MinPrice),   // $7: min_price
+		nullIfZero(q.MaxPrice),   // $8: max_price
+		q.Radius,                 // $9: radius (0 means no filtering)
+		q.UserLon,                // $10: user longitude
+		q.UserLat,                // $11: user latitude
+		q.Limit,                  // $12: limit
+		q.Offset,                 // $13: offset
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var games []GameWithVenue
+	var games []GameSummary
 	for rows.Next() {
-		var g GameWithVenue
+		var game GameSummary
 		err := rows.Scan(
-			&g.ID,
-			&g.SportType,
-			&g.Price,
-			&g.Format,
-			&g.VenueID,
-			&g.AdminID,
-			&g.MaxPlayers,
-			&g.GameLevel,
-			&g.StartTime,
-			&g.EndTime,
-			&g.Visibility,
-			&g.Status,
-			&g.IsBooked,
-			&g.MatchFull,
-			&g.CreatedAt,
-			&g.UpdatedAt,
-			&g.VenueName,
-			&g.Address,
-			&g.Latitude,
-			&g.Longitude,
-			pq.Array(&g.Amenities),
-			pq.Array(&g.ImageURLs),
+			&game.GameID,
+			&game.VenueID,
+			&game.VenueName,
+			&game.SportType,
+			&game.Price,
+			&game.Format,
+			&game.GameAdminName,
+			&game.GameLevel,
+			&game.StartTime,
+			&game.EndTime,
+			&game.MaxPlayers,
+			&game.CurrentPlayer,
+			pq.Array(&game.PlayerImages),
+			&game.VenueLat,
+			&game.VenueLon,
 		)
 		if err != nil {
 			return nil, err
 		}
-		games = append(games, g)
+		games = append(games, game)
 	}
 
 	return games, nil
@@ -608,7 +648,7 @@ func (s *GameStore) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*Ga
 			u.first_name, u.phone, u.profile_picture_url, u.skill_level
 		FROM game_join_requests gr
 		JOIN users u ON gr.user_id = u.id
-		WHERE gr.game_id = $1
+		WHERE gr.game_id = $1 AND gr.status = 'pending'
 `
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
@@ -643,4 +683,103 @@ func (s *GameStore) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*Ga
 	}
 
 	return requests, nil
+}
+
+// GetGameDetailsWithID returns detailed info for a single game, including booking status,
+// the admin ID, all joined players' IDs, and pending join-request IDs.
+func (s *GameStore) GetGameDetailsWithID(ctx context.Context, gameID int64) (*GameDetails, error) {
+	query := `
+SELECT
+	g.id               AS game_id,
+	g.venue_id,
+	v.name             AS venue_name,
+	g.sport_type,
+	g.price,
+	g.format,
+	g.game_level,
+	g.admin_id,
+	u.first_name       AS game_admin_name,
+	g.is_booked,
+	g.start_time,
+	g.end_time,
+	g.max_players,
+	(
+		SELECT COUNT(*)
+		FROM game_players gp
+		WHERE gp.game_id = g.id
+	)                   AS current_player,
+	COALESCE(
+		(
+			SELECT array_agg(t.profile_picture_url)
+			FROM (
+				SELECT u2.profile_picture_url
+				FROM game_players gp2
+				JOIN users u2 ON gp2.user_id = u2.id
+				WHERE gp2.game_id = g.id
+				  AND u2.profile_picture_url IS NOT NULL
+				ORDER BY gp2.joined_at
+				LIMIT 4
+			) AS t
+		),
+		'{}'
+	)                   AS player_images,
+	COALESCE(
+		(
+			SELECT array_agg(gp2.user_id)
+			FROM game_players gp2
+			WHERE gp2.game_id = g.id
+		),
+		'{}'
+	)                   AS player_ids,
+	COALESCE(
+		(
+			SELECT array_agg(gr.user_id)
+			FROM game_join_requests gr
+			WHERE gr.game_id = g.id
+			  AND gr.status = 'pending'
+		),
+		'{}'
+	)                   AS requested_player_ids,
+	ST_Y(v.location::geometry) AS venue_lat,
+	ST_X(v.location::geometry) AS venue_lon
+FROM games g
+JOIN venues v ON g.venue_id = v.id
+JOIN users u ON g.admin_id = u.id
+WHERE g.id = $1
+`
+
+	// enforce timeout
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	var gd GameDetails
+	err := s.db.QueryRowContext(ctx, query, gameID).Scan(
+		&gd.GameID,
+		&gd.VenueID,
+		&gd.VenueName,
+		&gd.SportType,
+		&gd.Price,
+		&gd.Format,
+		&gd.GameLevel,
+		&gd.AdminID,
+		&gd.GameAdminName,
+		&gd.IsBooked,
+		&gd.StartTime,
+		&gd.EndTime,
+		&gd.MaxPlayers,
+		&gd.CurrentPlayer,
+		pq.Array(&gd.PlayerImages),
+		pq.Array(&gd.PlayerIDs),
+		pq.Array(&gd.RequestedPlayerIDs),
+		&gd.VenueLat,
+		&gd.VenueLon,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("error retrieving game details: %w", err)
+	}
+
+	return &gd, nil
 }

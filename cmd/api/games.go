@@ -54,9 +54,13 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 		app.badRequestResponse(w, r, err)
 		return
 	}
+	//TODO: delete later
+	fmt.Printf("validated payload is %v:", payload)
 
 	// 2. Get the authenticated user
 	user := getUserFromContext(r)
+	//TODO: delete later
+	fmt.Printf("the user to create game is %v", user.FirstName)
 
 	// 4. Create the game
 	game := &store.Game{
@@ -83,14 +87,19 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	//TODO: delete later
+	fmt.Printf("Games Created at database..........✅")
+
 	// Put the admin in the game player
 	err = app.store.Games.InsertAdminInPlayer(r.Context(), gameID, user.ID)
 	if err != nil {
+		log.Println("🚨🚨🚨InsertAdminInPlayer failed:", err)
 		writeJSONError(w, http.StatusInternalServerError, "Failed to add player")
 		return
 	}
 	// 6. Return the created game as the response
 	if err := app.jsonResponse(w, http.StatusCreated, game); err != nil {
+
 		app.internalServerError(w, r, err)
 		return
 	}
@@ -422,70 +431,38 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 //	@Failure		500			{object}	error					"Internal server error"
 //	@Router			/get-games [get]
 func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("getGamesHandler triggered") // Debug log
+	log.Println("getGamesHandler triggered")
+
 	// Set default filter values.
 	fq := store.GameFilterQuery{
 		Limit:  20,
 		Offset: 0,
 		Sort:   "asc",
-		Radius: 0, // A radius of 0 indicates no location-based filtering.
+		Radius: 0, // 0 means no location-based filtering.
 	}
 
-	// Parse query parameters from the request to override defaults.
+	// Parse query parameters from the request (overriding defaults if provided).
 	fq, err := fq.Parse(r)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	// Validate the filter query. This step ensures, for example, that Limit is at least 1 and Sort is either "asc" or "desc".
+	// Validate the filter query.
 	if err := Validate.Struct(fq); err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	// Query the database using the parsed filter.
+	// Query the database for matching games.
 	games, err := app.store.Games.GetGames(r.Context(), fq)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	// Transform each game into a Mapbox feature (GeoJSON format)
-	type GameFeature struct {
-		Type       string                 `json:"type"`
-		Geometry   map[string]interface{} `json:"geometry"`
-		Properties map[string]interface{} `json:"properties"`
-	}
-
-	features := make([]GameFeature, 0, len(games))
-	for _, game := range games {
-		features = append(features, GameFeature{
-			Type: "Feature",
-			Geometry: map[string]interface{}{
-				"type":        "Point",
-				"coordinates": []float64{game.Longitude, game.Latitude},
-			},
-			Properties: map[string]interface{}{
-				"id":        game.ID,
-				"sportType": game.SportType,
-				"startTime": game.StartTime,
-				"endTime":   game.EndTime,
-				"venueName": game.VenueName,
-				"address":   game.Address,
-				"price":     game.Price,
-				"imageUrls": game.ImageURLs,
-				"amenities": game.Amenities,
-				"isBooked":  game.IsBooked,
-			},
-		})
-	}
-
-	// Build the JSON response including both raw game data and GeoJSON features.
-	response := map[string]interface{}{
-		"results":  games,
-		"features": features,
-	}
+	response := make([]store.GameSummary, len(games))
+	copy(response, games)
 
 	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
 		app.internalServerError(w, r, err)
@@ -596,5 +573,45 @@ func (app *application) getAllGameJoinRequestsHandler(w http.ResponseWriter, r *
 	if err := app.jsonResponse(w, http.StatusOK, requests); err != nil {
 		app.internalServerError(w, r, err)
 		return
+	}
+}
+
+// GetGameDetails godoc
+//
+//	@Summary		Get detailed game information
+//	@Description	Returns detailed information for a specific game including venue details and player images
+//	@Tags			Games
+//	@Accept			json
+//	@Produce		json
+//	@Param			gameID	path		int	true	"Game ID"
+//	@Success		200		{object}	store.GameDetails
+//	@Failure		400		{object}	error	"Invalid game ID"
+//	@Failure		404		{object}	error	"Game not found"
+//	@Failure		500		{object}	error	"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/games/{gameID} [get]
+func (app *application) getGameDetailsHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse gameID from URL
+	gameIDStr := chi.URLParam(r, "gameID")
+	gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, errors.New("invalid game ID"))
+		return
+	}
+
+	// Fetch game details
+	game, err := app.store.Games.GetGameDetailsWithID(r.Context(), gameID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			app.notFoundResponse(w, r, errors.New("game not found"))
+			return
+		}
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Return JSON response
+	if err := app.jsonResponse(w, http.StatusOK, game); err != nil {
+		app.internalServerError(w, r, err)
 	}
 }

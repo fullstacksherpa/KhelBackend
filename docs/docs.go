@@ -23,6 +23,90 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/app-reviews": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns all app reviews from all users.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "App_Reviews"
+                ],
+                "summary": "List All App Reviews",
+                "responses": {
+                    "200": {
+                        "description": "List of all reviews",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.AppReview"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized route",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows authenticated users to submit a rating and feedback for the app.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "App_Reviews"
+                ],
+                "summary": "Submit App Review",
+                "parameters": [
+                    {
+                        "description": "Review payload",
+                        "name": "review",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.AppReviewPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Review submitted",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/authentication/refresh": {
             "post": {
                 "description": "Validates the provided refresh token and issues new access and refresh tokens.",
@@ -339,6 +423,55 @@ const docTemplate = `{
                 }
             }
         },
+        "/games/{gameID}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns detailed information for a specific game including venue details and player images",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Get detailed game information",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/store.GameDetails"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid game ID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Game not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/games/{gameID}/accept": {
             "post": {
                 "security": [
@@ -565,6 +698,264 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/qa": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get all questions with replies for a game",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Questions"
+                ],
+                "summary": "Get all Q\u0026A for a game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.QuestionWithReplies"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/questions": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get all questions for a game",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Questions"
+                ],
+                "summary": "Get game questions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.Question"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new question for a game",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Questions"
+                ],
+                "summary": "Create a game question",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Question payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.QuestionPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/store.Question"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/questions/{questionID}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete a question (only by author)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Questions"
+                ],
+                "summary": "Delete a question",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Question ID",
+                        "name": "questionID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/games/{gameID}/questions/{questionID}/replies": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a reply to a question (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Questions"
+                ],
+                "summary": "Create a reply",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Question ID",
+                        "name": "questionID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reply payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ReplyPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/store.Reply"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {}
                     }
                 }
@@ -1393,6 +1784,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/venue/{id}": {
+            "get": {
+                "description": "Retrieve detailed information for a venue including aggregated review and game statistics.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Get venue details",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response with venue details",
+                        "schema": {
+                            "$ref": "#/definitions/main.VenueDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid venue id",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found: Venue not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venues": {
             "post": {
                 "security": [
@@ -2117,6 +2549,17 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "main.AppReviewPayload": {
+            "type": "object",
+            "properties": {
+                "feedback": {
+                    "type": "string"
+                },
+                "rating": {
+                    "type": "integer"
+                }
+            }
+        },
         "main.AvailableTimeSlot": {
             "type": "object",
             "properties": {
@@ -2257,6 +2700,18 @@ const docTemplate = `{
                 }
             }
         },
+        "main.QuestionPayload": {
+            "type": "object",
+            "required": [
+                "question"
+            ],
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "maxLength": 120
+                }
+            }
+        },
         "main.RefreshPayload": {
             "type": "object",
             "required": [
@@ -2300,6 +2755,18 @@ const docTemplate = `{
                 }
             }
         },
+        "main.ReplyPayload": {
+            "type": "object",
+            "required": [
+                "reply"
+            ],
+            "properties": {
+                "reply": {
+                    "type": "string",
+                    "maxLength": 120
+                }
+            }
+        },
         "main.RequestResetPasswordPayload": {
             "type": "object",
             "required": [
@@ -2337,6 +2804,9 @@ const docTemplate = `{
                 },
                 "refresh_token": {
                     "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
                 }
             }
         },
@@ -2367,6 +2837,72 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/store.User"
+                }
+            }
+        },
+        "main.VenueDetailResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "amenities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "average_rating": {
+                    "type": "number"
+                },
+                "completed_games": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_urls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "location": {
+                    "description": "[latitude, longitude]",
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "open_time": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "phone_number": {
+                    "type": "string"
+                },
+                "sport": {
+                    "type": "string"
+                },
+                "total_reviews": {
+                    "type": "integer"
+                },
+                "upcoming_games": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -2435,6 +2971,26 @@ const docTemplate = `{
             "properties": {
                 "is_owner": {
                     "type": "boolean"
+                }
+            }
+        },
+        "store.AppReview": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "feedback": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -2543,6 +3099,79 @@ const docTemplate = `{
                 }
             }
         },
+        "store.GameDetails": {
+            "type": "object",
+            "properties": {
+                "admin_id": {
+                    "type": "integer"
+                },
+                "current_player": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "format": {
+                    "type": "string"
+                },
+                "game_admin_name": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "game_level": {
+                    "type": "string"
+                },
+                "is_booked": {
+                    "type": "boolean"
+                },
+                "max_players": {
+                    "type": "integer"
+                },
+                "player_ids": {
+                    "description": "all joined player user IDs",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "player_images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "requested_player_ids": {
+                    "description": "pending request user IDs",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "sport_type": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                },
+                "venue_lat": {
+                    "type": "number"
+                },
+                "venue_lon": {
+                    "type": "number"
+                },
+                "venue_name": {
+                    "type": "string"
+                }
+            }
+        },
         "store.GameRequestStatus": {
             "type": "string",
             "enum": [
@@ -2612,6 +3241,72 @@ const docTemplate = `{
                 },
                 "venueID": {
                     "type": "integer"
+                }
+            }
+        },
+        "store.Question": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "question": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "store.QuestionWithReplies": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "question": {
+                    "type": "string"
+                },
+                "replies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.Reply"
+                    }
+                }
+            }
+        },
+        "store.Reply": {
+            "type": "object",
+            "properties": {
+                "admin_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "question_id": {
+                    "type": "integer"
+                },
+                "reply": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },

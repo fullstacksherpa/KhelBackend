@@ -79,3 +79,7 @@ func (a *JWTAuthenticator) ValidateRefreshToken(token string) (*jwt.Token, error
 		return []byte(a.refreshSecret), nil
 	}, jwt.WithExpirationRequired(), jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
 }
+
+func (a *JWTAuthenticator) Secret() string {
+	return a.secret
+}

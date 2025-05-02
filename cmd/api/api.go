@@ -111,6 +111,7 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Route("/v1", func(r chi.Router) {
+		r.Get("/venue/{id}", app.getVenueDetailHandler)
 		r.Get("/list-venues", app.listVenuesHandler)
 		r.Get("/get-games", app.getGamesHandler)
 		r.Get("/health", app.healthCheckHandler)
@@ -118,6 +119,12 @@ func (app *application) mount() http.Handler {
 		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
 
 		r.With(app.BasicAuthMiddleware()).Get("/debug/vars", expvar.Handler().ServeHTTP)
+
+		r.Route("/app-reviews", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+			r.Post("/", app.submitReviewHandler)
+			r.Get("/", app.getAllAppReviewsHandler)
+		})
 
 		r.Route("/venues", func(r chi.Router) {
 
@@ -146,13 +153,13 @@ func (app *application) mount() http.Handler {
 		})
 		// Route that does NOT require authentication
 		r.Put("/users/activate/{token}", app.activateUserHandler)
-
+		r.With(app.AuthTokenIgnoreExpiryMiddleware).Post("/users/logout", app.logoutHandler)
 		r.Route("/users", func(r chi.Router) {
+
 			r.Use(app.AuthTokenMiddleware)
 			r.Put("/", app.updateUserHandler)
 			r.Post("/profile-picture", app.uploadProfilePictureHandler)
 			r.Put("/profile-picture", app.updateProfilePictureHandler)
-			r.Post("/logout", app.logoutHandler)
 
 			r.Route("/{userID}", func(r chi.Router) {
 				r.Use(app.AuthTokenMiddleware)
@@ -166,6 +173,8 @@ func (app *application) mount() http.Handler {
 			r.Get("/shortlist", app.listShortlistedGamesHandler)
 			r.Post("/create", app.createGameHandler)
 			r.Route("/{gameID}", func(r chi.Router) {
+				r.Get("/qa", app.getGameQAHandler)
+				r.Get("/", app.getGameDetailsHandler)
 				r.Post("/shortlist", app.addShortlistedGameHandler)      // Add game to shortlist
 				r.Delete("/shortlist", app.removeShortlistedGameHandler) // Remove game from shortlist
 				r.With(app.CheckAdmin).Post("/assign-assistant/{playerID}", app.AssignAssistantHandler)
@@ -176,6 +185,16 @@ func (app *application) mount() http.Handler {
 				r.With(app.RequireGameAdminAssistant).Post("/reject", app.RejectJoinRequest)
 				r.With(app.RequireGameAdminAssistant).Patch("/toggle-match-full", app.toggleMatchFullHandler)
 				r.With(app.RequireGameAdminAssistant).Patch("/cancel-game", app.cancelGameHandler)
+
+				r.Route("/questions", func(r chi.Router) {
+					r.Post("/", app.createQuestionHandler)
+					r.Get("/", app.getGameQuestionsHandler)
+
+					r.Route("/{questionID}", func(r chi.Router) {
+						r.Delete("/", app.deleteQuestionHandler)
+						r.With(app.RequireGameAdminAssistant).Post("/replies", app.createReplyHandler)
+					})
+				})
 
 			})
 		})

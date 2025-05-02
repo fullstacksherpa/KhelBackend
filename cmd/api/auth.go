@@ -8,6 +8,7 @@ import (
 	"khel/internal/mailer"
 	"khel/internal/store"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -129,6 +130,7 @@ type CreateUserTokenPayload struct {
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	UserID       string `json:"user_id"`
 }
 
 // Envelope is a wrapper for API responses.made for swagger doc success output
@@ -188,12 +190,11 @@ func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Reques
 		app.internalServerError(w, r, err)
 		return
 	}
-
+	userIDStr := strconv.FormatInt(user.ID, 10)
 	response := map[string]string{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
-		"profile_image": user.ProfilePictureURL.String,
-		"first_name":    user.FirstName,
+		"user_id":       userIDStr,
 	}
 	fmt.Println(response)
 
@@ -220,6 +221,7 @@ func (app *application) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	// Delete refresh token from DB
 	err := app.store.Users.DeleteRefreshToken(r.Context(), userID)
 	if err != nil {
+		fmt.Printf("the error from handler is %s", err)
 		app.internalServerError(w, r, err)
 		return
 	}

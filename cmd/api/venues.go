@@ -416,3 +416,80 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 		app.internalServerError(w, r, err)
 	}
 }
+
+type VenueDetailResponse struct {
+	ID             int64     `json:"id"`
+	OwnerID        int64     `json:"owner_id"`
+	Name           string    `json:"name"`
+	Address        string    `json:"address"`
+	Location       []float64 `json:"location"` // [latitude, longitude]
+	Description    *string   `json:"description,omitempty"`
+	PhoneNumber    string    `json:"phone_number"`
+	Amenities      []string  `json:"amenities,omitempty"`
+	OpenTime       *string   `json:"open_time,omitempty"`
+	Sport          string    `json:"sport"`
+	ImageURLs      []string  `json:"image_urls,omitempty"`
+	CreatedAt      string    `json:"created_at"`
+	UpdatedAt      string    `json:"updated_at"`
+	TotalReviews   int       `json:"total_reviews"`
+	AverageRating  float64   `json:"average_rating"`
+	UpcomingGames  int       `json:"upcoming_games"`
+	CompletedGames int       `json:"completed_games"`
+}
+
+// getVenueDetailHandler handles the GET /venue/{id} endpoint.
+//
+//	@Summary		Get venue details
+//	@Description	Retrieve detailed information for a venue including aggregated review and game statistics.
+//	@Tags			Venue
+//	@Produce		json
+//	@Param			id	path		int					true	"Venue ID"
+//	@Success		200	{object}	VenueDetailResponse	"Successful response with venue details"
+//	@Failure		400	{object}	error				"Bad Request: Invalid venue id"
+//	@Failure		404	{object}	error				"Not Found: Venue not found"
+//	@Failure		500	{object}	error				"Internal Server Error"
+//	@Router			/venue/{id} [get]
+func (app *application) getVenueDetailHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract venue ID from the URL.
+	venueIDStr := chi.URLParam(r, "id")
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil || venueID <= 0 {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venue id"))
+		return
+	}
+	fmt.Printf("the venue id is %v", venueID)
+
+	// Query the venue detail using the repository method.
+	vd, err := app.store.Venues.GetVenueDetail(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, fmt.Errorf("venue not found: %v", err))
+		return
+	}
+
+	// Optionally, you can format the timestamps as needed.
+	resp := VenueDetailResponse{
+		ID:             vd.ID,
+		OwnerID:        vd.OwnerID,
+		Name:           vd.Name,
+		Address:        vd.Address,
+		Location:       vd.Location,
+		Description:    vd.Description,
+		PhoneNumber:    vd.PhoneNumber,
+		Amenities:      vd.Amenities,
+		OpenTime:       vd.OpenTime,
+		Sport:          vd.Sport,
+		ImageURLs:      vd.ImageURLs,
+		CreatedAt:      vd.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:      vd.UpdatedAt.Format(time.RFC3339),
+		TotalReviews:   vd.TotalReviews,
+		AverageRating:  vd.AverageRating,
+		UpcomingGames:  vd.UpcomingGames,
+		CompletedGames: vd.CompletedGames,
+	}
+
+	// Send the response as JSON.
+	if err := app.jsonResponse(w, http.StatusOK, resp); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+}
