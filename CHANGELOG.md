@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.6.0...v1.7.0) (2025-05-02)
+
+
+### Features
+
+* added game question and answer ([92914c0](https://github.com/fullstacksherpa/KhelBackend/commit/92914c0f8d6de45f924260b8eca6c1f125f82528))
+
+
+### Bug Fixes
+
+* change ubuntu version to latest ([593d6c3](https://github.com/fullstacksherpa/KhelBackend/commit/593d6c3251e84574b47491bc1a5b448d4bccf528))
+
 ## [1.6.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.5.0...v1.6.0) (2025-04-10)
 
 
