@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.7.0...v1.8.0) (2025-05-09)
+
+
+### Features
+
+* added booking ([6414abc](https://github.com/fullstacksherpa/KhelBackend/commit/6414abc130b34c5882f18422bea1051441d1737b))
+
 ## [1.7.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.6.0...v1.7.0) (2025-05-02)
 
 
