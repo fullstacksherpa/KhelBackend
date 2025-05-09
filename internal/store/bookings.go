@@ -63,35 +63,16 @@ func (s *BookingStore) GetPricingSlots(ctx context.Context, venueID int64, dayOf
 	var slots []PricingSlot
 	for rows.Next() {
 		var ps PricingSlot
-		var startTimeStr, endTimeStr string
-		if err := rows.Scan(&ps.ID, &ps.VenueID, &ps.DayOfWeek, &startTimeStr, &endTimeStr, &ps.Price); err != nil {
+		var start, end time.Time
+		if err := rows.Scan(&ps.ID, &ps.VenueID, &ps.DayOfWeek, &start, &end, &ps.Price); err != nil {
 			return nil, err
 		}
 		// Parse the time values (assumes format "15:04:05")
-		ps.StartTime, _ = time.Parse("15:04:05", startTimeStr)
-		ps.EndTime, _ = time.Parse("15:04:05", endTimeStr)
+		ps.StartTime = start
+		ps.EndTime = end
 		slots = append(slots, ps)
 	}
 	return slots, nil
-	//		[
-	//	  {
-	//	    "ID": 1,
-	//	    "VenueID": 100,
-	//	    "DayOfWeek": "monday",
-	//	    "StartTime": "0000-01-01T09:00:00Z",
-	//	    "EndTime": "0000-01-01T12:00:00Z",
-	//	    "Price": 1500
-	//	  },
-	//	  {
-	//	    "ID": 2,
-	//	    "VenueID": 100,
-	//	    "DayOfWeek": "monday",
-	//	    "StartTime": "0000-01-01T13:00:00Z",
-	//	    "EndTime": "0000-01-01T18:00:00Z",
-	//	    "Price": 2000
-	//	  }
-	//
-	// ]
 }
 
 // GetBookingsForDate retrieves existing bookings for a venue on a specific date.
@@ -158,4 +139,19 @@ func (s *BookingStore) UpdatePricing(ctx context.Context, p *PricingSlot) error 
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+func (s *BookingStore) CreatePricingSlot(ctx context.Context, p *PricingSlot) error {
+	query := `
+    INSERT INTO venue_pricing
+      (venue_id, day_of_week, start_time, end_time, price)
+    VALUES ($1,$2,$3,$4,$5)
+    RETURNING id`
+	return s.db.QueryRowContext(ctx, query,
+		p.VenueID,
+		p.DayOfWeek,
+		p.StartTime.Format("15:04:05"),
+		p.EndTime.Format("15:04:05"),
+		p.Price,
+	).Scan(&p.ID)
 }

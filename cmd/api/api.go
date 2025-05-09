@@ -112,8 +112,6 @@ func (app *application) mount() http.Handler {
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/venue/{id}", app.getVenueDetailHandler)
-		r.Get("/list-venues", app.listVenuesHandler)
-		r.Get("/get-games", app.getGamesHandler)
 		r.Get("/health", app.healthCheckHandler)
 		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
 		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
@@ -129,6 +127,7 @@ func (app *application) mount() http.Handler {
 		r.Route("/venues", func(r chi.Router) {
 
 			r.Use(app.AuthTokenMiddleware)
+			r.Get("/list-venues", app.listVenuesHandler)
 			r.Get("/favorites", app.listFavoritesHandler)
 			// Expects URL: /venues/{venueID}/available-times?date=YYYY-MM-DD
 			r.Get("/{venueID}/available-times", app.availableTimesHandler)
@@ -143,6 +142,7 @@ func (app *application) mount() http.Handler {
 			// Routes that require venue ownership
 			r.Route("/{venueID}", func(r chi.Router) {
 				r.Use(app.IsOwnerMiddleware)
+				r.Post("/pricing", app.createVenuePricingHandler)
 				r.Put("/pricing/{pricingID}", app.updateVenuePricingHandler)
 				r.Patch("/", app.updateVenueInfo)
 				r.Delete("/photos", app.deleteVenuePhotoHandler)
@@ -170,8 +170,10 @@ func (app *application) mount() http.Handler {
 
 		r.Route("/games", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
+			r.Get("/get-games", app.getGamesHandler)
 			r.Get("/shortlist", app.listShortlistedGamesHandler)
 			r.Post("/create", app.createGameHandler)
+			r.Get("/{venueID}/upcoming", app.getUpcomingGamesByVenueHandler)
 			r.Route("/{gameID}", func(r chi.Router) {
 				r.Get("/qa", app.getGameQAHandler)
 				r.Get("/", app.getGameDetailsHandler)

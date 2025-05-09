@@ -384,6 +384,137 @@ const docTemplate = `{
                 }
             }
         },
+        "/games/get-games": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a list of games based on filters such as sport type, game level, venue, booking status, location, time range, and status.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Retrieve a list of games",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Sport type to filter games (e.g., basketball)",
+                        "name": "sport_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Game level (e.g., intermediate)",
+                        "name": "game_level",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Venue ID to filter games",
+                        "name": "venue_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter games based on booking status",
+                        "name": "is_booked",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Game status: active, cancelled, completed",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User latitude for location filtering",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "User longitude for location filtering",
+                        "name": "lon",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Radius in kilometers for location-based filtering (0 for no filter)",
+                        "name": "radius",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter games starting after this time (RFC3339 format)",
+                        "name": "start_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter games ending before this time (RFC3339 format)",
+                        "name": "end_before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum price",
+                        "name": "min_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum price",
+                        "name": "max_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of results to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pagination offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort order, either 'asc' or 'desc'",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of games and GeoJSON features",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.GameSummary"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request parameters",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/games/shortlist": {
             "get": {
                 "security": [
@@ -595,7 +726,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/games/{gameID}/cancel": {
+        "/games/{gameID}/cancel-game": {
             "patch": {
                 "security": [
                     {
@@ -1279,9 +1410,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/get-games": {
+        "/games/{venueID}/upcoming": {
             "get": {
-                "description": "Returns a list of games based on filters such as sport type, game level, venue, booking status, location, and time range. The response includes both raw game data and GeoJSON features for mapping.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a list of upcoming active games for the specified venue.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1291,107 +1427,32 @@ const docTemplate = `{
                 "tags": [
                     "Games"
                 ],
-                "summary": "Retrieve a list of games",
+                "summary": "Retrieve upcoming active games at a venue",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Sport type to filter games (e.g., basketball)",
-                        "name": "sport_type",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Game level (e.g., intermediate)",
-                        "name": "game_level",
-                        "in": "query"
-                    },
-                    {
                         "type": "integer",
-                        "description": "Venue ID to filter games",
-                        "name": "venue_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "Filter games based on booking status",
-                        "name": "is_booked",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "User latitude for location filtering",
-                        "name": "lat",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "User longitude for location filtering",
-                        "name": "lon",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Radius in kilometers for location-based filtering (0 for no filter)",
-                        "name": "radius",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter games starting after this time (RFC3339 format)",
-                        "name": "start_after",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter games ending before this time (RFC3339 format)",
-                        "name": "end_before",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Minimum price",
-                        "name": "min_price",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Maximum price",
-                        "name": "max_price",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Maximum number of results to return",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Pagination offset",
-                        "name": "offset",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Sort order, either 'asc' or 'desc'",
-                        "name": "sort",
-                        "in": "query"
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of games and GeoJSON features",
+                        "description": "List of upcoming active games",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.GameSummary"
+                            }
                         }
                     },
                     "400": {
-                        "description": "Invalid request parameters",
+                        "description": "Bad Request: Missing or invalid venueID",
                         "schema": {}
                     },
                     "500": {
-                        "description": "Internal server error",
+                        "description": "Internal Server Error: Could not retrieve upcoming games",
                         "schema": {}
                     }
                 }
@@ -1412,72 +1473,6 @@ const docTemplate = `{
                         "description": "ok",
                         "schema": {
                             "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/list-venues": {
-            "get": {
-                "description": "Get paginated list of venues with filters",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Venue"
-                ],
-                "summary": "List venues",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Filter by sport type",
-                        "name": "sport",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "Latitude for location filter",
-                        "name": "lat",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "Longitude for location filter",
-                        "name": "lng",
-                        "in": "query"
-                    },
-                    {
-                        "type": "number",
-                        "description": "Distance in meters from location",
-                        "name": "distance",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Items per page",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.VenueListResponse"
-                            }
                         }
                     }
                 }
@@ -1956,6 +1951,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/venues/list-venues": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get paginated list of venues with filters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "List venues",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by sport type",
+                        "name": "sport",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Latitude for location filter",
+                        "name": "lat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Longitude for location filter",
+                        "name": "lng",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Distance in meters from location",
+                        "name": "distance",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 7,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.VenueListResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/venues/{venueID}": {
             "patch": {
                 "security": [
@@ -2021,7 +2087,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Returns the available booking time slots for a given venue and date by subtracting booked intervals from the venue’s pricing slots.",
+                "description": "Returns one-hour buckets (with availability) for a given venue/day.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2050,20 +2116,20 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of available time slots",
+                        "description": "Hourly availability",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/main.AvailableTimeSlot"
+                                "$ref": "#/definitions/main.HourlySlot"
                             }
                         }
                     },
                     "400": {
-                        "description": "Bad Request: Invalid input",
+                        "description": "Bad Request",
                         "schema": {}
                     },
                     "500": {
-                        "description": "Internal Server Error: Could not retrieve available times",
+                        "description": "Internal Server Error",
                         "schema": {}
                     }
                 }
@@ -2329,6 +2395,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/venues/{venueID}/pricing": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Adds a new day/time price rule to venue_pricing",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Create a new pricing slot for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New pricing slot",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreatePricingPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Pricing slot created",
+                        "schema": {
+                            "$ref": "#/definitions/store.PricingSlot"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venues/{venueID}/pricing/{pricingID}": {
             "put": {
                 "security": [
@@ -2560,20 +2680,6 @@ const docTemplate = `{
                 }
             }
         },
-        "main.AvailableTimeSlot": {
-            "type": "object",
-            "properties": {
-                "end_time": {
-                    "type": "string"
-                },
-                "price_per_hour": {
-                    "type": "integer"
-                },
-                "start_time": {
-                    "type": "string"
-                }
-            }
-        },
         "main.BookVenuePayload": {
             "type": "object",
             "required": [
@@ -2654,6 +2760,40 @@ const docTemplate = `{
                 }
             }
         },
+        "main.CreatePricingPayload": {
+            "type": "object",
+            "required": [
+                "day_of_week",
+                "end_time",
+                "price",
+                "start_time"
+            ],
+            "properties": {
+                "day_of_week": {
+                    "type": "string",
+                    "enum": [
+                        "sunday",
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday"
+                    ]
+                },
+                "end_time": {
+                    "description": "format \"15:04:05\"",
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "description": "format \"15:04:05\"",
+                    "type": "string"
+                }
+            }
+        },
         "main.CreateUserTokenPayload": {
             "type": "object",
             "required": [
@@ -2677,6 +2817,23 @@ const docTemplate = `{
             "properties": {
                 "data": {
                     "$ref": "#/definitions/main.TokenResponse"
+                }
+            }
+        },
+        "main.HourlySlot": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "price_per_hour": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
                 }
             }
         },
@@ -2924,6 +3081,9 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "is_favorite": {
+                    "type": "boolean"
+                },
                 "location": {
                     "description": "[longitude, latitude]",
                     "type": "array",
@@ -2971,6 +3131,12 @@ const docTemplate = `{
             "properties": {
                 "is_owner": {
                     "type": "boolean"
+                },
+                "venue_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -3126,6 +3292,9 @@ const docTemplate = `{
                 "is_booked": {
                     "type": "boolean"
                 },
+                "match_full": {
+                    "type": "boolean"
+                },
                 "max_players": {
                     "type": "integer"
                 },
@@ -3156,6 +3325,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "start_time": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 },
                 "venue_id": {
@@ -3217,6 +3389,73 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "store.GameSummary": {
+            "type": "object",
+            "properties": {
+                "current_player": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "format": {
+                    "type": "string"
+                },
+                "game_admin_name": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "game_level": {
+                    "type": "string"
+                },
+                "is_booked": {
+                    "type": "boolean"
+                },
+                "match_full": {
+                    "type": "boolean"
+                },
+                "max_players": {
+                    "type": "integer"
+                },
+                "player_images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "shortlisted": {
+                    "type": "boolean"
+                },
+                "sport_type": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                },
+                "venue_lat": {
+                    "description": "Venue latitude",
+                    "type": "number"
+                },
+                "venue_lon": {
+                    "description": "Venue longitude",
+                    "type": "number"
+                },
+                "venue_name": {
+                    "type": "string"
                 }
             }
         },

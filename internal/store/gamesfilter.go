@@ -8,13 +8,14 @@ import (
 )
 
 type GameFilterQuery struct {
-	Limit     int    `validate:"gte=1"`          // Maximum number of results to return
-	Offset    int    `validate:"gte=0"`          // Pagination offset
-	Sort      string `validate:"oneof=asc desc"` // Sorting order for start_time
-	SportType string // Filter by sport type (e.g., "basketball")
-	GameLevel string // Filter by game level (e.g., "intermediate")
-	VenueID   int    // Filter by a specific venue id
-	IsBooked  *bool  // Filter based on booking status (nil = no filter)
+	Limit     int     `validate:"gte=1"`          // Maximum number of results to return
+	Offset    int     `validate:"gte=0"`          // Pagination offset
+	Sort      string  `validate:"oneof=asc desc"` // Sorting order for start_time
+	SportType string  // Filter by sport type (e.g., "basketball")
+	GameLevel string  // Filter by game level (e.g., "intermediate")
+	VenueID   int     // Filter by a specific venue id
+	IsBooked  *bool   // Filter based on booking status (nil = no filter)
+	Status    *string `validate:"omitempty,oneof=active cancelled completed"`
 
 	// Location-based filtering
 	UserLat float64 // User's latitude for radius filter
@@ -56,6 +57,11 @@ func (q GameFilterQuery) Parse(r *http.Request) (GameFilterQuery, error) {
 			return q, fmt.Errorf("invalid is_booked value: %w", err)
 		}
 		q.IsBooked = &isBooked
+	}
+
+	if status := params.Get("status"); status != "" {
+		// you may want to validate it's one of your enum values here
+		q.Status = &status
 	}
 
 	if latStr := params.Get("lat"); latStr != "" {

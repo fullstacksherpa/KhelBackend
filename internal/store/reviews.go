@@ -16,8 +16,8 @@ type Review struct {
 	UpdatedAt time.Time `json:"updated_at"`
 
 	// Joined fields
-	UserName  string `json:"user_name,omitempty"`
-	AvatarURL string `json:"avatar_url,omitempty"`
+	UserName  string  `json:"user_name,omitempty"`
+	AvatarURL *string `json:"avatar_url,omitempty"`
 }
 type ReviewStore struct {
 	db *sql.DB
@@ -40,7 +40,7 @@ func (s *ReviewStore) CreateReview(ctx context.Context, review *Review) error {
 func (s *ReviewStore) GetReviews(ctx context.Context, venueID int64) ([]Review, error) {
 	query := `
         SELECT vr.id, vr.venue_id, vr.user_id, vr.rating, vr.comment, 
-               vr.created_at, vr.updated_at, u.name, u.avatar_url
+               vr.created_at, vr.updated_at, u.first_name, u.profile_picture_url
         FROM reviews vr
         JOIN users u ON u.id = vr.user_id
         WHERE vr.venue_id = $1
@@ -69,6 +69,7 @@ func (s *ReviewStore) GetReviews(ctx context.Context, venueID int64) ([]Review, 
 		if err != nil {
 			return nil, err
 		}
+
 		reviews = append(reviews, review)
 	}
 	return reviews, nil

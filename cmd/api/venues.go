@@ -14,7 +14,8 @@ import (
 )
 
 type isOwnerResponse struct {
-	IsOwner bool `json:"is_owner"`
+	IsOwner  bool    `json:"is_owner"`
+	VenueIDs []int64 `json:"venue_ids,omitempty"`
 }
 
 // IsVenueOwner godoc
@@ -31,14 +32,15 @@ type isOwnerResponse struct {
 func (app *application) isVenueOwnerHandler(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(r)
 
-	isOwner, err := app.store.Venues.IsOwnerOfAnyVenue(r.Context(), user.ID)
+	venueIDs, err := app.store.Venues.GetOwnedVenueIDs(r.Context(), user.ID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
 	resp := isOwnerResponse{
-		IsOwner: isOwner,
+		IsOwner:  len(venueIDs) > 0,
+		VenueIDs: venueIDs,
 	}
 
 	if err := app.jsonResponse(w, http.StatusOK, resp); err != nil {
@@ -223,6 +225,7 @@ type VenueListResponse struct {
 	Sport         string    `json:"sport"`
 	TotalReviews  int       `json:"total_reviews"`
 	AverageRating float64   `json:"average_rating"`
+	IsFavorite    bool      `json:"is_favorite"`
 }
 
 // @Summary		List venues
@@ -235,9 +238,12 @@ type VenueListResponse struct {
 // @Param			lng			query	number	false	"Longitude for location filter"
 // @Param			distance	query	number	false	"Distance in meters from location"
 // @Param			page		query	int		false	"Page number"		default(1)
-// @Param			limit		query	int		false	"Items per page"	default(20)
+// @Param			limit		query	int		false	"Items per page"	default(7)
 // @Success		200			{array}	VenueListResponse
-// @Router			/list-venues [get]
+//
+//	@Security		ApiKeyAuth
+//
+// @Router			/venues/list-venues [get]
 func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	q := r.URL.Query()
@@ -247,8 +253,14 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 		page = 1
 	}
 	limit, _ := strconv.Atoi(q.Get("limit"))
-	if limit < 1 || limit > 25 {
-		limit = 12
+	if limit < 1 || limit > 15 {
+		limit = 7
+	}
+
+	// Check for a location filter and adjust pagination accordingly.
+	if q.Get("lat") != "" && q.Get("lng") != "" && q.Get("distance") != "" {
+		// Override pagination for map queries.
+		limit = 1000 // Or another value that makes sense for your data size.
 	}
 
 	fmt.Printf("the query object of listVenuesHandler is %v", q)
@@ -281,9 +293,18 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	var favMap map[int64]struct{}
+	user := getUserFromContext(r)
+	favMap, err = app.store.FavoriteVenues.GetFavoriteVenueIDsByUser(r.Context(), user.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
 	// Convert to response format
 	response := make([]VenueListResponse, len(venues))
 	for i, v := range venues {
+		_, isFav := favMap[v.ID]
 		response[i] = VenueListResponse{
 			ID:            v.ID,
 			Name:          v.Name,
@@ -295,6 +316,7 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 			Sport:         v.Sport,
 			TotalReviews:  v.TotalReviews,
 			AverageRating: v.AverageRating,
+			IsFavorite:    isFav,
 		}
 	}
 

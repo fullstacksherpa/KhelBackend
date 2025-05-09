@@ -3,9 +3,10 @@ package store
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // FavoriteVenue represents a favorite venue record.
@@ -69,23 +70,16 @@ func (s *FavoriteVenuesStore) GetFavoritesByUser(ctx context.Context, userID int
 	var favorites []Venue
 	for rows.Next() {
 		var v Venue
-		var amenitiesJSON []byte
-		var imageURLsJSON []byte
+
 		// Scan the venue fields – be sure to match the order and types.
 		if err := rows.Scan(
 			&v.ID, &v.OwnerID, &v.Name, &v.Address, &v.Description,
-			&amenitiesJSON, &v.OpenTime, &imageURLsJSON, &v.Sport,
+			pq.Array(&v.Amenities), &v.OpenTime, pq.Array(&v.ImageURLs), &v.Sport,
 			&v.CreatedAt, &v.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan venue row: %w", err)
 		}
-		// Unmarshal JSON arrays if needed.
-		if err := json.Unmarshal(amenitiesJSON, &v.Amenities); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal amenities: %w", err)
-		}
-		if err := json.Unmarshal(imageURLsJSON, &v.ImageURLs); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal image_urls: %w", err)
-		}
+
 		favorites = append(favorites, v)
 	}
 
@@ -94,4 +88,31 @@ func (s *FavoriteVenuesStore) GetFavoritesByUser(ctx context.Context, userID int
 	}
 
 	return favorites, nil
+}
+
+// GetFavoriteVenueIDsByUser returns the venue IDs a user has favorited.
+func (s *FavoriteVenuesStore) GetFavoriteVenueIDsByUser(ctx context.Context, userID int64) (map[int64]struct{}, error) {
+	query := `
+        SELECT venue_id
+        FROM favorite_venues
+        WHERE user_id = $1
+    `
+	rows, err := s.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get favorite ids: %w", err)
+	}
+	defer rows.Close()
+
+	favs := make(map[int64]struct{})
+	for rows.Next() {
+		var vid int64
+		if err := rows.Scan(&vid); err != nil {
+			return nil, fmt.Errorf("failed to scan favorite id: %w", err)
+		}
+		favs[vid] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return favs, nil
 }
