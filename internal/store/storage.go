@@ -41,7 +41,7 @@ type Storage struct {
 		AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error
 		IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error)
 		GetVenueByID(ctx context.Context, venueID int64) (*Venue, error)
-		IsOwnerOfAnyVenue(ctx context.Context, userID int64) (bool, error)
+		GetOwnedVenueIDs(ctx context.Context, userID int64) ([]int64, error)
 		List(ctx context.Context, filter VenueFilter) ([]VenueListing, error)
 		GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error)
 	}
@@ -76,17 +76,20 @@ type Storage struct {
 		AssignAssistant(ctx context.Context, gameID, playerID int64) error
 		CancelGame(ctx context.Context, gameID int64) error
 		GetGameDetailsWithID(ctx context.Context, gameID int64) (*GameDetails, error)
+		GetUpcomingGamesByVenue(ctx context.Context, venueID int64) ([]GameSummary, error)
 	}
 	Bookings interface {
 		GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error)
 		GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error)
 		CreateBooking(ctx context.Context, booking *Booking) error
 		UpdatePricing(ctx context.Context, p *PricingSlot) error
+		CreatePricingSlot(ctx context.Context, p *PricingSlot) error
 	}
 	FavoriteVenues interface {
 		AddFavorite(ctx context.Context, userID, venueID int64) error
 		RemoveFavorite(ctx context.Context, userID, venueID int64) error
 		GetFavoritesByUser(ctx context.Context, userID int64) ([]Venue, error)
+		GetFavoriteVenueIDsByUser(ctx context.Context, userID int64) (map[int64]struct{}, error)
 	}
 	ShortlistedGames interface {
 		AddShortlist(ctx context.Context, userID, gameID int64) error

@@ -408,34 +408,34 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 // GetGames godoc
 //
 //	@Summary		Retrieve a list of games
-//	@Description	Returns a list of games based on filters such as sport type, game level, venue, booking status, location, and time range. The response includes both raw game data and GeoJSON features for mapping.
+//	@Description	Returns a list of games based on filters such as sport type, game level, venue, booking status, location, time range, and status.
 //	@Tags			Games
 //	@Accept			json
 //	@Produce		json
-//	@Param			sport_type	query		string					false	"Sport type to filter games (e.g., basketball)"
-//	@Param			game_level	query		string					false	"Game level (e.g., intermediate)"
-//	@Param			venue_id	query		int						false	"Venue ID to filter games"
-//	@Param			is_booked	query		boolean					false	"Filter games based on booking status"
-//	@Param			lat			query		number					false	"User latitude for location filtering"
-//	@Param			lon			query		number					false	"User longitude for location filtering"
-//	@Param			radius		query		int						false	"Radius in kilometers for location-based filtering (0 for no filter)"
-//	@Param			start_after	query		string					false	"Filter games starting after this time (RFC3339 format)"
-//	@Param			end_before	query		string					false	"Filter games ending before this time (RFC3339 format)"
-//	@Param			min_price	query		int						false	"Minimum price"
-//	@Param			max_price	query		int						false	"Maximum price"
-//	@Param			limit		query		int						false	"Maximum number of results to return"
-//	@Param			offset		query		int						false	"Pagination offset"
-//	@Param			sort		query		string					false	"Sort order, either 'asc' or 'desc'"
-//	@Success		200			{object}	map[string]interface{}	"List of games and GeoJSON features"
-//	@Failure		400			{object}	error					"Invalid request parameters"
-//	@Failure		500			{object}	error					"Internal server error"
-//	@Router			/get-games [get]
+//	@Param			sport_type	query		string				false	"Sport type to filter games (e.g., basketball)"
+//	@Param			game_level	query		string				false	"Game level (e.g., intermediate)"
+//	@Param			venue_id	query		int					false	"Venue ID to filter games"
+//	@Param			is_booked	query		boolean				false	"Filter games based on booking status"
+//	@Param			status		query		string				false	"Game status: active, cancelled, completed"
+//	@Param			lat			query		number				false	"User latitude for location filtering"
+//	@Param			lon			query		number				false	"User longitude for location filtering"
+//	@Param			radius		query		int					false	"Radius in kilometers for location-based filtering (0 for no filter)"
+//	@Param			start_after	query		string				false	"Filter games starting after this time (RFC3339 format)"
+//	@Param			end_before	query		string				false	"Filter games ending before this time (RFC3339 format)"
+//	@Param			min_price	query		int					false	"Minimum price"
+//	@Param			max_price	query		int					false	"Maximum price"
+//	@Param			limit		query		int					false	"Maximum number of results to return"
+//	@Param			offset		query		int					false	"Pagination offset"
+//	@Param			sort		query		string				false	"Sort order, either 'asc' or 'desc'"
+//	@Success		200			{object}	[]store.GameSummary	"List of games and GeoJSON features"
+//	@Failure		400			{object}	error				"Invalid request parameters"
+//	@Failure		500			{object}	error				"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/games/get-games [get]
 func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("getGamesHandler triggered")
-
 	// Set default filter values.
 	fq := store.GameFilterQuery{
-		Limit:  20,
+		Limit:  10,
 		Offset: 0,
 		Sort:   "asc",
 		Radius: 0, // 0 means no location-based filtering.
@@ -454,11 +454,35 @@ func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Get the currently logged in user.
+	user := getUserFromContext(r)
+	fmt.Printf("the getGame userID is %d", user.ID)
+
 	// Query the database for matching games.
 	games, err := app.store.Games.GetGames(r.Context(), fq)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
+	}
+
+	// Get the shortlisted games for the user.
+	shortlistedGames, err := app.store.ShortlistedGames.GetShortlistedGamesByUser(r.Context(), user.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Build a set of shortlisted game IDs for fast lookup.
+	shortlistedIDs := make(map[int64]struct{})
+	for _, sg := range shortlistedGames {
+		shortlistedIDs[sg.ID] = struct{}{}
+	}
+
+	// Mark games as shortlisted if they appear in the user's shortlist.
+	for i, game := range games {
+		if _, found := shortlistedIDs[game.GameID]; found {
+			games[i].Shortlisted = true
+		}
 	}
 
 	response := make([]store.GameSummary, len(games))
@@ -518,7 +542,7 @@ func (app *application) toggleMatchFullHandler(w http.ResponseWriter, r *http.Re
 //	@Failure		404	{object}	error				"Game not found"
 //	@Failure		500	{object}	error				"Internal server error"
 //	@Security		ApiKeyAuth
-//	@Router			/games/{gameID}/cancel [patch]
+//	@Router			/games/{gameID}/cancel-game [patch]
 func (app *application) cancelGameHandler(w http.ResponseWriter, r *http.Request) {
 	gameIDStr := chi.URLParam(r, "gameID")
 	gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
@@ -612,6 +636,46 @@ func (app *application) getGameDetailsHandler(w http.ResponseWriter, r *http.Req
 
 	// Return JSON response
 	if err := app.jsonResponse(w, http.StatusOK, game); err != nil {
+		app.internalServerError(w, r, err)
+	}
+}
+
+// GetUpcomingGamesByVenue godoc
+//
+//	@Summary		Retrieve upcoming active games at a venue
+//	@Description	Returns a list of upcoming active games for the specified venue.
+//	@Tags			Games
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID	path		int					true	"Venue ID"
+//	@Success		200		{array}		store.GameSummary	"List of upcoming active games"
+//	@Failure		400		{object}	error				"Bad Request: Missing or invalid venueID"
+//	@Failure		500		{object}	error				"Internal Server Error: Could not retrieve upcoming games"
+//	@Security		ApiKeyAuth
+//	@Router			/games/{venueID}/upcoming [get]
+func (app *application) getUpcomingGamesByVenueHandler(w http.ResponseWriter, r *http.Request) {
+	// Retrieve the venueID from the URL path parameter using Chi.
+	venueIDStr := chi.URLParam(r, "venueID")
+	if venueIDStr == "" {
+		app.badRequestResponse(w, r, fmt.Errorf("missing venueID parameter"))
+		return
+	}
+
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID parameter: %w", err))
+		return
+	}
+
+	// Query the database for upcoming active games at the specified venue.
+	games, err := app.store.Games.GetUpcomingGamesByVenue(r.Context(), venueID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Return the games as a JSON response.
+	if err := app.jsonResponse(w, http.StatusOK, games); err != nil {
 		app.internalServerError(w, r, err)
 	}
 }

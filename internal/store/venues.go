@@ -241,15 +241,26 @@ func (s *VenuesStore) IsOwner(ctx context.Context, venueID int64, userID int64) 
 	return false, nil
 }
 
-// IsOwnerOfAnyVenue checks if the user owns any venue
-func (s *VenuesStore) IsOwnerOfAnyVenue(ctx context.Context, userID int64) (bool, error) {
-	query := `SELECT 1 FROM venues WHERE owner_id = $1 LIMIT 1`
-	var dummy int
-	err := s.db.QueryRowContext(ctx, query, userID).Scan(&dummy)
-	if err == sql.ErrNoRows {
-		return false, nil
+func (s *VenuesStore) GetOwnedVenueIDs(ctx context.Context, userID int64) ([]int64, error) {
+	query := `SELECT id FROM venues WHERE owner_id = $1`
+	rows, err := s.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
 	}
-	return err == nil, err
+	defer rows.Close()
+
+	var venueIDs []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		venueIDs = append(venueIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return venueIDs, nil
 }
 
 // GetVenueByID retrieves a venue by its ID.
@@ -298,69 +309,106 @@ type VenueListing struct {
 	AverageRating float64
 }
 
+// List returns a paginated slice of VenueListing, optionally filtered by sport
+// and/or by a geographic radius, and—when a location is provided—sorted
+// nearest-first.
 func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueListing, error) {
-	// Base query without inline comments
+	// 1) Base SELECT + JOIN + aggregates
 	baseQuery := `
-        SELECT 
+        SELECT
             v.id,
             v.name,
             v.address,
-            ST_X(v.location::geometry) as longitude,
-            ST_Y(v.location::geometry) as latitude,
+            ST_X(v.location::geometry)    AS longitude,
+            ST_Y(v.location::geometry)    AS latitude,
             v.image_urls,
             v.open_time,
             v.phone_number,
             v.sport,
-            COUNT(r.id) as total_reviews,
-            COALESCE(AVG(r.rating), 0) as average_rating
+            COUNT(r.id)                   AS total_reviews,
+            COALESCE(AVG(r.rating), 0)    AS average_rating
         FROM venues v
         LEFT JOIN reviews r ON v.id = r.venue_id
         WHERE 1=1
     `
 
-	var where []string
-	var args []interface{}
-	argCounter := 1
+	var (
+		where      []string          // accumulated WHERE clauses
+		args       []interface{}     // positional arguments for QueryContext
+		argCounter int           = 1 // current $n index
+		orderBy    string            // ORDER BY clause, if any
+	)
 
-	// Sport filter
+	// 2) Sport filter
 	if filter.Sport != nil {
 		where = append(where, fmt.Sprintf("v.sport = $%d", argCounter))
 		args = append(args, *filter.Sport)
 		argCounter++
 	}
 
-	// Location filter
-	if filter.Latitude != nil && filter.Longitude != nil && filter.Distance != nil {
-		where = append(where,
-			fmt.Sprintf("ST_DWithin(v.location::geography, ST_MakePoint($%d, $%d)::geography, $%d)",
-				argCounter, argCounter+1, argCounter+2))
-		args = append(args, *filter.Longitude, *filter.Latitude, *filter.Distance)
+	// 3) Location filter: both lat, lng and distance must be non-nil
+	hasLocation := filter.Latitude != nil && filter.Longitude != nil && filter.Distance != nil
+	if hasLocation {
+		// ST_DWithin to filter to only those within `distance` meters
+		where = append(where, fmt.Sprintf(
+			"ST_DWithin(v.location::geography, ST_MakePoint($%d, $%d)::geography, $%d)",
+			argCounter, argCounter+1, argCounter+2,
+		))
+		// Note: ST_MakePoint takes (longitude, latitude)
+		args = append(args,
+			*filter.Longitude,
+			*filter.Latitude,
+			*filter.Distance,
+		)
+		// remember the positions we passed lon/lat so we can reuse in ORDER BY
+		lonPos, latPos := argCounter, argCounter+1
 		argCounter += 3
+
+		// build the ORDER BY to sort nearest → farthest
+		orderBy = fmt.Sprintf(
+			"ST_Distance(v.location::geography, ST_MakePoint($%d, $%d)::geography) ASC",
+			lonPos, latPos,
+		)
 	}
 
-	// Build final query
+	// 4) Assemble the full query
 	query := baseQuery
+
 	if len(where) > 0 {
 		query += " AND " + strings.Join(where, " AND ")
 	}
 
-	// Add pagination
+	// 5) GROUP BY is required for the COUNT/AVG aggregates
 	query += " GROUP BY v.id"
-	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argCounter, argCounter+1)
-	args = append(args, filter.Limit, (filter.Page-1)*filter.Limit)
 
+	// 6) If we have a location filter, apply the distance-based ordering;
+	// otherwise you could leave rows in default order or add e.g. `ORDER BY v.name`
+	if hasLocation {
+		query += " ORDER BY " + orderBy
+	}
+
+	// 7) Finally, add pagination: LIMIT then OFFSET
+	//    next two placeholders: $argCounter = limit, $argCounter+1 = offset
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argCounter, argCounter+1)
+	args = append(args,
+		filter.Limit,
+		(filter.Page-1)*filter.Limit,
+	)
+
+	// 8) Execute
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying venues: %w", err)
 	}
 	defer rows.Close()
 
+	// 9) Scan result rows into Go structs
 	var venues []VenueListing
 	for rows.Next() {
 		var v VenueListing
 		var openTime sql.NullString
 
-		err := rows.Scan(
+		if err := rows.Scan(
 			&v.ID,
 			&v.Name,
 			&v.Address,
@@ -372,19 +420,16 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
 			&v.Sport,
 			&v.TotalReviews,
 			&v.AverageRating,
-		)
-
-		if err != nil {
+		); err != nil {
 			return nil, fmt.Errorf("error scanning venue row: %w", err)
 		}
-
 		if openTime.Valid {
 			v.OpenTime = &openTime.String
 		}
-
 		venues = append(venues, v)
 	}
 
+	// 10) Return final slice
 	return venues, nil
 }
 

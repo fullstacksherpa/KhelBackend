@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"khel/internal/store"
+	"log"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,31 +20,40 @@ type AvailableTimeSlot struct {
 	PricePerHour int       `json:"price_per_hour"`
 }
 
+// HourlySlot represents one 1-hour booking bucket.
+type HourlySlot struct {
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+	PricePerHour int       `json:"price_per_hour"`
+	Available    bool      `json:"available"`
+}
+
 // AvailableTimes godoc
 //
 //	@Summary		List available time slots for a venue
-//	@Description	Returns the available booking time slots for a given venue and date by subtracting booked intervals from the venue’s pricing slots.
+//	@Description	Returns one-hour buckets (with availability) for a given venue/day.
 //	@Tags			Venue
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID	path		int					true	"Venue ID"
-//	@Param			date	query		string				true	"Date in YYYY-MM-DD format"
-//	@Success		200		{array}		AvailableTimeSlot	"List of available time slots"
-//	@Failure		400		{object}	error				"Bad Request: Invalid input"
-//	@Failure		500		{object}	error				"Internal Server Error: Could not retrieve available times"
+//	@Param			venueID	path		int			true	"Venue ID"
+//	@Param			date	query		string		true	"Date in YYYY-MM-DD format"
+//	@Success		200		{array}		HourlySlot	"Hourly availability"
+//	@Failure		400		{object}	error		"Bad Request"
+//	@Failure		500		{object}	error		"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/available-times [get]
 func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Request) {
-	venueIDStr := chi.URLParam(r, "venueID")
-	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	// Step 1: Parse venueID from URL path
+	venueID, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
+	// Step 2: Parse `date` from query param in format YYYY-MM-DD
 	dateStr := r.URL.Query().Get("date")
 	if dateStr == "" {
-		app.badRequestResponse(w, r, err)
+		app.badRequestResponse(w, r, fmt.Errorf("missing date"))
 		return
 	}
 	date, err := time.Parse("2006-01-02", dateStr)
@@ -51,80 +61,74 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	dayOfWeek := strings.ToLower(date.Weekday().String()) // e.g. "monday", "tuesday", etc.
+	dayOfWeek := strings.ToLower(date.Weekday().String())
 
-	// Fetch pricing slots for this venue on the specified day.
+	// Step 3: Load pricing slots and bookings for the venue and the selected date
 	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
-
-	// Get existing bookings for the venue on the given day.
 	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	// For each pricing slot, subtract booked intervals.
-	var availableSlots []AvailableTimeSlot
-	for _, ps := range pricingSlots {
-		// Create a full timestamp interval for the pricing slot on the specified date.
-		slotStart := time.Date(date.Year(), date.Month(), date.Day(), ps.StartTime.Hour(), ps.StartTime.Minute(), ps.StartTime.Second(), 0, time.UTC)
-		slotEnd := time.Date(date.Year(), date.Month(), date.Day(), ps.EndTime.Hour(), ps.EndTime.Minute(), ps.EndTime.Second(), 0, time.UTC)
+	// Step 4: Set the target timezone to Asia/Kathmandu
+	loc, err := time.LoadLocation("Asia/Kathmandu")
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
 
-		// Get available intervals within this pricing slot.
-		availIntervals := subtractIntervals(store.Interval{Start: slotStart, End: slotEnd}, bookings)
-		for _, interval := range availIntervals {
-			availableSlots = append(availableSlots, AvailableTimeSlot{
-				StartTime:    interval.Start,
-				EndTime:      interval.End,
+	// Step 5: Convert bookings to intervals in Kathmandu time
+	type TimeInterval struct {
+		Start time.Time
+		End   time.Time
+	}
+	var bookedIntervals []TimeInterval
+	for _, b := range bookings {
+		bookedIntervals = append(bookedIntervals, TimeInterval{
+			Start: b.Start.In(loc),
+			End:   b.End.In(loc),
+		})
+	}
+
+	// Step 6: Define a helper function to check for overlaps
+	overlaps := func(start, end time.Time) bool {
+		for _, bi := range bookedIntervals {
+			if start.Before(bi.End) && bi.Start.Before(end) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Step 7: Generate hourly time slots and mark availability
+	var out []HourlySlot
+	for _, ps := range pricingSlots {
+		// Convert pricing slot times into the selected date in Nepal timezone
+		slotStart := time.Date(date.Year(), date.Month(), date.Day(),
+			ps.StartTime.Hour(), ps.StartTime.Minute(), 0, 0, loc)
+		slotEnd := time.Date(date.Year(), date.Month(), date.Day(),
+			ps.EndTime.Hour(), ps.EndTime.Minute(), 0, 0, loc)
+
+		// Break the slot into 1-hour buckets
+		for t := slotStart; !t.Add(time.Hour).After(slotEnd); t = t.Add(time.Hour) {
+			tEnd := t.Add(time.Hour)
+
+			out = append(out, HourlySlot{
+				StartTime:    t,
+				EndTime:      tEnd,
 				PricePerHour: ps.Price,
+				Available:    !overlaps(t, tEnd),
 			})
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(availableSlots)
-}
-
-// subtractIntervals subtracts booked intervals from a pricing slot.
-// It returns the list of intervals that remain available.
-func subtractIntervals(slot store.Interval, bookings []store.Interval) []store.Interval {
-	// Sort bookings by start time.
-	sort.Slice(bookings, func(i, j int) bool {
-		return bookings[i].Start.Before(bookings[j].Start)
-	})
-	available := []store.Interval{}
-	currentStart := slot.Start
-
-	for _, b := range bookings {
-		// Skip bookings that end before the current start.
-		if !b.End.After(currentStart) {
-			continue
-		}
-		// If booking starts after currentStart, then there's an available segment.
-		if b.Start.After(currentStart) {
-			avail := store.Interval{Start: currentStart, End: b.Start}
-			if avail.End.After(avail.Start) {
-				available = append(available, avail)
-			}
-		}
-		// Move currentStart forward.
-		if b.End.After(currentStart) {
-			currentStart = b.End
-		}
-		// If currentStart has passed the slot's end, break.
-		if !currentStart.Before(slot.End) {
-			break
-		}
-	}
-	// Add any remaining time.
-	if currentStart.Before(slot.End) {
-		available = append(available, store.Interval{Start: currentStart, End: slot.End})
-	}
-	return available
+	// Step 8: Encode the result as JSON and send response
+	app.jsonResponse(w, http.StatusOK, out)
 }
 
 // BookVenuePayload represents the JSON payload to book a venue.
@@ -166,8 +170,15 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 		app.badRequestResponse(w, r, err)
 	}
 
+	loc, err := time.LoadLocation("Asia/Kathmandu")
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
 	// Determine the day and fetch pricing slots for that day.
-	dayOfWeek := strings.ToLower(payload.StartTime.Weekday().String())
+	localStart := payload.StartTime.In(loc)
+	dayOfWeek := strings.ToLower(localStart.Weekday().String())
 	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
 	if err != nil || len(pricingSlots) == 0 {
 		http.Error(w, "No pricing available for this day", http.StatusBadRequest)
@@ -179,9 +190,9 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	var applicablePrice int
 	for _, ps := range pricingSlots {
 		slotStart := time.Date(payload.StartTime.Year(), payload.StartTime.Month(), payload.StartTime.Day(),
-			ps.StartTime.Hour(), ps.StartTime.Minute(), ps.StartTime.Second(), 0, time.UTC)
+			ps.StartTime.Hour(), ps.StartTime.Minute(), ps.StartTime.Second(), 0, loc)
 		slotEnd := time.Date(payload.StartTime.Year(), payload.StartTime.Month(), payload.StartTime.Day(),
-			ps.EndTime.Hour(), ps.EndTime.Minute(), ps.EndTime.Second(), 0, time.UTC)
+			ps.EndTime.Hour(), ps.EndTime.Minute(), ps.EndTime.Second(), 0, loc)
 		// Check if the requested interval is within this pricing slot.
 		if (payload.StartTime.Equal(slotStart) || payload.StartTime.After(slotStart)) &&
 			(payload.EndTime.Equal(slotEnd) || payload.EndTime.Before(slotEnd)) {
@@ -213,16 +224,23 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	duration := payload.EndTime.Sub(payload.StartTime).Hours()
 	totalPrice := int(duration * float64(applicablePrice))
 
+	user := getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Create the booking.
 	booking := &store.Booking{
 		VenueID:    venueID,
-		UserID:     1, // Replace with the actual authenticated user ID.
+		UserID:     user.ID,
 		StartTime:  payload.StartTime,
 		EndTime:    payload.EndTime,
 		TotalPrice: totalPrice,
 		Status:     "confirmed",
 	}
 	if err := app.store.Bookings.CreateBooking(r.Context(), booking); err != nil {
+		log.Printf("CreateBooking failed: %v", err)
 		http.Error(w, "Error creating booking", http.StatusInternalServerError)
 		return
 	}
@@ -309,4 +327,74 @@ func (app *application) updateVenuePricingHandler(w http.ResponseWriter, r *http
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(pricing)
+}
+
+type CreatePricingPayload struct {
+	DayOfWeek string `json:"day_of_week" validate:"required,oneof=sunday monday tuesday wednesday thursday friday saturday"`
+	StartTime string `json:"start_time" validate:"required"` // format "15:04:05"
+	EndTime   string `json:"end_time"   validate:"required"` // format "15:04:05"
+	Price     int    `json:"price"      validate:"required,gt=0"`
+}
+
+// CreateVenuePricing godoc
+//
+//	@Summary		Create a new pricing slot for a venue
+//	@Description	Adds a new day/time price rule to venue_pricing
+//	@Tags			Venue
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID	path		int						true	"Venue ID"
+//	@Param			payload	body		CreatePricingPayload	true	"New pricing slot"
+//	@Success		201		{object}	store.PricingSlot		"Pricing slot created"
+//	@Failure		400		{object}	error					"Bad Request"
+//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/pricing [post]
+func (app *application) createVenuePricingHandler(w http.ResponseWriter, r *http.Request) {
+	// 1) Parse venueID
+	venueIDStr := chi.URLParam(r, "venueID")
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// 2) Decode + validate payload
+	var payload CreatePricingPayload
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+	if err := Validate.Struct(payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// 3) Parse times
+	startTime, err := time.Parse("15:04:05", payload.StartTime)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid start_time: %w", err))
+		return
+	}
+	endTime, err := time.Parse("15:04:05", payload.EndTime)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid end_time: %w", err))
+		return
+	}
+
+	// 4) Build model and call store
+	ps := &store.PricingSlot{
+		VenueID:   venueID,
+		DayOfWeek: strings.ToLower(payload.DayOfWeek),
+		StartTime: startTime,
+		EndTime:   endTime,
+		Price:     payload.Price,
+	}
+	if err := app.store.Bookings.CreatePricingSlot(r.Context(), ps); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 5) Return
+	app.jsonResponse(w, http.StatusOK, ps)
 }

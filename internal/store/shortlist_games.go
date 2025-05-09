@@ -50,6 +50,7 @@ func (s *ShortlistGamesStore) RemoveShortlist(ctx context.Context, userID, gameI
 // It joins the shortlisted_games table with the games table.
 func (s *ShortlistGamesStore) GetShortlistedGamesByUser(ctx context.Context, userID int64) ([]Game, error) {
 	query := `
+	-- Get shortlist for user
 		SELECT g.id, g.sport_type, g.price, g.format, g.venue_id, g.admin_id, g.max_players,
 		       g.game_level, g.start_time, g.end_time, g.visibility, g.instruction,
 		       g.status, g.is_booked, g.match_full, g.created_at, g.updated_at

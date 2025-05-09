@@ -7,15 +7,6 @@ definitions:
       rating:
         type: integer
     type: object
-  main.AvailableTimeSlot:
-    properties:
-      end_time:
-        type: string
-      price_per_hour:
-        type: integer
-      start_time:
-        type: string
-    type: object
   main.BookVenuePayload:
     properties:
       end_time:
@@ -75,6 +66,32 @@ definitions:
     - venue_id
     - visibility
     type: object
+  main.CreatePricingPayload:
+    properties:
+      day_of_week:
+        enum:
+        - sunday
+        - monday
+        - tuesday
+        - wednesday
+        - thursday
+        - friday
+        - saturday
+        type: string
+      end_time:
+        description: format "15:04:05"
+        type: string
+      price:
+        type: integer
+      start_time:
+        description: format "15:04:05"
+        type: string
+    required:
+    - day_of_week
+    - end_time
+    - price
+    - start_time
+    type: object
   main.CreateUserTokenPayload:
     properties:
       email:
@@ -92,6 +109,17 @@ definitions:
     properties:
       data:
         $ref: '#/definitions/main.TokenResponse'
+    type: object
+  main.HourlySlot:
+    properties:
+      available:
+        type: boolean
+      end_time:
+        type: string
+      price_per_hour:
+        type: integer
+      start_time:
+        type: string
     type: object
   main.PlayerResponse:
     properties:
@@ -258,6 +286,8 @@ definitions:
         items:
           type: string
         type: array
+      is_favorite:
+        type: boolean
       location:
         description: '[longitude, latitude]'
         items:
@@ -291,6 +321,10 @@ definitions:
     properties:
       is_owner:
         type: boolean
+      venue_ids:
+        items:
+          type: integer
+        type: array
     type: object
   store.AppReview:
     properties:
@@ -398,6 +432,8 @@ definitions:
         type: string
       is_booked:
         type: boolean
+      match_full:
+        type: boolean
       max_players:
         type: integer
       player_ids:
@@ -419,6 +455,8 @@ definitions:
       sport_type:
         type: string
       start_time:
+        type: string
+      status:
         type: string
       venue_id:
         type: integer
@@ -461,6 +499,51 @@ definitions:
         type: string
       user_id:
         type: integer
+    type: object
+  store.GameSummary:
+    properties:
+      current_player:
+        type: integer
+      end_time:
+        type: string
+      format:
+        type: string
+      game_admin_name:
+        type: string
+      game_id:
+        type: integer
+      game_level:
+        type: string
+      is_booked:
+        type: boolean
+      match_full:
+        type: boolean
+      max_players:
+        type: integer
+      player_images:
+        items:
+          type: string
+        type: array
+      price:
+        type: integer
+      shortlisted:
+        type: boolean
+      sport_type:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      venue_id:
+        type: integer
+      venue_lat:
+        description: Venue latitude
+        type: number
+      venue_lon:
+        description: Venue longitude
+        type: number
+      venue_name:
+        type: string
     type: object
   store.PricingSlot:
     properties:
@@ -942,7 +1025,7 @@ paths:
       summary: Assign an assistant role to a player
       tags:
       - Games
-  /games/{gameID}/cancel:
+  /games/{gameID}/cancel-game:
     patch:
       consumes:
       - application/json
@@ -1393,6 +1476,37 @@ paths:
       summary: Toggle match full status
       tags:
       - Games
+  /games/{venueID}/upcoming:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of upcoming active games for the specified venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of upcoming active games
+          schema:
+            items:
+              $ref: '#/definitions/store.GameSummary'
+            type: array
+        "400":
+          description: 'Bad Request: Missing or invalid venueID'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not retrieve upcoming games'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve upcoming active games at a venue
+      tags:
+      - Games
   /games/create:
     post:
       consumes:
@@ -1430,38 +1544,12 @@ paths:
       summary: Create a new game
       tags:
       - Games
-  /games/shortlist:
-    get:
-      consumes:
-      - application/json
-      description: Returns a list of games that the authenticated user has shortlisted.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of shortlisted games
-          schema:
-            items:
-              $ref: '#/definitions/store.Game'
-            type: array
-        "400":
-          description: 'Bad Request: Unauthenticated request'
-          schema: {}
-        "500":
-          description: 'Internal Server Error: Could not retrieve shortlist'
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Retrieve shortlisted games for the authenticated user
-      tags:
-      - Shortlist_Games
-  /get-games:
+  /games/get-games:
     get:
       consumes:
       - application/json
       description: Returns a list of games based on filters such as sport type, game
-        level, venue, booking status, location, and time range. The response includes
-        both raw game data and GeoJSON features for mapping.
+        level, venue, booking status, location, time range, and status.
       parameters:
       - description: Sport type to filter games (e.g., basketball)
         in: query
@@ -1479,6 +1567,10 @@ paths:
         in: query
         name: is_booked
         type: boolean
+      - description: 'Game status: active, cancelled, completed'
+        in: query
+        name: status
+        type: string
       - description: User latitude for location filtering
         in: query
         name: lat
@@ -1525,17 +1617,45 @@ paths:
         "200":
           description: List of games and GeoJSON features
           schema:
-            additionalProperties: true
-            type: object
+            items:
+              $ref: '#/definitions/store.GameSummary'
+            type: array
         "400":
           description: Invalid request parameters
           schema: {}
         "500":
           description: Internal server error
           schema: {}
+      security:
+      - ApiKeyAuth: []
       summary: Retrieve a list of games
       tags:
       - Games
+  /games/shortlist:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of games that the authenticated user has shortlisted.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of shortlisted games
+          schema:
+            items:
+              $ref: '#/definitions/store.Game'
+            type: array
+        "400":
+          description: 'Bad Request: Unauthenticated request'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: Could not retrieve shortlist'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve shortlisted games for the authenticated user
+      tags:
+      - Shortlist_Games
   /health:
     get:
       description: Healthcheck endpoint
@@ -1549,50 +1669,6 @@ paths:
       summary: Healthcheckk
       tags:
       - ops
-  /list-venues:
-    get:
-      consumes:
-      - application/json
-      description: Get paginated list of venues with filters
-      parameters:
-      - description: Filter by sport type
-        in: query
-        name: sport
-        type: string
-      - description: Latitude for location filter
-        in: query
-        name: lat
-        type: number
-      - description: Longitude for location filter
-        in: query
-        name: lng
-        type: number
-      - description: Distance in meters from location
-        in: query
-        name: distance
-        type: number
-      - default: 1
-        description: Page number
-        in: query
-        name: page
-        type: integer
-      - default: 20
-        description: Items per page
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/main.VenueListResponse'
-            type: array
-      summary: List venues
-      tags:
-      - Venue
   /users:
     put:
       consumes:
@@ -1904,8 +1980,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Returns the available booking time slots for a given venue and
-        date by subtracting booked intervals from the venue’s pricing slots.
+      description: Returns one-hour buckets (with availability) for a given venue/day.
       parameters:
       - description: Venue ID
         in: path
@@ -1921,16 +1996,16 @@ paths:
       - application/json
       responses:
         "200":
-          description: List of available time slots
+          description: Hourly availability
           schema:
             items:
-              $ref: '#/definitions/main.AvailableTimeSlot'
+              $ref: '#/definitions/main.HourlySlot'
             type: array
         "400":
-          description: 'Bad Request: Invalid input'
+          description: Bad Request
           schema: {}
         "500":
-          description: 'Internal Server Error: Could not retrieve available times'
+          description: Internal Server Error
           schema: {}
       security:
       - ApiKeyAuth: []
@@ -2109,6 +2184,41 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Upload a new photo for a venue
+      tags:
+      - Venue
+  /venues/{venueID}/pricing:
+    post:
+      consumes:
+      - application/json
+      description: Adds a new day/time price rule to venue_pricing
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: New pricing slot
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreatePricingPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Pricing slot created
+          schema:
+            $ref: '#/definitions/store.PricingSlot'
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new pricing slot for a venue
       tags:
       - Venue
   /venues/{venueID}/pricing/{pricingID}:
@@ -2303,6 +2413,52 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Check if user is a venue owner
+      tags:
+      - Venue
+  /venues/list-venues:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of venues with filters
+      parameters:
+      - description: Filter by sport type
+        in: query
+        name: sport
+        type: string
+      - description: Latitude for location filter
+        in: query
+        name: lat
+        type: number
+      - description: Longitude for location filter
+        in: query
+        name: lng
+        type: number
+      - description: Distance in meters from location
+        in: query
+        name: distance
+        type: number
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 7
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.VenueListResponse'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List venues
       tags:
       - Venue
 securityDefinitions:

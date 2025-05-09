@@ -298,9 +298,12 @@ func (app *application) refreshTokenHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	userIDStr := strconv.FormatInt(userID, 10)
+
 	response := map[string]string{
 		"access_token":  accessToken,
 		"refresh_token": newRefreshToken,
+		"user_id":       userIDStr,
 	}
 
 	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
