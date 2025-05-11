@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"khel/internal/store"
 	"log"
@@ -237,7 +239,7 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 		StartTime:  payload.StartTime,
 		EndTime:    payload.EndTime,
 		TotalPrice: totalPrice,
-		Status:     "confirmed",
+		Status:     "pending",
 	}
 	if err := app.store.Bookings.CreateBooking(r.Context(), booking); err != nil {
 		log.Printf("CreateBooking failed: %v", err)
@@ -267,7 +269,7 @@ type UpdatePricingPayload struct {
 //
 //	@Summary		Update a pricing slot for a venue
 //	@Description	Allows venue owners to update the pricing information (day, time range, and price) for a specific pricing slot.
-//	@Tags			Venue
+//	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
 //	@Param			venueID		path		int						true	"Venue ID"
@@ -340,7 +342,7 @@ type CreatePricingPayload struct {
 //
 //	@Summary		Create a new pricing slot for a venue
 //	@Description	Adds a new day/time price rule to venue_pricing
-//	@Tags			Venue
+//	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
 //	@Param			venueID	path		int						true	"Venue ID"
@@ -397,4 +399,174 @@ func (app *application) createVenuePricingHandler(w http.ResponseWriter, r *http
 
 	// 5) Return
 	app.jsonResponse(w, http.StatusOK, ps)
+}
+
+// getPendingBookingsHandler godoc
+//
+//	@Summary		List pending booking requests for a venue
+//	@Description	Returns all bookings with status="pending" for a given venue and date.
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID	path		int						true	"Venue ID"
+//	@Param			date	query		string					true	"Date in YYYY-MM-DD format"
+//	@Success		200		{array}		store.PendingBooking	"Pending bookings"
+//	@Failure		400		{object}	error					"Bad Request"
+//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/pending-bookings [get]
+func (app *application) getPendingBookingsHandler(w http.ResponseWriter, r *http.Request) {
+	// 1) parse venueID
+	vid, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
+		return
+	}
+
+	// 2) parse date query
+	dateStr := r.URL.Query().Get("date")
+	if dateStr == "" {
+		app.badRequestResponse(w, r, errors.New("missing date"))
+		return
+	}
+
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid date format: %w", err))
+		return
+	}
+
+	// 3) fetch from store
+	bookings, err := app.store.Bookings.GetPendingBookingsForVenueDate(r.Context(), vid, date)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 4) respond JSON
+	app.jsonResponse(w, http.StatusOK, bookings)
+}
+
+// getScheduledBookingsHandler godoc
+//
+//	@Summary		List Scheduled booking requests for a venue
+//	@Description	Returns all bookings with status="confirmed" for a given venue and date.
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID	path		int						true	"Venue ID"
+//	@Param			date	query		string					true	"Date in YYYY-MM-DD format"
+//	@Success		200		{array}		store.ScheduledBooking	"Scheduled bookings"
+//	@Failure		400		{object}	error					"Bad Request"
+//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/scheduled-bookings [get]
+func (app *application) getScheduledBookingsHandler(w http.ResponseWriter, r *http.Request) {
+	// 1) parse venueID
+	vid, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
+		return
+	}
+
+	// 2) parse date query
+	dateStr := r.URL.Query().Get("date")
+	if dateStr == "" {
+		app.badRequestResponse(w, r, errors.New("missing date"))
+		return
+	}
+
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid date format: %w", err))
+		return
+	}
+
+	// 3) fetch from store
+	bookings, err := app.store.Bookings.GetScheduledBookingsForVenueDate(r.Context(), vid, date)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 4) respond JSON
+	app.jsonResponse(w, http.StatusOK, bookings)
+}
+
+// acceptBookingHandler godoc
+//
+//	@Summary		Accept a pending booking request
+//	@Description	Marks the booking with status="pending" as "confirmed".
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID		path	int	true	"Venue ID"
+//	@Param			bookingID	path	int	true	"Booking ID"
+//	@Success		204
+//	@Failure		400	{object}	error	"Bad Request"
+//	@Failure		404	{object}	error	"Not Found"
+//	@Failure		500	{object}	error	"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/pending-bookings/{bookingID}/accept [post]
+func (app *application) acceptBookingHandler(w http.ResponseWriter, r *http.Request) {
+	vid, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
+		return
+	}
+	bid, err := strconv.ParseInt(chi.URLParam(r, "bookingID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid bookingID: %w", err))
+		return
+	}
+
+	if err := app.store.Bookings.AcceptBooking(r.Context(), vid, bid); err != nil {
+		if err == sql.ErrNoRows {
+			app.notFoundResponse(w, r, errors.New("not found"))
+		} else {
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// rejectBookingHandler godoc
+//
+//	@Summary		Reject a pending booking request
+//	@Description	Marks the booking with status="pending" as "rejected".
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID		path	int	true	"Venue ID"
+//	@Param			bookingID	path	int	true	"Booking ID"
+//	@Success		204
+//	@Failure		400	{object}	error	"Bad Request"
+//	@Failure		404	{object}	error	"Not Found"
+//	@Failure		500	{object}	error	"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/pending-bookings/{bookingID}/reject [post]
+func (app *application) rejectBookingHandler(w http.ResponseWriter, r *http.Request) {
+	vid, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
+		return
+	}
+	bid, err := strconv.ParseInt(chi.URLParam(r, "bookingID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid bookingID: %w", err))
+		return
+	}
+
+	if err := app.store.Bookings.RejectBooking(r.Context(), vid, bid); err != nil {
+		if err == sql.ErrNoRows {
+			app.notFoundResponse(w, r, errors.New("not found"))
+		} else {
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

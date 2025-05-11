@@ -170,12 +170,16 @@ func (app *application) IsOwnerMiddleware(next http.Handler) http.Handler {
 			app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %v", err))
 			return
 		}
+
 		if venueID == 0 {
 			app.badRequestResponse(w, r, errors.New("venue ID is required"))
 			return
 		}
 		user := getUserFromContext(r)
 		userID := user.ID
+
+		//TODO: delete later
+		fmt.Printf("IsOwnerMiddleware running 🔐🔐🔐🔐🔐🔐 for venueID: %d and userID: %d ", venueID, userID)
 
 		// Check if the user is the owner of the venue
 		isOwner, err := app.store.Venues.IsOwner(r.Context(), venueID, userID)

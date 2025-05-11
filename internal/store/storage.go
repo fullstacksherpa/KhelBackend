@@ -84,6 +84,11 @@ type Storage struct {
 		CreateBooking(ctx context.Context, booking *Booking) error
 		UpdatePricing(ctx context.Context, p *PricingSlot) error
 		CreatePricingSlot(ctx context.Context, p *PricingSlot) error
+		GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error)
+		UpdateBookingStatus(ctx context.Context, venueID, bookingID int64, status string) error
+		AcceptBooking(ctx context.Context, venueID, bookingID int64) error
+		RejectBooking(ctx context.Context, venueID, bookingID int64) error
+		GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error)
 	}
 	FavoriteVenues interface {
 		AddFavorite(ctx context.Context, userID, venueID int64) error
