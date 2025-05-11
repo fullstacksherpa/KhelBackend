@@ -22,7 +22,7 @@ type isOwnerResponse struct {
 //
 //	@Summary		Check if user is a venue owner
 //	@Description	Determines whether the authenticated user owns at least one venue
-//	@Tags			Venue
+//	@Tags			Venue-Owner
 //	@Produce		json
 //	@Success		200	{object}	isOwnerResponse	"Ownership check result"
 //	@Failure		401	{object}	error			"Unauthorized"
@@ -64,7 +64,7 @@ type CreateVenuePayload struct {
 //
 //	@Summary		Delete a venue photo
 //	@Description	Deletes a specific venue photo from Cloudinary and removes it from the database.
-//	@Tags			Venue
+//	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
 //	@Param			venueID		path		int64				true	"Venue ID"
@@ -112,7 +112,7 @@ func (app *application) deleteVenuePhotoHandler(w http.ResponseWriter, r *http.R
 //
 //	@Summary		Upload a new photo for a venue
 //	@Description	Uploads a new venue photo to Cloudinary and adds the new photo URL to the venue record.
-//	@Tags			Venue
+//	@Tags			Venue-Owner
 //	@Accept			multipart/form-data
 //	@Produce		json
 //	@Param			venueID	path		int					true	"Venue ID"
@@ -171,7 +171,7 @@ func (app *application) uploadVenuePhotoHandler(w http.ResponseWriter, r *http.R
 //
 //	@Summary		Update venue information
 //	@Description	Allows venue owners to update partial information about their venue.
-//	@Tags			Venue
+//	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
 //	@Param			venueID		path		int						true	"Venue ID"
@@ -378,7 +378,7 @@ func (app *application) CreateAndUploadVenue(ctx context.Context, venue *store.V
 //
 //	@Summary		Register a venue in our system
 //	@Description	Register a new venue with details such as name, address, location, and amenities.
-//	@Tags			Venue
+//	@Tags			Venue-Owner
 //	@Accept			multipart/form-data
 //	@Produce		json
 //	@Param			venue	formData	string		true	"Venue details (JSON string)"

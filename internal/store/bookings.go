@@ -44,6 +44,31 @@ type Interval struct {
 	End   time.Time
 }
 
+// PendingBooking is the view model for a pending booking request.
+type PendingBooking struct {
+	BookingID    int64     `json:"booking_id"`
+	UserID       int64     `json:"user_id"`
+	UserName     string    `json:"user_name"`
+	UserImageURL *string   `json:"user_image"` // nullable
+	UserPhone    string    `json:"user_number"`
+	Price        int       `json:"price"`
+	RequestedAt  time.Time `json:"requested_at"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+}
+
+type ScheduledBooking struct {
+	BookingID    int64     `json:"booking_id"`
+	UserID       int64     `json:"user_id"`
+	UserName     string    `json:"user_name"`
+	UserImageURL *string   `json:"user_image"`
+	UserPhone    string    `json:"user_number"`
+	Price        int       `json:"price"`
+	AcceptedAt   time.Time `json:"accepted_at"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+}
+
 type BookingStore struct {
 	db *sql.DB
 }
@@ -154,4 +179,143 @@ func (s *BookingStore) CreatePricingSlot(ctx context.Context, p *PricingSlot) er
 		p.EndTime.Format("15:04:05"),
 		p.Price,
 	).Scan(&p.ID)
+}
+
+// GetPendingBookingsForVenueDate loads all bookings with status='pending'
+// for the given venue on the given date.
+func (s *BookingStore) GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error) {
+	// normalize to date only
+	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	const q = `
+      SELECT
+        b.id,
+        b.user_id,
+        u.first_name || ' ' || u.last_name   AS user_name,
+        u.profile_picture_url,
+        u.phone,
+        b.total_price,
+        b.created_at,
+        b.start_time,
+        b.end_time
+      FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      WHERE
+        b.venue_id    = $1
+        AND b.status  = 'pending'
+        AND b.start_time >= $2
+        AND b.start_time <  $3
+      ORDER BY b.created_at
+    `
+	rows, err := s.db.QueryContext(ctx, q, venueID, startOfDay, endOfDay)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []PendingBooking
+	for rows.Next() {
+		var pb PendingBooking
+		if err := rows.Scan(
+			&pb.BookingID,
+			&pb.UserID,
+			&pb.UserName,
+			&pb.UserImageURL,
+			&pb.UserPhone,
+			&pb.Price,
+			&pb.RequestedAt,
+			&pb.StartTime,
+			&pb.EndTime,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, pb)
+	}
+	return out, rows.Err()
+}
+
+func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error) {
+	// normalize to date only
+	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	const q = `
+      SELECT
+        b.id,
+        b.user_id,
+        u.first_name || ' ' || u.last_name   AS user_name,
+        u.profile_picture_url,
+        u.phone,
+        b.total_price,
+        b.updated_at,
+        b.start_time,
+        b.end_time
+      FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      WHERE
+        b.venue_id    = $1
+        AND b.status  = 'confirmed'
+        AND b.start_time >= $2
+        AND b.start_time <  $3
+      ORDER BY b.start_time
+    `
+	rows, err := s.db.QueryContext(ctx, q, venueID, startOfDay, endOfDay)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ScheduledBooking
+	for rows.Next() {
+		var sb ScheduledBooking
+		if err := rows.Scan(
+			&sb.BookingID,
+			&sb.UserID,
+			&sb.UserName,
+			&sb.UserImageURL,
+			&sb.UserPhone,
+			&sb.Price,
+			&sb.AcceptedAt,
+			&sb.StartTime,
+			&sb.EndTime,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, sb)
+	}
+	return out, rows.Err()
+}
+
+// UpdateBookingStatus sets a new status ("confirmed", "rejected", etc.) on a booking.
+func (s *BookingStore) UpdateBookingStatus(ctx context.Context, venueID, bookingID int64, status string) error {
+	const q = `
+      UPDATE bookings
+      SET status    = $1,
+          updated_at = NOW()
+      WHERE id       = $2
+        AND venue_id = $3
+    `
+	res, err := s.db.ExecContext(ctx, q, status, bookingID, venueID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// AcceptBooking marks a pending booking as confirmed.
+func (s *BookingStore) AcceptBooking(ctx context.Context, venueID, bookingID int64) error {
+	return s.UpdateBookingStatus(ctx, venueID, bookingID, "confirmed")
+}
+
+// RejectBooking marks a pending booking as rejected.
+func (s *BookingStore) RejectBooking(ctx context.Context, venueID, bookingID int64) error {
+	return s.UpdateBookingStatus(ctx, venueID, bookingID, "rejected")
 }

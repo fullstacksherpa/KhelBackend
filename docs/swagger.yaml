@@ -545,6 +545,28 @@ definitions:
       venue_name:
         type: string
     type: object
+  store.PendingBooking:
+    properties:
+      booking_id:
+        type: integer
+      end_time:
+        type: string
+      price:
+        type: integer
+      requested_at:
+        type: string
+      start_time:
+        type: string
+      user_id:
+        type: integer
+      user_image:
+        description: nullable
+        type: string
+      user_name:
+        type: string
+      user_number:
+        type: string
+    type: object
   store.PricingSlot:
     properties:
       dayOfWeek:
@@ -628,6 +650,27 @@ definitions:
         type: string
       venue_id:
         type: integer
+    type: object
+  store.ScheduledBooking:
+    properties:
+      accepted_at:
+        type: string
+      booking_id:
+        type: integer
+      end_time:
+        type: string
+      price:
+        type: integer
+      start_time:
+        type: string
+      user_id:
+        type: integer
+      user_image:
+        type: string
+      user_name:
+        type: string
+      user_number:
+        type: string
     type: object
   store.User:
     properties:
@@ -1937,7 +1980,7 @@ paths:
       - ApiKeyAuth: []
       summary: Register a venue in our system
       tags:
-      - Venue
+      - Venue-Owner
   /venues/{venueID}:
     patch:
       consumes:
@@ -1975,7 +2018,7 @@ paths:
       - ApiKeyAuth: []
       summary: Update venue information
       tags:
-      - Venue
+      - Venue-Owner
   /venues/{venueID}/available-times:
     get:
       consumes:
@@ -2113,6 +2156,113 @@ paths:
       summary: Add a venue to favorites
       tags:
       - Favorite_Venues
+  /venues/{venueID}/pending-bookings:
+    get:
+      consumes:
+      - application/json
+      description: Returns all bookings with status="pending" for a given venue and
+        date.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Date in YYYY-MM-DD format
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pending bookings
+          schema:
+            items:
+              $ref: '#/definitions/store.PendingBooking'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List pending booking requests for a venue
+      tags:
+      - Venue-Owner
+  /venues/{venueID}/pending-bookings/{bookingID}/accept:
+    post:
+      consumes:
+      - application/json
+      description: Marks the booking with status="pending" as "confirmed".
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Booking ID
+        in: path
+        name: bookingID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Accept a pending booking request
+      tags:
+      - Venue-Owner
+  /venues/{venueID}/pending-bookings/{bookingID}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Marks the booking with status="pending" as "rejected".
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Booking ID
+        in: path
+        name: bookingID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Reject a pending booking request
+      tags:
+      - Venue-Owner
   /venues/{venueID}/photos:
     delete:
       consumes:
@@ -2149,7 +2299,7 @@ paths:
       - ApiKeyAuth: []
       summary: Delete a venue photo
       tags:
-      - Venue
+      - Venue-Owner
     post:
       consumes:
       - multipart/form-data
@@ -2185,7 +2335,7 @@ paths:
       - ApiKeyAuth: []
       summary: Upload a new photo for a venue
       tags:
-      - Venue
+      - Venue-Owner
   /venues/{venueID}/pricing:
     post:
       consumes:
@@ -2220,7 +2370,7 @@ paths:
       - ApiKeyAuth: []
       summary: Create a new pricing slot for a venue
       tags:
-      - Venue
+      - Venue-Owner
   /venues/{venueID}/pricing/{pricingID}:
     put:
       consumes:
@@ -2261,7 +2411,7 @@ paths:
       - ApiKeyAuth: []
       summary: Update a pricing slot for a venue
       tags:
-      - Venue
+      - Venue-Owner
   /venues/{venueID}/reviews:
     get:
       consumes:
@@ -2368,6 +2518,43 @@ paths:
       summary: Delete a venue review
       tags:
       - Venue
+  /venues/{venueID}/scheduled-bookings:
+    get:
+      consumes:
+      - application/json
+      description: Returns all bookings with status="confirmed" for a given venue
+        and date.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Date in YYYY-MM-DD format
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Scheduled bookings
+          schema:
+            items:
+              $ref: '#/definitions/store.ScheduledBooking'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List Scheduled booking requests for a venue
+      tags:
+      - Venue-Owner
   /venues/favorites:
     get:
       consumes:
@@ -2414,7 +2601,7 @@ paths:
       - ApiKeyAuth: []
       summary: Check if user is a venue owner
       tags:
-      - Venue
+      - Venue-Owner
   /venues/list-venues:
     get:
       consumes:

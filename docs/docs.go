@@ -1835,7 +1835,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Venue"
+                    "Venue-Owner"
                 ],
                 "summary": "Register a venue in our system",
                 "parameters": [
@@ -1930,7 +1930,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Venue"
+                    "Venue-Owner"
                 ],
                 "summary": "Check if user is a venue owner",
                 "responses": {
@@ -2037,7 +2037,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Venue"
+                    "Venue-Owner"
                 ],
                 "summary": "Update venue information",
                 "parameters": [
@@ -2287,6 +2287,167 @@ const docTemplate = `{
                 }
             }
         },
+        "/venues/{venueID}/pending-bookings": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns all bookings with status=\"pending\" for a given venue and date.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner"
+                ],
+                "summary": "List pending booking requests for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Date in YYYY-MM-DD format",
+                        "name": "date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pending bookings",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.PendingBooking"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/pending-bookings/{bookingID}/accept": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Marks the booking with status=\"pending\" as \"confirmed\".",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner"
+                ],
+                "summary": "Accept a pending booking request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Booking ID",
+                        "name": "bookingID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/pending-bookings/{bookingID}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Marks the booking with status=\"pending\" as \"rejected\".",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner"
+                ],
+                "summary": "Reject a pending booking request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Booking ID",
+                        "name": "bookingID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venues/{venueID}/photos": {
             "post": {
                 "security": [
@@ -2302,7 +2463,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Venue"
+                    "Venue-Owner"
                 ],
                 "summary": "Upload a new photo for a venue",
                 "parameters": [
@@ -2355,7 +2516,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Venue"
+                    "Venue-Owner"
                 ],
                 "summary": "Delete a venue photo",
                 "parameters": [
@@ -2410,7 +2571,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Venue"
+                    "Venue-Owner"
                 ],
                 "summary": "Create a new pricing slot for a venue",
                 "parameters": [
@@ -2464,7 +2625,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Venue"
+                    "Venue-Owner"
                 ],
                 "summary": "Update a pricing slot for a venue",
                 "parameters": [
@@ -2658,6 +2819,61 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found: Review not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/scheduled-bookings": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns all bookings with status=\"confirmed\" for a given venue and date.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner"
+                ],
+                "summary": "List Scheduled booking requests for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Date in YYYY-MM-DD format",
+                        "name": "date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scheduled bookings",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.ScheduledBooking"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {}
                     },
                     "500": {
@@ -3459,6 +3675,39 @@ const docTemplate = `{
                 }
             }
         },
+        "store.PendingBooking": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "requested_at": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_image": {
+                    "description": "nullable",
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_number": {
+                    "type": "string"
+                }
+            }
+        },
         "store.PricingSlot": {
             "type": "object",
             "properties": {
@@ -3580,6 +3829,38 @@ const docTemplate = `{
                 },
                 "venue_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "store.ScheduledBooking": {
+            "type": "object",
+            "properties": {
+                "accepted_at": {
+                    "type": "string"
+                },
+                "booking_id": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_image": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_number": {
+                    "type": "string"
                 }
             }
         },
