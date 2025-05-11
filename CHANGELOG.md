@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.8.0...v1.9.0) (2025-05-11)
+
+
+### Features
+
+* added booking accept and reject ([17ea62b](https://github.com/fullstacksherpa/KhelBackend/commit/17ea62b256c48ff8d6160adff9d3525a1c05ed28))
+
 ## [1.8.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.7.0...v1.8.0) (2025-05-09)
 
 
