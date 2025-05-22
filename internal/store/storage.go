@@ -30,6 +30,7 @@ type Storage struct {
 		UpdateResetToken(ctx context.Context, email, resetToken string, resetTokenExpires time.Time) error
 		GetByResetToken(ctx context.Context, resetToken string) (*User, error)
 		Update(ctx context.Context, user *User) error
+		UpdateAndUpload(ctx context.Context, userID int64, updates map[string]interface{}, profilePictureURL string) error
 	}
 	Venues interface {
 		Create(context.Context, *Venue) error

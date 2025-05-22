@@ -7,6 +7,7 @@ import (
 	"khel/internal/store"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/go-chi/chi/v5"
@@ -312,4 +313,148 @@ func (app *application) unfollowUserHandler(w http.ResponseWriter, r *http.Reque
 func getUserFromContext(r *http.Request) *store.User {
 	user, _ := r.Context().Value(userCtx).(*store.User)
 	return user
+}
+
+// editProfileHandler godoc
+//
+//	@Summary		Edit current user’s profile
+//	@Description	Update any combination of first name, last name, phone, skill level, and/or profile picture in one call.
+//	@Tags			users
+//	@Accept			mpfd
+//	@Produce		json
+//	@Param			first_name		formData	string	false	"First name"
+//	@Param			last_name		formData	string	false	"Last name"
+//	@Param			phone			formData	string	false	"Phone number (10 digits)"
+//	@Param			skill_level		formData	string	false	"Skill level"	Enums(beginner, intermediate, advanced)
+//	@Param			profile_picture	formData	file	false	"JPEG or PNG image (max 5 MB)"
+//	@Success		204				{string}	string	"Profile updated successfully"
+//	@Failure		400				{object}	error	"Bad request (e.g. parse error, invalid field)"
+//	@Failure		500				{object}	error	"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/users/update-profile [patch]
+func (app *application) editProfileHandler(w http.ResponseWriter, r *http.Request) {
+	user := getUserFromContext(r)
+	userID := user.ID
+
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		http.Error(w, "Could not parse form", http.StatusBadRequest)
+		return
+	}
+
+	// Build updates map
+	updates := make(map[string]interface{})
+	allowed := []string{"first_name", "last_name", "phone", "skill_level"}
+	for _, f := range allowed {
+		if vals := r.MultipartForm.Value[f]; len(vals) > 0 {
+			updates[f] = vals[0]
+		}
+	}
+
+	// Handle optional image upload
+	var newURL string
+	file, header, err := r.FormFile("profile_picture")
+	if err == nil {
+		defer file.Close()
+		ct := header.Header.Get("Content-Type")
+		if ct != "image/jpeg" && ct != "image/png" {
+			http.Error(w, "only jpeg/png", http.StatusBadRequest)
+			return
+		}
+		uploadParams := uploader.UploadParams{
+			PublicID:       fmt.Sprintf("/%d", userID),
+			Overwrite:      boolPtr(true),
+			Folder:         "profile_pictures",
+			Transformation: "w_300,h_300,c_fill,q_auto",
+		}
+		res, err := app.cld.Upload.Upload(r.Context(), file, uploadParams)
+		if err != nil {
+			http.Error(w, "upload failed", http.StatusInternalServerError)
+			return
+		}
+		newURL = res.SecureURL
+	}
+
+	// If no image was provided, keep existing URL:
+	if newURL == "" {
+		old, err := app.store.Users.GetProfileUrl(r.Context(), userID)
+		if err != nil {
+			app.internalServerError(w, r, err)
+			return
+		}
+		newURL = old
+	}
+
+	// 4) Call our new UpdateAndUpload
+	if err := app.store.Users.UpdateAndUpload(r.Context(), userID, updates, newURL); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// getCurrentUserHandler godoc
+//
+//	@Summary		Get current user profile
+//	@Description	Retrieve the authenticated user’s profile information
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	store.User	"Current user data"
+//	@Failure		401	{object}	error		"Unauthorized"
+//	@Failure		500	{object}	error		"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/users/me [get]
+func (app *application) getCurrentUserHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Extract *store.User from context
+	userCtx := getUserFromContext(r)
+	if userCtx == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. (Optional) re-fetch fresh data from DB to avoid stale info
+	user, err := app.store.Users.GetByID(r.Context(), userCtx.ID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.Error(w, "User not found", http.StatusNotFound)
+		} else {
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	// 3. Prepare a safe response DTO (omit sensitive fields)
+	resp := struct {
+		ID                int64   `json:"id"`
+		FirstName         string  `json:"first_name"`
+		LastName          string  `json:"last_name"`
+		Email             string  `json:"email"`
+		ProfilePictureURL *string `json:"profile_picture_url,omitempty"`
+		SkillLevel        *string `json:"skill_level,omitempty"`
+		Phone             string  `json:"phone"`
+		NoOfGames         int     `json:"no_of_games"`
+		CreatedAt         string  `json:"created_at"`
+		UpdatedAt         string  `json:"updated_at"`
+	}{
+		ID:        user.ID,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Email:     user.Email,
+		Phone:     user.Phone,
+		NoOfGames: int(user.NoOfGames.Int16),
+		CreatedAt: user.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
+	}
+	if user.ProfilePictureURL.Valid {
+		resp.ProfilePictureURL = &user.ProfilePictureURL.String
+	}
+	if user.SkillLevel.Valid {
+		resp.SkillLevel = &user.SkillLevel.String
+	}
+
+	// 4. JSON-encode and return
+	if err := app.jsonResponse(w, http.StatusOK, resp); err != nil {
+		app.internalServerError(w, r, err)
+	}
 }

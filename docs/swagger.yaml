@@ -688,6 +688,8 @@ definitions:
         type: string
       no_of_games:
         type: integer
+      phone:
+        type: string
       profile_picture_url:
         type: string
       skill_level:
@@ -1853,6 +1855,29 @@ paths:
       summary: logout user
       tags:
       - authentication
+  /users/me:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve the authenticated user’s profile information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Current user data
+          schema:
+            $ref: '#/definitions/store.User'
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get current user profile
+      tags:
+      - users
   /users/profile-picture:
     post:
       consumes:
@@ -1910,6 +1935,55 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Update profile picture
+      tags:
+      - users
+  /users/update-profile:
+    patch:
+      consumes:
+      - multipart/form-data
+      description: Update any combination of first name, last name, phone, skill level,
+        and/or profile picture in one call.
+      parameters:
+      - description: First name
+        in: formData
+        name: first_name
+        type: string
+      - description: Last name
+        in: formData
+        name: last_name
+        type: string
+      - description: Phone number (10 digits)
+        in: formData
+        name: phone
+        type: string
+      - description: Skill level
+        enum:
+        - beginner
+        - intermediate
+        - advanced
+        in: formData
+        name: skill_level
+        type: string
+      - description: JPEG or PNG image (max 5 MB)
+        in: formData
+        name: profile_picture
+        type: file
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Profile updated successfully
+          schema:
+            type: string
+        "400":
+          description: Bad request (e.g. parse error, invalid field)
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Edit current user’s profile
       tags:
       - users
   /venue/{id}:

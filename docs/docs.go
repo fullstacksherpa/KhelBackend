@@ -1601,6 +1601,42 @@ const docTemplate = `{
                 }
             }
         },
+        "/users/me": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve the authenticated user’s profile information",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get current user profile",
+                "responses": {
+                    "200": {
+                        "description": "Current user data",
+                        "schema": {
+                            "$ref": "#/definitions/store.User"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/users/profile-picture": {
             "put": {
                 "security": [
@@ -1684,6 +1720,79 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to upload image to Cloudinary or save URL in database",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/users/update-profile": {
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update any combination of first name, last name, phone, skill level, and/or profile picture in one call.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Edit current user’s profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "First name",
+                        "name": "first_name",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Last name",
+                        "name": "last_name",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Phone number (10 digits)",
+                        "name": "phone",
+                        "in": "formData"
+                    },
+                    {
+                        "enum": [
+                            "beginner",
+                            "intermediate",
+                            "advanced"
+                        ],
+                        "type": "string",
+                        "description": "Skill level",
+                        "name": "skill_level",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "JPEG or PNG image (max 5 MB)",
+                        "name": "profile_picture",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Profile updated successfully",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request (e.g. parse error, invalid field)",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {}
                     }
                 }
@@ -3887,6 +3996,9 @@ const docTemplate = `{
                 },
                 "no_of_games": {
                     "type": "integer"
+                },
+                "phone": {
+                    "type": "string"
                 },
                 "profile_picture_url": {
                     "type": "string"

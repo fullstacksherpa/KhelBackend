@@ -667,7 +667,6 @@ func (app *application) getUpcomingGamesByVenueHandler(w http.ResponseWriter, r 
 		return
 	}
 
-	// Query the database for upcoming active games at the specified venue.
 	games, err := app.store.Games.GetUpcomingGamesByVenue(r.Context(), venueID)
 	if err != nil {
 		app.internalServerError(w, r, err)
