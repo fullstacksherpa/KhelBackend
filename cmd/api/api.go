@@ -161,6 +161,8 @@ func (app *application) mount() http.Handler {
 		r.Route("/users", func(r chi.Router) {
 
 			r.Use(app.AuthTokenMiddleware)
+			r.Get("/me", app.getCurrentUserHandler)
+			r.Patch("/update-profile", app.editProfileHandler)
 			r.Put("/", app.updateUserHandler)
 			r.Post("/profile-picture", app.uploadProfilePictureHandler)
 			r.Put("/profile-picture", app.updateProfilePictureHandler)

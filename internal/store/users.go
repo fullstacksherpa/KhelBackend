@@ -24,7 +24,7 @@ type User struct {
 	FirstName            string         `json:"first_name"`
 	LastName             string         `json:"last_name"`
 	Email                string         `json:"email"`
-	Phone                string         `json:"-"` // Sensitive data
+	Phone                string         `json:"phone"`
 	Password             password       `json:"-"` // Hide password
 	ProfilePictureURL    sql.NullString `json:"profile_picture_url" swaggertype:"string"`
 	SkillLevel           sql.NullString `json:"skill_level" swaggertype:"string"`
@@ -167,19 +167,22 @@ func isValidField(field string) bool {
 
 func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {
 	query := `
-	   SELECT users.id, first_name, last_name, email, password, profile_picture_url, skill_level, created_at, no_of_games
+	   SELECT users.id, first_name, last_name, email, phone,  password, profile_picture_url, skill_level, created_at, no_of_games
 	   FROM users
 	   WHERE users.id = $1
 	`
+
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
 	user := &User{}
+
 	err := s.db.QueryRowContext(ctx, query, userID).Scan(
 		&user.ID,
 		&user.FirstName,
 		&user.LastName,
 		&user.Email,
+		&user.Phone,
 		&user.Password.hash,
 		&user.ProfilePictureURL,
 		&user.SkillLevel,
@@ -487,4 +490,50 @@ func (s *UsersStore) Update(ctx context.Context, user *User) error {
 	}
 
 	return nil
+}
+
+// UpdateAndUpload updates arbitrary user fields + profile_picture_url in one TX.
+func (s *UsersStore) UpdateAndUpload(ctx context.Context, userID int64, updates map[string]interface{}, profilePictureURL string) error {
+	return withTx(s.db, ctx, func(tx *sql.Tx) error {
+		// 1) If there are other fields to update, do them first
+		if len(updates) > 0 {
+			// validate skill_level
+			if lvl, ok := updates["skill_level"]; ok {
+				valid := map[string]bool{"beginner": true, "intermediate": true, "advanced": true}
+				if !valid[lvl.(string)] {
+					return fmt.Errorf("invalid skill_level: %s", lvl)
+				}
+			}
+
+			setClauses := []string{}
+			args := []interface{}{}
+			i := 1
+			for col, val := range updates {
+				if !isValidField(col) {
+					return fmt.Errorf("invalid field name: %s", col)
+				}
+				setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, i))
+				args = append(args, val)
+				i++
+			}
+			// append updated_at and WHERE
+			args = append(args, userID)
+			query := fmt.Sprintf(
+				"UPDATE users SET %s, updated_at = NOW() WHERE id = $%d",
+				strings.Join(setClauses, ", "),
+				i,
+			)
+			if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+				return fmt.Errorf("update fields failed: %w", err)
+			}
+		}
+
+		// 2) Always update profile_picture_url (even if empty string => clear it)
+		q2 := `UPDATE users SET profile_picture_url = $1, updated_at = NOW() WHERE id = $2`
+		if _, err := tx.ExecContext(ctx, q2, profilePictureURL, userID); err != nil {
+			return fmt.Errorf("update profile picture failed: %w", err)
+		}
+
+		return nil
+	})
 }

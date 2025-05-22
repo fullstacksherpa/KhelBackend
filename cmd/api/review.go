@@ -59,7 +59,7 @@ func (app *application) createVenueReviewHandler(w http.ResponseWriter, r *http.
 	}
 	if already {
 		// 409 Conflict is the usual HTTP response when the resource already exists
-		app.conflictResponse(w, r, errors.New("you have already reviewed this venue"))
+		app.conflictResponse(w, r, errors.New("you have already reviewed this venue. delete previous one to review again"))
 		return
 	}
 
