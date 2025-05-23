@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.9.0...v1.10.0) (2025-05-23)
+
+
+### Features
+
+* added user features ([d21c662](https://github.com/fullstacksherpa/KhelBackend/commit/d21c662b7a5a4c24ef44efa7d0428eb04b09ed88))
+* change driver from database/sql to pgx/v5 and all data access logic implementation ([a6108c7](https://github.com/fullstacksherpa/KhelBackend/commit/a6108c7f184b850221965c24b2fb764331485ca3))
+
+
+### Bug Fixes
+
+* fix error with staticcheck ([00f8cd4](https://github.com/fullstacksherpa/KhelBackend/commit/00f8cd477414b5ff93f243b8847e4d52f29049f5))
+
 ## [1.9.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.8.0...v1.9.0) (2025-05-11)
 
 
