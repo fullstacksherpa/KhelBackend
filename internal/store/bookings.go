@@ -160,7 +160,7 @@ func (s *BookingStore) UpdatePricing(ctx context.Context, p *PricingSlot) error 
 	rowsAffected := result.RowsAffected()
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("Failed to update Pricing for this venue with id=%d", p.VenueID)
+		return fmt.Errorf("failed to update Pricing for this venue with id=%d", p.VenueID)
 	}
 	return nil
 }
