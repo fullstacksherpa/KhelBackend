@@ -2,11 +2,12 @@ package store
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// PricingSlot represents a pricing and availability slot for a venue.
 type PricingSlot struct {
 	ID        int64
 	VenueID   int64
@@ -70,7 +71,7 @@ type ScheduledBooking struct {
 }
 
 type BookingStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 func (s *BookingStore) GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error) {
@@ -79,7 +80,7 @@ func (s *BookingStore) GetPricingSlots(ctx context.Context, venueID int64, dayOf
         FROM venue_pricing 
         WHERE venue_id = $1 AND day_of_week = $2
         ORDER BY start_time`
-	rows, err := s.db.QueryContext(ctx, query, venueID, dayOfWeek)
+	rows, err := s.db.Query(ctx, query, venueID, dayOfWeek)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +113,7 @@ func (s *BookingStore) GetBookingsForDate(ctx context.Context, venueID int64, da
         WHERE venue_id = $1 AND start_time < $2 AND end_time > $3
         ORDER BY start_time
     `
-	rows, err := s.db.QueryContext(ctx, query, venueID, endOfDay, startOfDay)
+	rows, err := s.db.Query(ctx, query, venueID, endOfDay, startOfDay)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +137,7 @@ func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) erro
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, created_at, updated_at
     `
-	return s.db.QueryRowContext(ctx, query,
+	return s.db.QueryRow(ctx, query,
 		booking.VenueID,
 		booking.UserID,
 		booking.StartTime,
@@ -152,16 +153,14 @@ func (s *BookingStore) UpdatePricing(ctx context.Context, p *PricingSlot) error 
 		UPDATE venue_pricing 
 		SET day_of_week = $1, start_time = $2, end_time = $3, price = $4
 		WHERE id = $5 AND venue_id = $6`
-	result, err := s.db.ExecContext(ctx, query, p.DayOfWeek, p.StartTime.Format("15:04:05"), p.EndTime.Format("15:04:05"), p.Price, p.ID, p.VenueID)
+	result, err := s.db.Exec(ctx, query, p.DayOfWeek, p.StartTime.Format("15:04:05"), p.EndTime.Format("15:04:05"), p.Price, p.ID, p.VenueID)
 	if err != nil {
 		return err
 	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
+	rowsAffected := result.RowsAffected()
+
 	if rowsAffected == 0 {
-		return sql.ErrNoRows
+		return fmt.Errorf("Failed to update Pricing for this venue with id=%d", p.VenueID)
 	}
 	return nil
 }
@@ -172,7 +171,7 @@ func (s *BookingStore) CreatePricingSlot(ctx context.Context, p *PricingSlot) er
       (venue_id, day_of_week, start_time, end_time, price)
     VALUES ($1,$2,$3,$4,$5)
     RETURNING id`
-	return s.db.QueryRowContext(ctx, query,
+	return s.db.QueryRow(ctx, query,
 		p.VenueID,
 		p.DayOfWeek,
 		p.StartTime.Format("15:04:05"),
@@ -208,7 +207,7 @@ func (s *BookingStore) GetPendingBookingsForVenueDate(ctx context.Context, venue
         AND b.start_time <  $3
       ORDER BY b.created_at
     `
-	rows, err := s.db.QueryContext(ctx, q, venueID, startOfDay, endOfDay)
+	rows, err := s.db.Query(ctx, q, venueID, startOfDay, endOfDay)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +259,7 @@ func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, ven
         AND b.start_time <  $3
       ORDER BY b.start_time
     `
-	rows, err := s.db.QueryContext(ctx, q, venueID, startOfDay, endOfDay)
+	rows, err := s.db.Query(ctx, q, venueID, startOfDay, endOfDay)
 	if err != nil {
 		return nil, err
 	}
@@ -296,16 +295,14 @@ func (s *BookingStore) UpdateBookingStatus(ctx context.Context, venueID, booking
       WHERE id       = $2
         AND venue_id = $3
     `
-	res, err := s.db.ExecContext(ctx, q, status, bookingID, venueID)
+	res, err := s.db.Exec(ctx, q, status, bookingID, venueID)
 	if err != nil {
 		return err
 	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
+	rows := res.RowsAffected()
+
 	if rows == 0 {
-		return sql.ErrNoRows
+		return fmt.Errorf("failed to update booking status for bookingID=%d and venueID=%d", bookingID, venueID)
 	}
 	return nil
 }

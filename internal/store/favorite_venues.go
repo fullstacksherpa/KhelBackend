@@ -2,11 +2,10 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // FavoriteVenue represents a favorite venue record.
@@ -18,7 +17,7 @@ type FavoriteVenue struct {
 
 // FavoriteVenuesStore handles database operations for favorite venues.
 type FavoriteVenuesStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 // AddFavorite inserts a record into the favorite_venues table.
@@ -28,7 +27,7 @@ func (s *FavoriteVenuesStore) AddFavorite(ctx context.Context, userID, venueID i
 		VALUES ($1, $2)
 		ON CONFLICT DO NOTHING
 	`
-	_, err := s.db.ExecContext(ctx, query, userID, venueID)
+	_, err := s.db.Exec(ctx, query, userID, venueID)
 	if err != nil {
 		return fmt.Errorf("failed to add favorite: %w", err)
 	}
@@ -41,7 +40,7 @@ func (s *FavoriteVenuesStore) RemoveFavorite(ctx context.Context, userID, venueI
 		DELETE FROM favorite_venues
 		WHERE user_id = $1 AND venue_id = $2
 	`
-	_, err := s.db.ExecContext(ctx, query, userID, venueID)
+	_, err := s.db.Exec(ctx, query, userID, venueID)
 	if err != nil {
 		return fmt.Errorf("failed to remove favorite: %w", err)
 	}
@@ -61,7 +60,7 @@ func (s *FavoriteVenuesStore) GetFavoritesByUser(ctx context.Context, userID int
 		ORDER BY f.created_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, userID)
+	rows, err := s.db.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get favorites: %w", err)
 	}
@@ -74,7 +73,7 @@ func (s *FavoriteVenuesStore) GetFavoritesByUser(ctx context.Context, userID int
 		// Scan the venue fields – be sure to match the order and types.
 		if err := rows.Scan(
 			&v.ID, &v.OwnerID, &v.Name, &v.Address, &v.Description,
-			pq.Array(&v.Amenities), &v.OpenTime, pq.Array(&v.ImageURLs), &v.Sport,
+			&v.Amenities, &v.OpenTime, &v.ImageURLs, &v.Sport,
 			&v.CreatedAt, &v.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan venue row: %w", err)
@@ -97,7 +96,7 @@ func (s *FavoriteVenuesStore) GetFavoriteVenueIDsByUser(ctx context.Context, use
         FROM favorite_venues
         WHERE user_id = $1
     `
-	rows, err := s.db.QueryContext(ctx, query, userID)
+	rows, err := s.db.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get favorite ids: %w", err)
 	}

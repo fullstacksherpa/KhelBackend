@@ -2,9 +2,10 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ShortlistedGame represents a record in the shortlisted_games table.
@@ -16,7 +17,7 @@ type ShortlistedGame struct {
 
 // ShortlistGamesStore handles database operations for shortlisted games.
 type ShortlistGamesStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 // AddShortlist adds a game to the user's shortlist.
@@ -26,7 +27,7 @@ func (s *ShortlistGamesStore) AddShortlist(ctx context.Context, userID, gameID i
 		VALUES ($1, $2)
 		ON CONFLICT DO NOTHING
 	`
-	_, err := s.db.ExecContext(ctx, query, userID, gameID)
+	_, err := s.db.Exec(ctx, query, userID, gameID)
 	if err != nil {
 		return fmt.Errorf("failed to add shortlisted game: %w", err)
 	}
@@ -39,7 +40,7 @@ func (s *ShortlistGamesStore) RemoveShortlist(ctx context.Context, userID, gameI
 		DELETE FROM shortlisted_games
 		WHERE user_id = $1 AND game_id = $2
 	`
-	_, err := s.db.ExecContext(ctx, query, userID, gameID)
+	_, err := s.db.Exec(ctx, query, userID, gameID)
 	if err != nil {
 		return fmt.Errorf("failed to remove shortlisted game: %w", err)
 	}
@@ -60,7 +61,7 @@ func (s *ShortlistGamesStore) GetShortlistedGamesByUser(ctx context.Context, use
 		ORDER BY sg.created_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, userID)
+	rows, err := s.db.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shortlisted games: %w", err)
 	}

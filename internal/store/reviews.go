@@ -2,8 +2,10 @@ package store
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Review struct {
@@ -20,7 +22,7 @@ type Review struct {
 	AvatarURL *string `json:"avatar_url,omitempty"`
 }
 type ReviewStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 func (s *ReviewStore) CreateReview(ctx context.Context, review *Review) error {
@@ -29,7 +31,7 @@ func (s *ReviewStore) CreateReview(ctx context.Context, review *Review) error {
         VALUES ($1, $2, $3, $4)
         RETURNING id, created_at, updated_at
     `
-	return s.db.QueryRowContext(ctx, query,
+	return s.db.QueryRow(ctx, query,
 		review.VenueID,
 		review.UserID,
 		review.Rating,
@@ -46,7 +48,7 @@ func (s *ReviewStore) GetReviews(ctx context.Context, venueID int64) ([]Review, 
         WHERE vr.venue_id = $1
         ORDER BY vr.created_at DESC
     `
-	rows, err := s.db.QueryContext(ctx, query, venueID)
+	rows, err := s.db.Query(ctx, query, venueID)
 	if err != nil {
 		return nil, err
 	}
@@ -80,14 +82,15 @@ func (s *ReviewStore) DeleteReview(ctx context.Context, reviewID, userID int64) 
         DELETE FROM reviews 
         WHERE id = $1 AND user_id = $2
     `
-	result, err := s.db.ExecContext(ctx, query, reviewID, userID)
+	result, err := s.db.Exec(ctx, query, reviewID, userID)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected := result.RowsAffected()
+
 	if rowsAffected == 0 {
-		return sql.ErrNoRows
+		return fmt.Errorf("no review found for deletion: id=%d user_id=%d", reviewID, userID)
 	}
 	return nil
 }
@@ -100,13 +103,13 @@ func (s *ReviewStore) GetReviewStats(ctx context.Context, venueID int64) (total 
         FROM reviews
         WHERE venue_id = $1
     `
-	err = s.db.QueryRowContext(ctx, query, venueID).Scan(&total, &average)
+	err = s.db.QueryRow(ctx, query, venueID).Scan(&total, &average)
 	return total, average, err
 }
 
 func (s *ReviewStore) IsReviewOwner(ctx context.Context, reviewID int64, userID int64) (bool, error) {
 	var reviewUserID int64
-	err := s.db.QueryRowContext(ctx, `SELECT user_id FROM reviews WHERE id = $1`, reviewID).Scan(&reviewUserID)
+	err := s.db.QueryRow(ctx, `SELECT user_id FROM reviews WHERE id = $1`, reviewID).Scan(&reviewUserID)
 	if err != nil {
 		return false, err
 	}
@@ -123,6 +126,6 @@ func (s *ReviewStore) HasReview(ctx context.Context, venueID, userID int64) (boo
           WHERE venue_id = $1 AND user_id = $2
         )
     `
-	err := s.db.QueryRowContext(ctx, query, venueID, userID).Scan(&exists)
+	err := s.db.QueryRow(ctx, query, venueID, userID).Scan(&exists)
 	return exists, err
 }

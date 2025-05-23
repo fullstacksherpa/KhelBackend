@@ -2,11 +2,10 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Follower struct {
@@ -16,7 +15,7 @@ type Follower struct {
 }
 
 type FollowerStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 func (s *FollowerStore) Follow(ctx context.Context, followerID, userID int64) error {
@@ -27,13 +26,11 @@ func (s *FollowerStore) Follow(ctx context.Context, followerID, userID int64) er
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	_, err := s.db.ExecContext(ctx, query, userID, followerID)
+	_, err := s.db.Exec(ctx, query, userID, followerID)
 	if err != nil {
-		log.Printf("Error executing query: %v", err) // Add this line for debugging
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
-			return ErrConflict
-		}
-		return fmt.Errorf("failed to follow user: %w", err) // Return the actual error
+		log.Printf("Follow query failed for userID=%d, followerID=%d: %v", userID, followerID, err)
+
+		return fmt.Errorf("failed to follow user: %w", err)
 	}
 	return nil
 }
@@ -47,6 +44,6 @@ func (s *FollowerStore) Unfollow(ctx context.Context, followerID, userID int64) 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	_, err := s.db.ExecContext(ctx, query, userID, followerID)
+	_, err := s.db.Exec(ctx, query, userID, followerID)
 	return err
 }
