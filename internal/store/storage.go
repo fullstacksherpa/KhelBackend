@@ -2,9 +2,11 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -17,7 +19,7 @@ type Storage struct {
 	Users interface {
 		GetByID(context.Context, int64) (*User, error)
 		GetByEmail(context.Context, string) (*User, error)
-		Create(context.Context, *sql.Tx, *User) error
+		Create(ctx context.Context, tx pgx.Tx, user *User) error
 		CreateAndInvite(ctx context.Context, user *User, token string, exp time.Duration) error
 		Activate(context.Context, string) error
 		Delete(context.Context, int64) error
@@ -116,7 +118,7 @@ type Storage struct {
 	}
 }
 
-func NewStorage(db *sql.DB) Storage {
+func NewStorage(db *pgxpool.Pool) Storage {
 	return Storage{
 		Users:            &UsersStore{db},
 		Venues:           &VenuesStore{db},
@@ -131,16 +133,16 @@ func NewStorage(db *sql.DB) Storage {
 	}
 }
 
-func withTx(db *sql.DB, ctx context.Context, fn func(*sql.Tx) error) error {
-	tx, err := db.BeginTx(ctx, nil)
+func withTx(pool *pgxpool.Pool, ctx context.Context, fn func(pgx.Tx) error) error {
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback(ctx)
 
 	if err := fn(tx); err != nil {
-		_ = tx.Rollback()
 		return err
 	}
 
-	return tx.Commit()
+	return tx.Commit(ctx)
 }

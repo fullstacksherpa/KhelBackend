@@ -2,9 +2,10 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Review represents an app review submitted by a user.
@@ -18,7 +19,7 @@ type AppReview struct {
 
 // ReviewsStore handles database operations for app reviews.
 type AppReviewStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 // AddReview inserts a new review record into the app_reviews table.
@@ -27,7 +28,7 @@ func (s *AppReviewStore) AddReview(ctx context.Context, userID int64, rating int
         INSERT INTO app_reviews (user_id, rating, feedback)
         VALUES ($1, $2, $3)
     `
-	if _, err := s.db.ExecContext(ctx, query, userID, rating, feedback); err != nil {
+	if _, err := s.db.Exec(ctx, query, userID, rating, feedback); err != nil {
 		return fmt.Errorf("failed to insert review: %w", err)
 	}
 	return nil
@@ -41,7 +42,7 @@ func (s *AppReviewStore) GetAllReviews(ctx context.Context) ([]AppReview, error)
         ORDER BY created_at DESC
     `
 
-	rows, err := s.db.QueryContext(ctx, query)
+	rows, err := s.db.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query reviews: %w", err)
 	}

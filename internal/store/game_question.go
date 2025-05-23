@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -39,7 +41,7 @@ type QuestionWithReplies struct {
 }
 
 type QuestionStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 // CreateQuestion creates a new game question
@@ -50,7 +52,7 @@ func (s *QuestionStore) CreateQuestion(ctx context.Context, question *Question) 
 		RETURNING id, created_at, updated_at
 	`
 
-	err := s.db.QueryRowContext(ctx, query,
+	err := s.db.QueryRow(ctx, query,
 		question.GameID,
 		question.UserID,
 		question.Question,
@@ -76,7 +78,7 @@ func (s *QuestionStore) GetQuestionsByGame(ctx context.Context, gameID int64) ([
 		ORDER BY created_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, gameID)
+	rows, err := s.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching questions: %w", err)
 	}
@@ -109,7 +111,7 @@ func (s *QuestionStore) CreateReply(ctx context.Context, reply *Reply) error {
 		RETURNING id, created_at, updated_at
 	`
 
-	err := s.db.QueryRowContext(ctx, query,
+	err := s.db.QueryRow(ctx, query,
 		reply.QuestionID,
 		reply.AdminID,
 		reply.Reply,
@@ -135,7 +137,7 @@ func (s *QuestionStore) GetRepliesByQuestion(ctx context.Context, questionID int
 		ORDER BY created_at ASC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, questionID)
+	rows, err := s.db.Query(ctx, query, questionID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching replies: %w", err)
 	}
@@ -167,12 +169,12 @@ func (s *QuestionStore) DeleteQuestion(ctx context.Context, questionID, userID i
 		WHERE id = $1 AND user_id = $2
 	`
 
-	result, err := s.db.ExecContext(ctx, query, questionID, userID)
+	result, err := s.db.Exec(ctx, query, questionID, userID)
 	if err != nil {
 		return fmt.Errorf("error deleting question: %w", err)
 	}
 
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
 		return ErrQuestionNotFound
 	}
@@ -196,7 +198,7 @@ func (s *QuestionStore) GetQuestionsWithReplies(ctx context.Context, gameID int6
 		ORDER BY q.created_at DESC, r.created_at ASC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, gameID)
+	rows, err := s.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching questions with replies: %w", err)
 	}

@@ -105,12 +105,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Invalid value for DB_MAX_OPEN_CONNS: %v", err)
 	}
-	// Retrieve and convert maxIdleConns
-	maxIdleConnsStr := os.Getenv("DB_MAX_IDLE_CONNS")
-	maxIdleConns, err := strconv.Atoi(maxIdleConnsStr)
-	if err != nil {
-		log.Fatalf("Invalid value for DB_MAX_IDLE_CONNS: %v", err)
-	}
 
 	cfg := config{
 		addr:        os.Getenv("ADDR"),
@@ -120,7 +114,6 @@ func main() {
 		db: dbConfig{
 			addr:         os.Getenv("DB_ADDR"),
 			maxOpenConns: maxOpenConns,
-			maxIdleConns: maxIdleConns,
 			maxIdleTime:  os.Getenv("DB_MAX_IDLE_TIME"),
 		},
 		mail: mailConfig{
@@ -156,10 +149,9 @@ func main() {
 	defer logger.Sync()
 
 	// Database
-	db, err := db.New(
+	dbpool, err := db.New(
 		cfg.db.addr,
-		cfg.db.maxOpenConns,
-		cfg.db.maxIdleConns,
+		int32(cfg.db.maxOpenConns), // convert to int32 if needed
 		cfg.db.maxIdleTime,
 	)
 
@@ -167,11 +159,11 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	defer db.Close()
+	defer dbpool.Close()
 	logger.Info("database connection pool established")
 
 	//storage
-	store := store.NewStorage(db)
+	store := store.NewStorage(dbpool)
 
 	//cloudinary
 	cloudinaryUrl := os.Getenv("CLOUDINARY_URL")
@@ -215,7 +207,7 @@ func main() {
 	//Metrics collected http://localhost:8080/v1/debug/vars
 	expvar.NewString("version").Set(version)
 	expvar.Publish("database", expvar.Func(func() any {
-		return db.Stats()
+		return dbpool.Stat()
 	}))
 	expvar.Publish("goroutines", expvar.Func(func() any {
 		return runtime.NumGoroutine()

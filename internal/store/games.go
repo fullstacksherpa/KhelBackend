@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/lib/pq"
 )
 
@@ -132,7 +135,7 @@ type GameDetails struct {
 }
 
 type GameStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
@@ -148,7 +151,7 @@ func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	err := s.db.QueryRowContext(
+	err := s.db.QueryRow(
 		ctx, query,
 		game.SportType,
 		game.Price,
@@ -190,7 +193,7 @@ func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error
 	defer cancel()
 
 	game := &Game{}
-	err := s.db.QueryRowContext(ctx, query, gameID).Scan(
+	err := s.db.QueryRow(ctx, query, gameID).Scan(
 		&game.ID,
 		&game.SportType,
 		&game.Price,
@@ -211,7 +214,7 @@ func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("game not found")
 		}
 		return nil, fmt.Errorf("error retrieving game: %w", err)
@@ -226,9 +229,9 @@ func (s *GameStore) CheckRequestExist(ctx context.Context, gameID int64, userID 
         WHERE game_id = $1 AND user_id = $2 AND status = 'pending'`
 
 	var exists int
-	err := s.db.QueryRowContext(ctx, query, gameID, userID).Scan(&exists)
+	err := s.db.QueryRow(ctx, query, gameID, userID).Scan(&exists)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil // No existing request
 		}
 		return false, err // Return unexpected errors
@@ -241,7 +244,7 @@ func (s *GameStore) AddToGameRequest(ctx context.Context, gameID int64, UserID i
 	query := `
         INSERT INTO game_join_requests (game_id, user_id, status)
         VALUES ($1, $2, 'pending')`
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := s.db.Exec(ctx, query,
 		gameID, UserID)
 	if err != nil {
 		return err
@@ -257,9 +260,9 @@ func (s *GameStore) IsAdminAssistant(ctx context.Context, gameID int64, userID i
 		)`
 
 	var isAdmin bool
-	err := s.db.QueryRowContext(ctx, query, gameID, userID).Scan(&isAdmin)
+	err := s.db.QueryRow(ctx, query, gameID, userID).Scan(&isAdmin)
 	if err != nil {
-		return false, err // Unexpected database error
+		return false, err
 	}
 
 	return isAdmin, nil
@@ -271,18 +274,17 @@ func (s *GameStore) IsAdmin(ctx context.Context, gameID, userID int64) (bool, er
 			WHERE game_id = $1 AND user_id = $2 AND role = 'admin'
 		)`
 	var isAdmin bool
-	err := s.db.QueryRowContext(ctx, query, gameID, userID).Scan(&isAdmin)
+	err := s.db.QueryRow(ctx, query, gameID, userID).Scan(&isAdmin)
 	if err != nil {
-		return false, err // No need to check sql.ErrNoRows
+		return false, err
 	}
 	return isAdmin, nil
 }
 
 func (s *GameStore) ToggleMatchFull(ctx context.Context, gameID int64) error {
-	// First, check the current value of match_full
 	var currentValue bool
 	query := `SELECT match_full FROM games WHERE id = $1`
-	err := s.db.QueryRowContext(ctx, query, gameID).Scan(&currentValue)
+	err := s.db.QueryRow(ctx, query, gameID).Scan(&currentValue)
 	if err != nil {
 		return fmt.Errorf("error checking match_full: %w", err)
 	}
@@ -295,7 +297,7 @@ func (s *GameStore) ToggleMatchFull(ctx context.Context, gameID int64) error {
 		UPDATE games 
 		SET match_full = $1 
 		WHERE id = $2`
-	_, err = s.db.ExecContext(ctx, updateQuery, toggledValue, gameID)
+	_, err = s.db.Exec(ctx, updateQuery, toggledValue, gameID)
 	if err != nil {
 		return fmt.Errorf("error updating match_full: %w", err)
 	}
@@ -304,12 +306,11 @@ func (s *GameStore) ToggleMatchFull(ctx context.Context, gameID int64) error {
 }
 
 func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) error {
-	// Step 1: Get the max players for the game
 	var maxPlayers int
 	query := `SELECT max_players FROM games WHERE id = $1`
-	err := s.db.QueryRowContext(ctx, query, gameID).Scan(&maxPlayers)
+	err := s.db.QueryRow(ctx, query, gameID).Scan(&maxPlayers)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return fmt.Errorf("game not found")
 		}
 		return fmt.Errorf("error fetching game details: %w", err)
@@ -318,7 +319,7 @@ func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) e
 	// Step 2: Count current players in the game
 	var currentPlayers int
 	query = `SELECT COUNT(*) FROM game_players WHERE game_id = $1`
-	err = s.db.QueryRowContext(ctx, query, gameID).Scan(&currentPlayers)
+	err = s.db.QueryRow(ctx, query, gameID).Scan(&currentPlayers)
 	if err != nil {
 		return fmt.Errorf("error counting current players: %w", err)
 	}
@@ -330,7 +331,7 @@ func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) e
 
 	// Step 4: Insert player if limit is not reached
 	insertQuery := `INSERT INTO game_players (game_id, user_id, role, joined_at) VALUES ($1, $2, 'player', NOW())`
-	_, err = s.db.ExecContext(ctx, insertQuery, gameID, userID)
+	_, err = s.db.Exec(ctx, insertQuery, gameID, userID)
 	if err != nil {
 		return fmt.Errorf("error inserting player into game: %w", err)
 	}
@@ -338,12 +339,11 @@ func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) e
 	return nil
 }
 
-// TODO: delete later
 func (s *GameStore) InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error {
 	query := `
 		INSERT INTO game_players (game_id, user_id, role)
 		VALUES ($1, $2, 'admin')`
-	_, err := s.db.ExecContext(ctx, query, gameID, userID)
+	_, err := s.db.Exec(ctx, query, gameID, userID)
 	if err != nil {
 		return fmt.Errorf("InsertAdminInPlayer error (gameID=%d, userID=%d): %w", gameID, userID, err)
 	}
@@ -362,10 +362,9 @@ func (s *GameStore) UpdateRequestStatus(ctx context.Context, gameID, userID int6
 
 	// Execute the update query
 	var requestID int64
-	err := s.db.QueryRowContext(ctx, query, status, gameID, userID).Scan(&requestID)
+	err := s.db.QueryRow(ctx, query, status, gameID, userID).Scan(&requestID)
 	if err != nil {
-		// Return an error if no rows were updated or there's a database issue
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return fmt.Errorf("no pending request found for the game and user")
 		}
 		return fmt.Errorf("error updating request status: %w", err)
@@ -384,7 +383,7 @@ func (s *GameStore) GetJoinRequest(ctx context.Context, gameID, userID int64) (*
 	defer cancel()
 
 	var req GameRequest
-	err := s.db.QueryRowContext(ctx, query, gameID, userID).Scan(
+	err := s.db.QueryRow(ctx, query, gameID, userID).Scan(
 		&req.ID,
 		&req.GameID,
 		&req.UserID,
@@ -394,7 +393,7 @@ func (s *GameStore) GetJoinRequest(ctx context.Context, gameID, userID int64) (*
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("error retrieving join request: %w", err)
@@ -412,7 +411,7 @@ func (s *GameStore) GetPlayerCount(ctx context.Context, gameID int) (int, error)
 	defer cancel()
 	var count int
 
-	err := s.db.QueryRowContext(ctx, query, gameID).Scan(&count)
+	err := s.db.QueryRow(ctx, query, gameID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("error getting player count: %w", err)
 	}
@@ -438,7 +437,7 @@ func (s *GameStore) GetGamePlayers(ctx context.Context, gameID int64) ([]*User, 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query, gameID)
+	rows, err := s.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying game players: %w", err)
 	}
@@ -479,13 +478,13 @@ func (s *GameStore) AssignAssistant(ctx context.Context, gameID, playerID int64)
 		SET role = 'assistant' 
 		WHERE game_id = $1 AND user_id = $2 AND role = 'player'
 	`
-	res, err := s.db.ExecContext(ctx, query, gameID, playerID)
+	res, err := s.db.Exec(ctx, query, gameID, playerID)
 	if err != nil {
 		return err
 	}
 
 	// Check if the update affected any row
-	rowsAffected, _ := res.RowsAffected()
+	rowsAffected := res.RowsAffected()
 	if rowsAffected == 0 {
 		return errors.New("player not found or already an assistant")
 	}
@@ -557,7 +556,7 @@ LIMIT $13 OFFSET $14
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query,
+	rows, err := s.db.Query(ctx, query,
 		nullIfEmpty(q.SportType), // $1
 		nullIfEmpty(q.GameLevel), // $2
 		nullIfZero(q.VenueID),    // $3
@@ -594,7 +593,7 @@ LIMIT $13 OFFSET $14
 			&g.EndTime,
 			&g.MaxPlayers,
 			&g.CurrentPlayer,
-			pq.Array(&g.PlayerImages),
+			&g.PlayerImages,
 			&g.IsBooked,
 			&g.MatchFull,
 			&g.Status,
@@ -633,13 +632,13 @@ func nullTime(t time.Time) interface{} {
 
 func (s *GameStore) CancelGame(ctx context.Context, gameID int64) error {
 	query := `UPDATE games SET status = 'cancelled' WHERE id = $1`
-	result, err := s.db.ExecContext(ctx, query, gameID)
+	result, err := s.db.Exec(ctx, query, gameID)
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
-		return sql.ErrNoRows
+		return fmt.Errorf("no Game found for cancel: id=%d", gameID)
 	}
 	return nil
 }
@@ -669,7 +668,7 @@ func (s *GameStore) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*Ga
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
-	rows, err := s.db.QueryContext(ctx, query, gameID)
+	rows, err := s.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving join requests: %w", err)
 	}
@@ -771,7 +770,7 @@ WHERE g.id = $1
 	defer cancel()
 
 	var gd GameDetails
-	err := s.db.QueryRowContext(ctx, query, gameID).Scan(
+	err := s.db.QueryRow(ctx, query, gameID).Scan(
 		&gd.GameID,
 		&gd.VenueID,
 		&gd.VenueName,
@@ -785,9 +784,9 @@ WHERE g.id = $1
 		&gd.EndTime,
 		&gd.MaxPlayers,
 		&gd.CurrentPlayer,
-		pq.Array(&gd.PlayerImages),
-		pq.Array(&gd.PlayerIDs),
-		pq.Array(&gd.RequestedPlayerIDs),
+		&gd.PlayerImages,
+		&gd.PlayerIDs,
+		&gd.RequestedPlayerIDs,
 		&gd.IsBooked,
 		&gd.MatchFull,
 		&gd.Status,
@@ -795,7 +794,7 @@ WHERE g.id = $1
 		&gd.VenueLon,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("error retrieving game details: %w", err)
@@ -847,11 +846,10 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
 		ORDER BY g.start_time ASC
 	`
 
-	// Apply a query timeout.
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query, venueID)
+	rows, err := s.db.Query(ctx, query, venueID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get upcoming games for venue: %w", err)
 	}

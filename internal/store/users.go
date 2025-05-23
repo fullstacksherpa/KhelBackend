@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -60,10 +62,10 @@ func (p *password) Compare(text string) error {
 }
 
 type UsersStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
-func (s *UsersStore) Create(ctx context.Context, tx *sql.Tx, user *User) error {
+func (s *UsersStore) Create(ctx context.Context, tx pgx.Tx, user *User) error {
 
 	query := `
 	  INSERT INTO users (first_name, last_name, password, email, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at
@@ -72,7 +74,7 @@ func (s *UsersStore) Create(ctx context.Context, tx *sql.Tx, user *User) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	err := tx.QueryRowContext(
+	err := tx.QueryRow(
 		ctx, query, user.FirstName, user.LastName, user.Password.hash, user.Email, user.Phone,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 
@@ -92,7 +94,7 @@ func (s *UsersStore) Create(ctx context.Context, tx *sql.Tx, user *User) error {
 
 func (s *UsersStore) SetProfile(ctx context.Context, url string, userID int64) error {
 	query := `UPDATE users SET profile_picture_url = $1 WHERE id = $2`
-	_, err := s.db.ExecContext(ctx, query, url, userID)
+	_, err := s.db.Exec(ctx, query, url, userID)
 	if err != nil {
 		return err
 	}
@@ -102,7 +104,7 @@ func (s *UsersStore) SetProfile(ctx context.Context, url string, userID int64) e
 func (s *UsersStore) GetProfileUrl(ctx context.Context, userID int64) (string, error) {
 	var oldProfilePictureURL string
 	query := `SELECT profile_picture_url FROM users WHERE id = $1`
-	err := s.db.QueryRowContext(ctx, query, userID).Scan(&oldProfilePictureURL)
+	err := s.db.QueryRow(ctx, query, userID).Scan(&oldProfilePictureURL)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Handle the case where no rows are returned (user not found)
@@ -146,7 +148,7 @@ func (s *UsersStore) UpdateUser(ctx context.Context, userID int64, updates map[s
 	query := fmt.Sprintf("UPDATE users SET %s, updated_at = NOW() WHERE id = $%d",
 		strings.Join(setClauses, ", "), argCounter)
 
-	_, err := s.db.ExecContext(ctx, query, args...)
+	_, err := s.db.Exec(ctx, query, args...)
 	if err != nil {
 		log.Printf("Failed to update user: %v", err)
 		return fmt.Errorf("failed to update user: %w", err)
@@ -177,7 +179,7 @@ func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {
 
 	user := &User{}
 
-	err := s.db.QueryRowContext(ctx, query, userID).Scan(
+	err := s.db.QueryRow(ctx, query, userID).Scan(
 		&user.ID,
 		&user.FirstName,
 		&user.LastName,
@@ -201,7 +203,7 @@ func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {
 }
 
 func (s *UsersStore) CreateAndInvite(ctx context.Context, user *User, token string, invitationExp time.Duration) error {
-	return withTx(s.db, ctx, func(tx *sql.Tx) error {
+	return withTx(s.db, ctx, func(tx pgx.Tx) error {
 		if err := s.Create(ctx, tx, user); err != nil {
 			return err
 		}
@@ -214,13 +216,13 @@ func (s *UsersStore) CreateAndInvite(ctx context.Context, user *User, token stri
 	})
 }
 
-func (s *UsersStore) createUserInvitation(ctx context.Context, tx *sql.Tx, token string, exp time.Duration, userID int64) error {
+func (s *UsersStore) createUserInvitation(ctx context.Context, tx pgx.Tx, token string, exp time.Duration, userID int64) error {
 	query := `INSERT INTO user_invitations (token, user_id, expiry) VALUES ($1, $2, $3)`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	_, err := tx.ExecContext(ctx, query, token, userID, time.Now().Add(exp))
+	_, err := tx.Exec(ctx, query, token, userID, time.Now().Add(exp))
 	if err != nil {
 		return err
 	}
@@ -229,7 +231,7 @@ func (s *UsersStore) createUserInvitation(ctx context.Context, tx *sql.Tx, token
 }
 
 func (s *UsersStore) Activate(ctx context.Context, token string) error {
-	return withTx(s.db, ctx, func(tx *sql.Tx) error {
+	return withTx(s.db, ctx, func(tx pgx.Tx) error {
 		// 1. find the user that this token belongs to
 		user, err := s.getUserFromInvitation(ctx, tx, token)
 		if err != nil {
@@ -251,7 +253,7 @@ func (s *UsersStore) Activate(ctx context.Context, token string) error {
 	})
 }
 
-func (s *UsersStore) getUserFromInvitation(ctx context.Context, tx *sql.Tx, token string) (*User, error) {
+func (s *UsersStore) getUserFromInvitation(ctx context.Context, tx pgx.Tx, token string) (*User, error) {
 	query := `
 		SELECT u.id, u.first_name, u.last_name, u.email, u.created_at, u.is_active
 		FROM users u
@@ -266,7 +268,7 @@ func (s *UsersStore) getUserFromInvitation(ctx context.Context, tx *sql.Tx, toke
 	defer cancel()
 
 	user := &User{}
-	err := tx.QueryRowContext(ctx, query, hashToken, time.Now()).Scan(
+	err := tx.QueryRow(ctx, query, hashToken, time.Now()).Scan(
 		&user.ID,
 		&user.FirstName,
 		&user.LastName,
@@ -286,13 +288,13 @@ func (s *UsersStore) getUserFromInvitation(ctx context.Context, tx *sql.Tx, toke
 	return user, nil
 }
 
-func (s *UsersStore) update(ctx context.Context, tx *sql.Tx, user *User) error {
+func (s *UsersStore) update(ctx context.Context, tx pgx.Tx, user *User) error {
 	query := `UPDATE users SET  email = $1, is_active = $2 WHERE id = $3`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	_, err := tx.ExecContext(ctx, query, user.Email, user.IsActive, user.ID)
+	_, err := tx.Exec(ctx, query, user.Email, user.IsActive, user.ID)
 	if err != nil {
 		return err
 	}
@@ -300,13 +302,13 @@ func (s *UsersStore) update(ctx context.Context, tx *sql.Tx, user *User) error {
 	return nil
 }
 
-func (s *UsersStore) deleteUserInvitations(ctx context.Context, tx *sql.Tx, userID int64) error {
+func (s *UsersStore) deleteUserInvitations(ctx context.Context, tx pgx.Tx, userID int64) error {
 	query := `DELETE FROM user_invitations WHERE user_id = $1`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	_, err := tx.ExecContext(ctx, query, userID)
+	_, err := tx.Exec(ctx, query, userID)
 	if err != nil {
 		return err
 	}
@@ -314,9 +316,8 @@ func (s *UsersStore) deleteUserInvitations(ctx context.Context, tx *sql.Tx, user
 	return nil
 }
 
-// later we will use to implement saga design pattern when sending emailWithToken fail
 func (s *UsersStore) Delete(ctx context.Context, userID int64) error {
-	return withTx(s.db, ctx, func(tx *sql.Tx) error {
+	return withTx(s.db, ctx, func(tx pgx.Tx) error {
 		if err := s.delete(ctx, tx, userID); err != nil {
 			return err
 		}
@@ -329,13 +330,13 @@ func (s *UsersStore) Delete(ctx context.Context, userID int64) error {
 	})
 }
 
-func (s *UsersStore) delete(ctx context.Context, tx *sql.Tx, id int64) error {
+func (s *UsersStore) delete(ctx context.Context, tx pgx.Tx, id int64) error {
 	query := `DELETE FROM users WHERE id = $1`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	_, err := tx.ExecContext(ctx, query, id)
+	_, err := tx.Exec(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -353,7 +354,7 @@ func (s *UsersStore) GetByEmail(ctx context.Context, email string) (*User, error
 	defer cancel()
 
 	user := &User{}
-	err := s.db.QueryRowContext(ctx, query, email).Scan(
+	err := s.db.QueryRow(ctx, query, email).Scan(
 		&user.ID,
 		&user.FirstName,
 		&user.Phone,
@@ -375,7 +376,7 @@ func (s *UsersStore) GetByEmail(ctx context.Context, email string) (*User, error
 
 func (s *UsersStore) SaveRefreshToken(ctx context.Context, userID int64, refreshToken string) error {
 	query := `UPDATE users SET refresh_token = $1, updated_at = NOW() WHERE id = $2`
-	_, err := s.db.ExecContext(ctx, query, refreshToken, userID)
+	_, err := s.db.Exec(ctx, query, refreshToken, userID)
 	if err != nil {
 		return fmt.Errorf("failed to save refresh token: %w", err)
 	}
@@ -384,7 +385,7 @@ func (s *UsersStore) SaveRefreshToken(ctx context.Context, userID int64, refresh
 
 func (s *UsersStore) DeleteRefreshToken(ctx context.Context, userID int64) error {
 	query := `UPDATE users SET refresh_token = NULL, updated_at = NOW() WHERE id = $1`
-	_, err := s.db.ExecContext(ctx, query, userID)
+	_, err := s.db.Exec(ctx, query, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete refresh token: %w", err)
 	}
@@ -397,7 +398,7 @@ func (s *UsersStore) GetRefreshToken(ctx context.Context, userID int64) (string,
 
 	// Query to retrieve the refresh token for the given userID
 	query := `SELECT refresh_token FROM users WHERE id = $1`
-	err := s.db.QueryRowContext(ctx, query, userID).Scan(&refreshToken)
+	err := s.db.QueryRow(ctx, query, userID).Scan(&refreshToken)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -418,7 +419,7 @@ func (s *UsersStore) UpdateResetToken(ctx context.Context, email, resetToken str
         SET reset_password_token = $1, reset_password_expires = $2
         WHERE email = $3
     `
-	_, err := s.db.ExecContext(ctx, query, resetToken, resetTokenExpires, email)
+	_, err := s.db.Exec(ctx, query, resetToken, resetTokenExpires, email)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return err
@@ -435,7 +436,7 @@ func (s *UsersStore) GetByResetToken(ctx context.Context, resetToken string) (*U
         WHERE reset_password_token = $1
     `
 	var user User
-	err := s.db.QueryRowContext(ctx, query, resetToken).Scan(
+	err := s.db.QueryRow(ctx, query, resetToken).Scan(
 		&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Phone, &user.Password.hash, &user.ProfilePictureURL, &user.SkillLevel, &user.NoOfGames, &user.RefreshToken, &user.IsActive, &user.ResetPasswordToken, &user.ResetPasswordExpires, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
@@ -484,7 +485,7 @@ func (s *UsersStore) Update(ctx context.Context, user *User) error {
 		user.ID,
 	}
 
-	_, err := s.db.ExecContext(ctx, query, args...)
+	_, err := s.db.Exec(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -494,7 +495,7 @@ func (s *UsersStore) Update(ctx context.Context, user *User) error {
 
 // UpdateAndUpload updates arbitrary user fields + profile_picture_url in one TX.
 func (s *UsersStore) UpdateAndUpload(ctx context.Context, userID int64, updates map[string]interface{}, profilePictureURL string) error {
-	return withTx(s.db, ctx, func(tx *sql.Tx) error {
+	return withTx(s.db, ctx, func(tx pgx.Tx) error {
 		// 1) If there are other fields to update, do them first
 		if len(updates) > 0 {
 			// validate skill_level
@@ -523,14 +524,14 @@ func (s *UsersStore) UpdateAndUpload(ctx context.Context, userID int64, updates 
 				strings.Join(setClauses, ", "),
 				i,
 			)
-			if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+			if _, err := tx.Exec(ctx, query, args...); err != nil {
 				return fmt.Errorf("update fields failed: %w", err)
 			}
 		}
 
 		// 2) Always update profile_picture_url (even if empty string => clear it)
 		q2 := `UPDATE users SET profile_picture_url = $1, updated_at = NOW() WHERE id = $2`
-		if _, err := tx.ExecContext(ctx, q2, profilePictureURL, userID); err != nil {
+		if _, err := tx.Exec(ctx, q2, profilePictureURL, userID); err != nil {
 			return fmt.Errorf("update profile picture failed: %w", err)
 		}
 

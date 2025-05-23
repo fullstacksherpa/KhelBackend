@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype" // For PostGIS GEOGRAPHY
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Venue represents a venue in the database
@@ -39,7 +39,7 @@ type VenueDetail struct {
 }
 
 type VenuesStore struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 // CheckIfVenueExists checks if a venue with the same name and owner already exists
@@ -49,7 +49,7 @@ func (s *VenuesStore) CheckIfVenueExists(ctx context.Context, name string, owner
 	`
 
 	var existingVenueID int64
-	err := s.db.QueryRowContext(ctx, query, name, ownerID).Scan(&existingVenueID)
+	err := s.db.QueryRow(ctx, query, name, ownerID).Scan(&existingVenueID)
 
 	// If an error is not found, it means the venue exists
 	if err == nil {
@@ -93,7 +93,7 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 		Valid: true, // Make sure the point is valid
 	}
 
-	err = s.db.QueryRowContext(
+	err = s.db.QueryRow(
 		ctx, query,
 		venue.OwnerID,
 		venue.Name,
@@ -101,9 +101,9 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 		point.P.X, // Longitude
 		point.P.Y, // Latitude
 		venue.Description,
-		pq.Array(venue.Amenities),
+		venue.Amenities,
 		venue.OpenTime,
-		pq.Array([]string{}), // no images at first
+		[]string{}, // no images at first
 		venue.Sport,
 		venue.PhoneNumber,
 	).Scan(
@@ -125,7 +125,7 @@ func (s *VenuesStore) RemovePhotoURL(ctx context.Context, venueID int64, photoUR
 		SET image_urls = array_remove(image_urls, $1)
 		WHERE id = $2
 	`
-	_, err := s.db.ExecContext(ctx, query, photoURL, venueID)
+	_, err := s.db.Exec(ctx, query, photoURL, venueID)
 	if err != nil {
 		return fmt.Errorf("failed to remove photo URL: %w", err)
 	}
@@ -139,7 +139,7 @@ func (s *VenuesStore) AddPhotoURL(ctx context.Context, venueID int64, photoURL s
 		SET image_urls = array_append(image_urls, $1)
 		WHERE id = $2
 	`
-	_, err := s.db.ExecContext(ctx, query, photoURL, venueID)
+	_, err := s.db.Exec(ctx, query, photoURL, venueID)
 	if err != nil {
 		return fmt.Errorf("failed to add photo URL: %w", err)
 	}
@@ -181,7 +181,7 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 			// Handle amenities as an array of strings
 			if amenities, ok := value.([]string); ok {
 				query += fmt.Sprintf("amenities = $%d, ", argCounter)
-				args = append(args, pq.Array(amenities))
+				args = append(args, amenities)
 				argCounter++
 			} else {
 				return fmt.Errorf("invalid amenities data")
@@ -211,7 +211,7 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 	args = append(args, venueID)
 
 	// Execute the query
-	_, err := s.db.ExecContext(ctx, query, args...)
+	_, err := s.db.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update venue: %w", err)
 	}
@@ -223,7 +223,7 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 func (s *VenuesStore) IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error) {
 	var ownerID int64
 
-	err := s.db.QueryRowContext(ctx, `SELECT owner_id FROM venues WHERE id = $1`, venueID).Scan(&ownerID)
+	err := s.db.QueryRow(ctx, `SELECT owner_id FROM venues WHERE id = $1`, venueID).Scan(&ownerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, fmt.Errorf("venue not found")
@@ -243,7 +243,7 @@ func (s *VenuesStore) IsOwner(ctx context.Context, venueID int64, userID int64) 
 
 func (s *VenuesStore) GetOwnedVenueIDs(ctx context.Context, userID int64) ([]int64, error) {
 	query := `SELECT id FROM venues WHERE owner_id = $1`
-	rows, err := s.db.QueryContext(ctx, query, userID)
+	rows, err := s.db.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (s *VenuesStore) GetVenueByID(ctx context.Context, venueID int64) (*Venue, 
 	SELECT id, owner_id, name, address, description, amenities, open_time, image_urls, sport, phone_number, created_at, updated_at 
 	FROM venues 
 	WHERE id = $1`
-	row := s.db.QueryRowContext(ctx, query, venueID)
+	row := s.db.QueryRow(ctx, query, venueID)
 	var v Venue
 	var amenitiesJSON []byte
 	var imageURLsJSON []byte
@@ -313,96 +313,90 @@ type VenueListing struct {
 // and/or by a geographic radius, and—when a location is provided—sorted
 // nearest-first.
 func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueListing, error) {
-	// 1) Base SELECT + JOIN + aggregates
-	baseQuery := `
-        SELECT
-            v.id,
-            v.name,
-            v.address,
-            ST_X(v.location::geometry)    AS longitude,
-            ST_Y(v.location::geometry)    AS latitude,
-            v.image_urls,
-            v.open_time,
-            v.phone_number,
-            v.sport,
-            COUNT(r.id)                   AS total_reviews,
-            COALESCE(AVG(r.rating), 0)    AS average_rating
-        FROM venues v
-        LEFT JOIN reviews r ON v.id = r.venue_id
-        WHERE 1=1
-    `
-
 	var (
-		where      []string          // accumulated WHERE clauses
-		args       []interface{}     // positional arguments for QueryContext
-		argCounter int           = 1 // current $n index
-		orderBy    string            // ORDER BY clause, if any
+		where      []string
+		args       []interface{}
+		argCounter int = 1
+		orderBy    string
 	)
 
-	// 2) Sport filter
+	// 1) Sport filter
 	if filter.Sport != nil {
 		where = append(where, fmt.Sprintf("v.sport = $%d", argCounter))
 		args = append(args, *filter.Sport)
 		argCounter++
 	}
 
-	// 3) Location filter: both lat, lng and distance must be non-nil
+	// 2) Location filter
 	hasLocation := filter.Latitude != nil && filter.Longitude != nil && filter.Distance != nil
+	var lonPos, latPos int
 	if hasLocation {
-		// ST_DWithin to filter to only those within `distance` meters
 		where = append(where, fmt.Sprintf(
 			"ST_DWithin(v.location::geography, ST_MakePoint($%d, $%d)::geography, $%d)",
 			argCounter, argCounter+1, argCounter+2,
 		))
-		// Note: ST_MakePoint takes (longitude, latitude)
 		args = append(args,
 			*filter.Longitude,
 			*filter.Latitude,
 			*filter.Distance,
 		)
-		// remember the positions we passed lon/lat so we can reuse in ORDER BY
-		lonPos, latPos := argCounter, argCounter+1
+		lonPos, latPos = argCounter, argCounter+1
 		argCounter += 3
 
-		// build the ORDER BY to sort nearest → farthest
 		orderBy = fmt.Sprintf(
 			"ST_Distance(v.location::geography, ST_MakePoint($%d, $%d)::geography) ASC",
 			lonPos, latPos,
 		)
 	}
 
-	// 4) Assemble the full query
-	query := baseQuery
+	// 3) Build query using WITH clause for pre-aggregated stats
+	query := `
+		WITH venue_stats AS (
+			SELECT venue_id, COUNT(*) AS total_reviews, AVG(rating) AS average_rating
+			FROM reviews
+			GROUP BY venue_id
+		)
+		SELECT
+			v.id,
+			v.name,
+			v.address,
+			ST_X(v.location::geometry)    AS longitude,
+			ST_Y(v.location::geometry)    AS latitude,
+			v.image_urls,
+			v.open_time,
+			v.phone_number,
+			v.sport,
+			COALESCE(vs.total_reviews, 0),
+			COALESCE(vs.average_rating, 0)
+		FROM venues v
+		LEFT JOIN venue_stats vs ON v.id = vs.venue_id
+	`
 
 	if len(where) > 0 {
-		query += " AND " + strings.Join(where, " AND ")
+		query += " WHERE " + strings.Join(where, " AND ")
 	}
 
-	// 5) GROUP BY is required for the COUNT/AVG aggregates
-	query += " GROUP BY v.id"
-
-	// 6) If we have a location filter, apply the distance-based ordering;
-	// otherwise you could leave rows in default order or add e.g. `ORDER BY v.name`
 	if hasLocation {
 		query += " ORDER BY " + orderBy
+	} else {
+		query += " ORDER BY v.name"
 	}
 
-	// 7) Finally, add pagination: LIMIT then OFFSET
-	//    next two placeholders: $argCounter = limit, $argCounter+1 = offset
+	// 4) Pagination
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argCounter, argCounter+1)
 	args = append(args,
 		filter.Limit,
 		(filter.Page-1)*filter.Limit,
 	)
 
-	// 8) Execute
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	// 5) Execute query
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying venues: %w", err)
 	}
 	defer rows.Close()
 
-	// 9) Scan result rows into Go structs
+	// 6) Scan results
 	var venues []VenueListing
 	for rows.Next() {
 		var v VenueListing
@@ -414,7 +408,7 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
 			&v.Address,
 			&v.Longitude,
 			&v.Latitude,
-			pq.Array(&v.ImageURLs),
+			&v.ImageURLs,
 			&openTime,
 			&v.PhoneNumber,
 			&v.Sport,
@@ -429,21 +423,20 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
 		venues = append(venues, v)
 	}
 
-	// 10) Return final slice
 	return venues, nil
 }
 
 // UpdateImageURLs updates the venue record with the provided image URLs.
 func (s *VenuesStore) UpdateImageURLs(ctx context.Context, venueID int64, urls []string) error {
 	query := `UPDATE venues SET image_urls = $1 WHERE id = $2`
-	_, err := s.db.ExecContext(ctx, query, pq.Array(urls), venueID)
+	_, err := s.db.Exec(ctx, query, urls, venueID)
 	return err
 }
 
 // Delete removes the venue with the given ID from the database.
 func (s *VenuesStore) Delete(ctx context.Context, venueID int64) error {
 	query := `DELETE FROM venues WHERE id = $1`
-	_, err := s.db.ExecContext(ctx, query, venueID)
+	_, err := s.db.Exec(ctx, query, venueID)
 	return err
 }
 
@@ -482,7 +475,7 @@ func (s *VenuesStore) GetVenueDetail(ctx context.Context, venueID int64) (*Venue
 	var vd VenueDetail
 	var longitude, latitude float64
 
-	err := s.db.QueryRowContext(ctx, query, venueID).Scan(
+	err := s.db.QueryRow(ctx, query, venueID).Scan(
 		&vd.ID,
 		&vd.OwnerID,
 		&vd.Name,
@@ -491,10 +484,10 @@ func (s *VenuesStore) GetVenueDetail(ctx context.Context, venueID int64) (*Venue
 		&latitude,
 		&vd.Description,
 		&vd.PhoneNumber,
-		pq.Array(&vd.Amenities),
+		&vd.Amenities,
 		&vd.OpenTime,
 		&vd.Sport,
-		pq.Array(&vd.ImageURLs),
+		&vd.ImageURLs,
 		&vd.CreatedAt,
 		&vd.UpdatedAt,
 		&vd.TotalReviews,
