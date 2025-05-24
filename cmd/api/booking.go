@@ -570,3 +570,33 @@ func (app *application) rejectBookingHandler(w http.ResponseWriter, r *http.Requ
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// getBookingsByUserHandler godoc
+//
+//	@Summary		List all bookings for a user
+//	@Description	Returns every booking made by the specified user, including venue details.
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{array}		store.UserBooking
+//	@Failure		400	{object}	error	"Bad Request"
+//	@Failure		401	{object}	error	"Unauthorized"
+//	@Failure		500	{object}	error	"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/users/bookings [get]
+func (app *application) getBookingsByUserHandler(w http.ResponseWriter, r *http.Request) {
+
+	user := getUserFromContext(r)
+	if user == nil {
+		app.unauthorizedErrorResponse(w, r, errors.New("unauthorized request"))
+		return
+	}
+
+	bookings, err := app.store.Bookings.GetBookingsByUserID(r.Context(), user.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusOK, bookings)
+}

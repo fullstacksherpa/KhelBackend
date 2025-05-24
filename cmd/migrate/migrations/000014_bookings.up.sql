@@ -10,3 +10,9 @@ CREATE TABLE IF NOT EXISTS bookings (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+
+
+-- ENUM ('confirmed', 'pending', 'rejected', 'done');
+
+

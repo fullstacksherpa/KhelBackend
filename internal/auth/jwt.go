@@ -19,14 +19,15 @@ func NewJWTAuthenticator(secret, refreshSecret, aud, iss string) *JWTAuthenticat
 }
 
 // GenerateTokens generates both access and refresh tokens
-func (a *JWTAuthenticator) GenerateTokens(userID int64) (string, string, error) {
+func (a *JWTAuthenticator) GenerateTokens(userID int64, role string) (string, string, error) {
 	accessClaims := jwt.MapClaims{
-		"sub": userID,
-		"exp": time.Now().Add(time.Hour * 24 * 3).Unix(), // 3 days
-		"iat": time.Now().Unix(),
-		"nbf": time.Now().Unix(),
-		"iss": a.iss,
-		"aud": a.aud,
+		"sub":  userID,
+		"role": role,
+		"exp":  time.Now().Add(time.Hour * 24 * 3).Unix(), // 3 days
+		"iat":  time.Now().Unix(),
+		"nbf":  time.Now().Unix(),
+		"iss":  a.iss,
+		"aud":  a.aud,
 	}
 
 	refreshClaims := jwt.MapClaims{
