@@ -131,6 +131,7 @@ type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	UserID       string `json:"user_id"`
+	Role         string `json:"role"`
 }
 
 // Envelope is a wrapper for API responses.made for swagger doc success output
@@ -178,7 +179,21 @@ func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Reques
 		app.unauthorizedErrorResponse(w, r, err)
 		return
 	}
-	accessToken, refreshToken, err := app.authenticator.GenerateTokens(user.ID)
+
+	venueIDs, err := app.store.Venues.GetOwnedVenueIDs(r.Context(), user.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	var role string
+	if len(venueIDs) > 0 {
+		role = "venue_owner"
+	} else {
+		role = "user"
+	}
+
+	accessToken, refreshToken, err := app.authenticator.GenerateTokens(user.ID, role)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -195,6 +210,7 @@ func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Reques
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"user_id":       userIDStr,
+		"role":          role,
 	}
 	fmt.Println(response)
 
@@ -284,8 +300,21 @@ func (app *application) refreshTokenHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	venueIDs, err := app.store.Venues.GetOwnedVenueIDs(r.Context(), userID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	var role string
+	if len(venueIDs) > 0 {
+		role = "venue_owner"
+	} else {
+		role = "user"
+	}
+
 	// Generate new tokens
-	accessToken, newRefreshToken, err := app.authenticator.GenerateTokens(userID)
+	accessToken, newRefreshToken, err := app.authenticator.GenerateTokens(userID, role)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -304,6 +333,7 @@ func (app *application) refreshTokenHandler(w http.ResponseWriter, r *http.Reque
 		"access_token":  accessToken,
 		"refresh_token": newRefreshToken,
 		"user_id":       userIDStr,
+		"role":          role,
 	}
 
 	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {

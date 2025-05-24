@@ -160,6 +160,7 @@ func (app *application) mount() http.Handler {
 		r.Route("/users", func(r chi.Router) {
 
 			r.Use(app.AuthTokenMiddleware)
+			r.Get("/bookings", app.getBookingsByUserHandler)
 			r.Get("/me", app.getCurrentUserHandler)
 			r.Patch("/update-profile", app.editProfileHandler)
 			r.Put("/", app.updateUserHandler)

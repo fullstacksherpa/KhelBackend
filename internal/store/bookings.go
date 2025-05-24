@@ -70,6 +70,18 @@ type ScheduledBooking struct {
 	EndTime      time.Time `json:"end_time"`
 }
 
+type UserBooking struct {
+	BookingID    int64     `json:"booking_id"`
+	VenueID      int64     `json:"venue_id"`
+	VenueName    string    `json:"venue_name"`
+	VenueAddress string    `json:"venue_address"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+	TotalPrice   int       `json:"total_price"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 type BookingStore struct {
 	db *pgxpool.Pool
 }
@@ -315,4 +327,48 @@ func (s *BookingStore) AcceptBooking(ctx context.Context, venueID, bookingID int
 // RejectBooking marks a pending booking as rejected.
 func (s *BookingStore) RejectBooking(ctx context.Context, venueID, bookingID int64) error {
 	return s.UpdateBookingStatus(ctx, venueID, bookingID, "rejected")
+}
+
+func (s *BookingStore) GetBookingsByUserID(ctx context.Context, userID int64) ([]UserBooking, error) {
+	const q = `
+      SELECT
+        b.id,
+        b.venue_id,
+        v.name,
+        v.address,
+        b.start_time,
+        b.end_time,
+        b.total_price,
+        b.status,
+        b.created_at
+      FROM bookings b
+      JOIN venues v ON v.id = b.venue_id
+      WHERE b.user_id = $1
+      ORDER BY b.created_at DESC
+    `
+	rows, err := s.db.Query(ctx, q, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []UserBooking
+	for rows.Next() {
+		var ub UserBooking
+		if err := rows.Scan(
+			&ub.BookingID,
+			&ub.VenueID,
+			&ub.VenueName,
+			&ub.VenueAddress,
+			&ub.StartTime,
+			&ub.EndTime,
+			&ub.TotalPrice,
+			&ub.Status,
+			&ub.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, ub)
+	}
+	return out, rows.Err()
 }

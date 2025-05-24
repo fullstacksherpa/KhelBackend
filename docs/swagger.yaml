@@ -207,6 +207,8 @@ definitions:
         type: string
       refresh_token:
         type: string
+      role:
+        type: string
       user_id:
         type: string
     type: object
@@ -695,6 +697,27 @@ definitions:
       skill_level:
         type: string
       updated_at:
+        type: string
+    type: object
+  store.UserBooking:
+    properties:
+      booking_id:
+        type: integer
+      created_at:
+        type: string
+      end_time:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      total_price:
+        type: integer
+      venue_address:
+        type: string
+      venue_id:
+        type: integer
+      venue_name:
         type: string
     type: object
   store.Venue:
@@ -1835,6 +1858,35 @@ paths:
       summary: Activate user account
       tags:
       - authentication
+  /users/bookings:
+    get:
+      consumes:
+      - application/json
+      description: Returns every booking made by the specified user, including venue
+        details.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/store.UserBooking'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List all bookings for a user
+      tags:
+      - users
   /users/logout:
     post:
       consumes:

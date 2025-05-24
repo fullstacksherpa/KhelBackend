@@ -92,6 +92,7 @@ type Storage struct {
 		AcceptBooking(ctx context.Context, venueID, bookingID int64) error
 		RejectBooking(ctx context.Context, venueID, bookingID int64) error
 		GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error)
+		GetBookingsByUserID(ctx context.Context, userID int64) ([]UserBooking, error)
 	}
 	FavoriteVenues interface {
 		AddFavorite(ctx context.Context, userID, venueID int64) error
