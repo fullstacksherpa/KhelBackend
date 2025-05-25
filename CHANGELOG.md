@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.11.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.10.0...v1.11.0) (2025-05-25)
+
+
+### Features
+
+* added booking migration for status enums ([e4af193](https://github.com/fullstacksherpa/KhelBackend/commit/e4af193816b98f730fb5c3a98be24a599344953b))
+
+
+### Bug Fixes
+
+* change sql/database from game store ([736b387](https://github.com/fullstacksherpa/KhelBackend/commit/736b3876c7eb568b956f60e58c9aa69e9e3b19a4))
+
 ## [1.10.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.9.0...v1.10.0) (2025-05-23)
 
 
