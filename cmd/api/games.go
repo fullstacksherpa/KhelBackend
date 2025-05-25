@@ -678,3 +678,35 @@ func (app *application) getUpcomingGamesByVenueHandler(w http.ResponseWriter, r 
 		app.internalServerError(w, r, err)
 	}
 }
+
+// GetUpcomingGamesForUser godoc
+//
+//	@Summary		List upcoming active games for the current user
+//	@Description	Returns a list of upcoming active games that the authenticated user has joined.
+//	@Tags			Games
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{array}		store.GameSummary	"List of upcoming active games for user"
+//	@Failure		401	{object}	error				"Unauthorized: missing or invalid API key"
+//	@Failure		500	{object}	error				"Internal Server Error: could not retrieve upcoming games"
+//	@Security		ApiKeyAuth
+//	@Router			/games/get-upcoming [get]
+func (app *application) getUpcomingGamesForUser(w http.ResponseWriter, r *http.Request) {
+
+	user := getUserFromContext(r)
+	if user == nil {
+		app.unauthorizedErrorResponse(w, r, errors.New("Unauthorized"))
+		return
+	}
+
+	games, err := app.store.Games.GetUpcomingGamesByUser(r.Context(), user.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Return the games as a JSON response.
+	if err := app.jsonResponse(w, http.StatusOK, games); err != nil {
+		app.internalServerError(w, r, err)
+	}
+}

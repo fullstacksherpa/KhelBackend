@@ -507,6 +507,45 @@
                 }
             }
         },
+        "/games/get-upcoming": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a list of upcoming active games that the authenticated user has joined.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Games"
+                ],
+                "summary": "List upcoming active games for the current user",
+                "responses": {
+                    "200": {
+                        "description": "List of upcoming active games for user",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.GameSummary"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized: missing or invalid API key",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: could not retrieve upcoming games",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/games/shortlist": {
             "get": {
                 "security": [
@@ -531,7 +570,10 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.Game"
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/store.ShortlistedGameDetail"
+                                }
                             }
                         }
                     },
@@ -1579,6 +1621,37 @@
                     "users"
                 ],
                 "summary": "List all bookings for a user",
+                "parameters": [
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 50,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 7,
+                        "description": "Items per page (max 50)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "confirmed",
+                            "pending",
+                            "rejected",
+                            "done"
+                        ],
+                        "type": "string",
+                        "description": "Filter by booking status",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -4007,6 +4080,85 @@
                     "type": "string"
                 },
                 "user_number": {
+                    "type": "string"
+                }
+            }
+        },
+        "store.ShortlistedGameDetail": {
+            "type": "object",
+            "properties": {
+                "admin_id": {
+                    "description": "Foreign key to users table (game admin)",
+                    "type": "integer"
+                },
+                "created_at": {
+                    "description": "Timestamp when the game was created",
+                    "type": "string"
+                },
+                "end_time": {
+                    "description": "Game end time",
+                    "type": "string"
+                },
+                "format": {
+                    "description": "Game format (nullable)",
+                    "type": "string"
+                },
+                "game_level": {
+                    "description": "Skill level (beginner, intermediate, advanced)",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Primary key",
+                    "type": "integer"
+                },
+                "instruction": {
+                    "description": "Game instructions (nullable)",
+                    "type": "string"
+                },
+                "is_booked": {
+                    "description": "Whether the game is booked",
+                    "type": "boolean"
+                },
+                "match_full": {
+                    "description": "Whether the game is full",
+                    "type": "boolean"
+                },
+                "max_players": {
+                    "description": "Maximum number of players",
+                    "type": "integer"
+                },
+                "price": {
+                    "description": "Price of the game (nullable)",
+                    "type": "integer"
+                },
+                "sport_type": {
+                    "description": "Type of sport (e.g., futsal, basketball)",
+                    "type": "string"
+                },
+                "start_time": {
+                    "description": "Game start time",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Game status (active, cancelled, completed)",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "Timestamp when the game was last updated",
+                    "type": "string"
+                },
+                "venue_address": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "description": "Foreign key to venues table",
+                    "type": "integer"
+                },
+                "venue_name": {
+                    "type": "string"
+                },
+                "visibility": {
+                    "description": "Visibility (public or private)",
                     "type": "string"
                 }
             }

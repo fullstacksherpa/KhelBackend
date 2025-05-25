@@ -80,6 +80,7 @@ type Storage struct {
 		CancelGame(ctx context.Context, gameID int64) error
 		GetGameDetailsWithID(ctx context.Context, gameID int64) (*GameDetails, error)
 		GetUpcomingGamesByVenue(ctx context.Context, venueID int64) ([]GameSummary, error)
+		GetUpcomingGamesByUser(ctx context.Context, userID int64) ([]GameSummary, error)
 	}
 	Bookings interface {
 		GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error)
@@ -92,7 +93,7 @@ type Storage struct {
 		AcceptBooking(ctx context.Context, venueID, bookingID int64) error
 		RejectBooking(ctx context.Context, venueID, bookingID int64) error
 		GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error)
-		GetBookingsByUserID(ctx context.Context, userID int64) ([]UserBooking, error)
+		GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error)
 	}
 	FavoriteVenues interface {
 		AddFavorite(ctx context.Context, userID, venueID int64) error
@@ -103,7 +104,10 @@ type Storage struct {
 	ShortlistedGames interface {
 		AddShortlist(ctx context.Context, userID, gameID int64) error
 		RemoveShortlist(ctx context.Context, userID, gameID int64) error
-		GetShortlistedGamesByUser(ctx context.Context, userID int64) ([]Game, error)
+		GetShortlistedGamesByUser(
+			ctx context.Context,
+			userID int64,
+		) ([]ShortlistedGameDetail, error)
 	}
 	GameQA interface {
 		CreateQuestion(ctx context.Context, question *Question) error
