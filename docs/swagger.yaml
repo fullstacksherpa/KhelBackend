@@ -674,6 +674,64 @@ definitions:
       user_number:
         type: string
     type: object
+  store.ShortlistedGameDetail:
+    properties:
+      admin_id:
+        description: Foreign key to users table (game admin)
+        type: integer
+      created_at:
+        description: Timestamp when the game was created
+        type: string
+      end_time:
+        description: Game end time
+        type: string
+      format:
+        description: Game format (nullable)
+        type: string
+      game_level:
+        description: Skill level (beginner, intermediate, advanced)
+        type: string
+      id:
+        description: Primary key
+        type: integer
+      instruction:
+        description: Game instructions (nullable)
+        type: string
+      is_booked:
+        description: Whether the game is booked
+        type: boolean
+      match_full:
+        description: Whether the game is full
+        type: boolean
+      max_players:
+        description: Maximum number of players
+        type: integer
+      price:
+        description: Price of the game (nullable)
+        type: integer
+      sport_type:
+        description: Type of sport (e.g., futsal, basketball)
+        type: string
+      start_time:
+        description: Game start time
+        type: string
+      status:
+        description: Game status (active, cancelled, completed)
+        type: string
+      updated_at:
+        description: Timestamp when the game was last updated
+        type: string
+      venue_address:
+        type: string
+      venue_id:
+        description: Foreign key to venues table
+        type: integer
+      venue_name:
+        type: string
+      visibility:
+        description: Visibility (public or private)
+        type: string
+    type: object
   store.User:
     properties:
       created_at:
@@ -1699,6 +1757,32 @@ paths:
       summary: Retrieve a list of games
       tags:
       - Games
+  /games/get-upcoming:
+    get:
+      consumes:
+      - application/json
+      description: Returns a list of upcoming active games that the authenticated
+        user has joined.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of upcoming active games for user
+          schema:
+            items:
+              $ref: '#/definitions/store.GameSummary'
+            type: array
+        "401":
+          description: 'Unauthorized: missing or invalid API key'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: could not retrieve upcoming games'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List upcoming active games for the current user
+      tags:
+      - Games
   /games/shortlist:
     get:
       consumes:
@@ -1711,7 +1795,9 @@ paths:
           description: List of shortlisted games
           schema:
             items:
-              $ref: '#/definitions/store.Game'
+              items:
+                $ref: '#/definitions/store.ShortlistedGameDetail'
+              type: array
             type: array
         "400":
           description: 'Bad Request: Unauthenticated request'
@@ -1864,6 +1950,29 @@ paths:
       - application/json
       description: Returns every booking made by the specified user, including venue
         details.
+      parameters:
+      - default: 1
+        description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 7
+        description: Items per page (max 50)
+        in: query
+        maximum: 50
+        minimum: 1
+        name: limit
+        type: integer
+      - description: Filter by booking status
+        enum:
+        - confirmed
+        - pending
+        - rejected
+        - done
+        in: query
+        name: status
+        type: string
       produces:
       - application/json
       responses:

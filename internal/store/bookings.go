@@ -82,6 +82,16 @@ type UserBooking struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type BookingFilter struct {
+	Status *string // nil = no filtering
+	Page   int     // 1-based
+	Limit  int     // max items per page
+}
+
+func (f BookingFilter) offset() int {
+	return (f.Page - 1) * f.Limit
+}
+
 type BookingStore struct {
 	db *pgxpool.Pool
 }
@@ -329,8 +339,9 @@ func (s *BookingStore) RejectBooking(ctx context.Context, venueID, bookingID int
 	return s.UpdateBookingStatus(ctx, venueID, bookingID, "rejected")
 }
 
-func (s *BookingStore) GetBookingsByUserID(ctx context.Context, userID int64) ([]UserBooking, error) {
-	const q = `
+func (s *BookingStore) GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error) {
+	// build a dynamic WHERE clause
+	base := `
       SELECT
         b.id,
         b.venue_id,
@@ -343,10 +354,23 @@ func (s *BookingStore) GetBookingsByUserID(ctx context.Context, userID int64) ([
         b.created_at
       FROM bookings b
       JOIN venues v ON v.id = b.venue_id
-      WHERE b.user_id = $1
-      ORDER BY b.created_at DESC
-    `
-	rows, err := s.db.Query(ctx, q, userID)
+      WHERE b.user_id = $1`
+
+	// we’ll collect args in a slice
+	args := []interface{}{userID}
+	idx := 2
+
+	if filter.Status != nil {
+		base += fmt.Sprintf(" AND b.status = $%d", idx)
+		args = append(args, *filter.Status)
+		idx++
+	}
+
+	// add ordering + limit/offset
+	base += fmt.Sprintf(" ORDER BY b.created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
+	args = append(args, filter.Limit, filter.offset())
+
+	rows, err := s.db.Query(ctx, base, args...)
 	if err != nil {
 		return nil, err
 	}

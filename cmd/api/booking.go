@@ -578,21 +578,45 @@ func (app *application) rejectBookingHandler(w http.ResponseWriter, r *http.Requ
 //	@Tags			users
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{array}		store.UserBooking
-//	@Failure		400	{object}	error	"Bad Request"
-//	@Failure		401	{object}	error	"Unauthorized"
-//	@Failure		500	{object}	error	"Internal Server Error"
+//	@Param			page	query		int		false	"Page number (1-based)"		default(1)	minimum(1)
+//	@Param			limit	query		int		false	"Items per page (max 50)"	default(7)	minimum(1)	maximum(50)
+//	@Param			status	query		string	false	"Filter by booking status"	Enums(confirmed, pending, rejected, done)
+//	@Success		200		{array}		store.UserBooking
+//	@Failure		400		{object}	error	"Bad Request"
+//	@Failure		401		{object}	error	"Unauthorized"
+//	@Failure		500		{object}	error	"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/users/bookings [get]
 func (app *application) getBookingsByUserHandler(w http.ResponseWriter, r *http.Request) {
-
 	user := getUserFromContext(r)
 	if user == nil {
 		app.unauthorizedErrorResponse(w, r, errors.New("unauthorized request"))
 		return
 	}
 
-	bookings, err := app.store.Bookings.GetBookingsByUserID(r.Context(), user.ID)
+	// Parse query params
+	q := r.URL.Query()
+	page, _ := strconv.Atoi(q.Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit < 1 || limit > 50 {
+		limit = 7
+	}
+
+	var status *string
+	if s := q.Get("status"); s != "" {
+		status = &s
+	}
+
+	filter := store.BookingFilter{
+		Status: status,
+		Page:   page,
+		Limit:  limit,
+	}
+
+	bookings, err := app.store.Bookings.GetBookingsByUser(r.Context(), user.ID, filter)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return

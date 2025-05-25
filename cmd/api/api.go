@@ -177,6 +177,7 @@ func (app *application) mount() http.Handler {
 		r.Route("/games", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
 			r.Get("/get-games", app.getGamesHandler)
+			r.Get("/get-upcoming", app.getUpcomingGamesForUser)
 			r.Get("/shortlist", app.listShortlistedGamesHandler)
 			r.Post("/create", app.createGameHandler)
 			r.Get("/{venueID}/upcoming", app.getUpcomingGamesByVenueHandler)

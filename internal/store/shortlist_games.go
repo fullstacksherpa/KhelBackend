@@ -15,6 +15,12 @@ type ShortlistedGame struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type ShortlistedGameDetail struct {
+	Game
+	VenueName    string `json:"venue_name"`
+	VenueAddress string `json:"venue_address"`
+}
+
 // ShortlistGamesStore handles database operations for shortlisted games.
 type ShortlistGamesStore struct {
 	db *pgxpool.Pool
@@ -47,19 +53,23 @@ func (s *ShortlistGamesStore) RemoveShortlist(ctx context.Context, userID, gameI
 	return nil
 }
 
-// GetShortlistedGamesByUser retrieves all games that a user has shortlisted.
-// It joins the shortlisted_games table with the games table.
-func (s *ShortlistGamesStore) GetShortlistedGamesByUser(ctx context.Context, userID int64) ([]Game, error) {
-	query := `
-	-- Get shortlist for user
-		SELECT g.id, g.sport_type, g.price, g.format, g.venue_id, g.admin_id, g.max_players,
-		       g.game_level, g.start_time, g.end_time, g.visibility, g.instruction,
-		       g.status, g.is_booked, g.match_full, g.created_at, g.updated_at
-		FROM games g
-		JOIN shortlisted_games sg ON g.id = sg.game_id
-		WHERE sg.user_id = $1
-		ORDER BY sg.created_at DESC
-	`
+func (s *ShortlistGamesStore) GetShortlistedGamesByUser(
+	ctx context.Context,
+	userID int64,
+) ([]ShortlistedGameDetail, error) {
+	const query = `
+    SELECT
+      g.id, g.sport_type, g.price, g.format, g.venue_id, g.admin_id, g.max_players,
+      g.game_level, g.start_time, g.end_time, g.visibility, g.instruction,
+      g.status, g.is_booked, g.match_full, g.created_at, g.updated_at,
+      v.name   AS venue_name,
+      v.address AS venue_address
+    FROM games g
+    JOIN shortlisted_games sg ON g.id = sg.game_id
+    JOIN venues v           ON g.venue_id = v.id
+    WHERE sg.user_id = $1
+    ORDER BY sg.created_at DESC
+    `
 
 	rows, err := s.db.Query(ctx, query, userID)
 	if err != nil {
@@ -67,36 +77,37 @@ func (s *ShortlistGamesStore) GetShortlistedGamesByUser(ctx context.Context, use
 	}
 	defer rows.Close()
 
-	var games []Game
+	var list []ShortlistedGameDetail
 	for rows.Next() {
-		var g Game
+		var d ShortlistedGameDetail
 		if err := rows.Scan(
-			&g.ID,
-			&g.SportType,
-			&g.Price,
-			&g.Format,
-			&g.VenueID,
-			&g.AdminID,
-			&g.MaxPlayers,
-			&g.GameLevel,
-			&g.StartTime,
-			&g.EndTime,
-			&g.Visibility,
-			&g.Instruction,
-			&g.Status,
-			&g.IsBooked,
-			&g.MatchFull,
-			&g.CreatedAt,
-			&g.UpdatedAt,
+			&d.ID,
+			&d.SportType,
+			&d.Price,
+			&d.Format,
+			&d.VenueID,
+			&d.AdminID,
+			&d.MaxPlayers,
+			&d.GameLevel,
+			&d.StartTime,
+			&d.EndTime,
+			&d.Visibility,
+			&d.Instruction,
+			&d.Status,
+			&d.IsBooked,
+			&d.MatchFull,
+			&d.CreatedAt,
+			&d.UpdatedAt,
+			&d.VenueName,
+			&d.VenueAddress,
 		); err != nil {
-			return nil, fmt.Errorf("failed to scan game row: %w", err)
+			return nil, fmt.Errorf("failed to scan shortlisted game row: %w", err)
 		}
-		games = append(games, g)
+		list = append(list, d)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-
-	return games, nil
+	return list, nil
 }

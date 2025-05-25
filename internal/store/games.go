@@ -2,15 +2,13 @@ package store
 
 import (
 	"context"
-	"database/sql"
+
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/lib/pq"
 )
 
 // Game represents a game in the system
@@ -652,8 +650,8 @@ type GameRequestWithUser struct {
 	UpdatedAt         time.Time         `json:"updated_at"`
 	FirstName         string            `json:"first_name"`
 	Phone             string            `json:"phone"`
-	ProfilePictureURL sql.NullString    `json:"profile_picture_url" swaggertype:"string"`
-	SkillLevel        sql.NullString    `json:"skill_level" swaggertype:"string"`
+	ProfilePictureURL *string           `json:"profile_picture_url" swaggertype:"string"`
+	SkillLevel        *string           `json:"skill_level" swaggertype:"string"`
 }
 
 func (s *GameStore) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*GameRequestWithUser, error) {
@@ -821,17 +819,17 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
 		    g.max_players,
 		    (SELECT COUNT(*) FROM game_players gp WHERE gp.game_id = g.id) AS current_player,
 		    COALESCE((
-		      SELECT array_agg(t.profile_picture_url)
-		      FROM (
-		         SELECT u2.profile_picture_url
-		         FROM game_players gp2
-		         JOIN users u2 ON gp2.user_id = u2.id
-		         WHERE gp2.game_id = g.id
-		           AND u2.profile_picture_url IS NOT NULL
-		         ORDER BY gp2.joined_at
-		         LIMIT 4
-		      ) AS t
-		    ), '{}') AS player_images,
+  SELECT array_agg(t.profile_picture_url)
+  FROM (
+     SELECT u2.profile_picture_url
+     FROM game_players gp2
+     JOIN users u2 ON gp2.user_id = u2.id
+     WHERE gp2.game_id = g.id
+       AND u2.profile_picture_url IS NOT NULL
+     ORDER BY gp2.joined_at
+     LIMIT 4
+  ) AS t
+), ARRAY[]::text[]) AS player_images,
 		    g.is_booked,
 		    g.match_full,
 		    g.status,
@@ -871,7 +869,7 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
 			&g.EndTime,
 			&g.MaxPlayers,
 			&g.CurrentPlayer,
-			pq.Array(&g.PlayerImages),
+			&g.PlayerImages,
 			&g.IsBooked,
 			&g.MatchFull,
 			&g.Status,
@@ -887,5 +885,92 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
 		return nil, err
 	}
 
+	return games, nil
+}
+
+// GetUpcomingGamesByUser returns all active games the user has joined
+// whose start_time is in the future, ordered soonest-first.
+func (s *GameStore) GetUpcomingGamesByUser(ctx context.Context, userID int64) ([]GameSummary, error) {
+	const query = `
+SELECT 
+    g.id                AS game_id,
+    g.venue_id,
+    v.name             AS venue_name,
+    g.sport_type,
+    g.price,
+    g.format,
+    u.first_name       AS game_admin_name,
+    g.game_level,
+    g.start_time,
+    g.end_time,
+    g.max_players,
+    (SELECT COUNT(*) FROM game_players gp2 WHERE gp2.game_id = g.id) AS current_player,
+    COALESCE((
+      SELECT array_agg(t.profile_picture_url)
+      FROM (
+         SELECT u2.profile_picture_url
+         FROM game_players gp3
+         JOIN users u2 ON gp3.user_id = u2.id
+         WHERE gp3.game_id = g.id
+           AND u2.profile_picture_url IS NOT NULL
+         ORDER BY gp3.joined_at
+         LIMIT 4
+      ) AS t
+    ), '{}')                   AS player_images,
+    g.is_booked,
+    g.match_full,
+    g.status,
+    ST_Y(v.location::geometry) AS venue_lat,
+    ST_X(v.location::geometry) AS venue_lon
+FROM games g
+JOIN game_players gp ON gp.game_id = g.id
+JOIN venues v      ON g.venue_id = v.id
+JOIN users u       ON g.admin_id = u.id
+WHERE gp.user_id = $1
+  AND g.start_time >= NOW()
+  AND g.status = 'active'
+ORDER BY g.start_time ASC
+`
+
+	// apply timeout (reuse your QueryTimeoutDuration)
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	rows, err := s.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("GetUpcomingGamesByUser query error: %w", err)
+	}
+	defer rows.Close()
+
+	var games []GameSummary
+	for rows.Next() {
+		var g GameSummary
+		if err := rows.Scan(
+			&g.GameID,
+			&g.VenueID,
+			&g.VenueName,
+			&g.SportType,
+			&g.Price,
+			&g.Format,
+			&g.GameAdminName,
+			&g.GameLevel,
+			&g.StartTime,
+			&g.EndTime,
+			&g.MaxPlayers,
+			&g.CurrentPlayer,
+			&g.PlayerImages,
+			&g.IsBooked,
+			&g.MatchFull,
+			&g.Status,
+			&g.VenueLat,
+			&g.VenueLon,
+		); err != nil {
+			return nil, fmt.Errorf("GetUpcomingGamesByUser scan error: %w", err)
+		}
+		games = append(games, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("GetUpcomingGamesByUser rows iteration error: %w", err)
+	}
 	return games, nil
 }
