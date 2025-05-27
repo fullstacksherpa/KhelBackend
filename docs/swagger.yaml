@@ -2217,6 +2217,40 @@ paths:
       tags:
       - Venue-Owner
   /venues/{venueID}:
+    delete:
+      description: Deletes a venue by ID and removes all associated images from Cloudinary.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Venue deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid venue ID
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Venue not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a venue from the system
+      tags:
+      - Venue-Owner
     patch:
       consumes:
       - application/json

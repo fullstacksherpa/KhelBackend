@@ -23,6 +23,8 @@ func (app *application) parseVenueForm(w http.ResponseWriter, r *http.Request, d
 		return nil, fmt.Errorf("missing venue data in form")
 	}
 
+	fmt.Printf("📚 venueData %s\n", venueData)
+
 	// Decode JSON payload
 	if err := json.Unmarshal([]byte(venueData), data); err != nil {
 		return nil, fmt.Errorf("failed to decode JSON venue data: %w", err)

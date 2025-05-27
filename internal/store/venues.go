@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype" // For PostGIS GEOGRAPHY
+	// For PostGIS GEOGRAPHY
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -67,53 +68,44 @@ func (s *VenuesStore) CheckIfVenueExists(ctx context.Context, name string, owner
 
 // Create creates a new venue in the database
 func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
-	// Check if the venue with the same name and owner already exists
-	exists, err := s.CheckIfVenueExists(ctx, venue.Name, venue.OwnerID)
-	if err != nil {
-		return fmt.Errorf("error checking if venue exists: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("a venue with this name already exists for this owner")
-	}
 
-	// Proceed with insertion if venue does not exist
-	query := `
-	INSERT INTO venues (owner_id, name, address, location, description, amenities, open_time, image_urls, sport, phone_number)
-	VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6, $7, $8, $9, $10, $11)
-	RETURNING id, created_at, updated_at
-`
+	const query = `
+    INSERT INTO venues (
+      owner_id, name, address, location,
+      description, amenities, open_time,
+      image_urls, sport, phone_number
+    ) VALUES (
+      $1, $2, $3,
+      ST_SetSRID(ST_MakePoint($4, $5), 4326),
+      $6, $7, $8, $9, $10, $11
+    )
+    RETURNING id, created_at, updated_at
+    `
 
-	// Create a pgtype.Point for PostGIS geography
-	point := pgtype.Point{
-		P: pgtype.Vec2{
-			// Client sends [lat, long], PostGIS needs (long, lat) so i swap the value
-			X: venue.Location[1], // long
-			Y: venue.Location[0], // Latitude
-		},
-		Valid: true, // Make sure the point is valid
-	}
-
-	err = s.db.QueryRow(
-		ctx, query,
+	// Build the args array—make absolutely sure you have exactly 11 items here:
+	args := []interface{}{
 		venue.OwnerID,
 		venue.Name,
 		venue.Address,
-		point.P.X, // Longitude
-		point.P.Y, // Latitude
+		venue.Location[0], // longitude
+		venue.Location[1], // latitude
 		venue.Description,
 		venue.Amenities,
 		venue.OpenTime,
-		[]string{}, // no images at first
+		[]string{}, // initial empty image_urls
 		venue.Sport,
 		venue.PhoneNumber,
-	).Scan(
-		&venue.ID,
-		&venue.CreatedAt,
-		&venue.UpdatedAt,
-	)
-
-	if err != nil {
-		return err
+	}
+	fmt.Println("🔨 Raw SQL:", query)
+	fmt.Printf("📦 ARGS: %#v\n", args)
+	row := s.db.QueryRow(ctx, query, args...)
+	if err := row.Scan(&venue.ID, &venue.CreatedAt, &venue.UpdatedAt); err != nil {
+		fmt.Println("❌ Scan error:", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			// Insert succeeded, but didn’t RETURN any row
+			return fmt.Errorf("venue insert returned no rows — please verify the SQL & table schema: %w", err)
+		}
+		return fmt.Errorf("error scanning insert result: %w", err)
 	}
 	return nil
 }
@@ -148,12 +140,10 @@ func (s *VenuesStore) AddPhotoURL(ctx context.Context, venueID int64, photoURL s
 
 // Update updates a venue's data in the database
 func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[string]interface{}) error {
-	// Start building the SQL query
 	query := "UPDATE venues SET "
 	args := []interface{}{}
 	argCounter := 1
 
-	// Iterate over the updateData map to build the query dynamically
 	for key, value := range updateData {
 		switch key {
 		case "name":
@@ -165,10 +155,9 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 			args = append(args, value)
 			argCounter++
 		case "location":
-			// Handle location as a PostGIS point
-			if location, ok := value.([]float64); ok && len(location) == 2 {
+			if loc, ok := value.([]float64); ok && len(loc) == 2 {
 				query += fmt.Sprintf("location = ST_SetSRID(ST_MakePoint($%d, $%d), 4326), ", argCounter, argCounter+1)
-				args = append(args, location[0], location[1]) // Longitude, Latitude
+				args = append(args, loc[0], loc[1])
 				argCounter += 2
 			} else {
 				return fmt.Errorf("invalid location data")
@@ -178,7 +167,6 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 			args = append(args, value)
 			argCounter++
 		case "amenities":
-			// Handle amenities as an array of strings
 			if amenities, ok := value.([]string); ok {
 				query += fmt.Sprintf("amenities = $%d, ", argCounter)
 				args = append(args, amenities)
@@ -202,20 +190,14 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 			return fmt.Errorf("unsupported field: %s", key)
 		}
 	}
-
-	// Remove the trailing comma and space
-	query = query[:len(query)-2]
-
-	// Add the WHERE clause
+	// Trim trailing comma & space
+	query = strings.TrimSuffix(query, ", ")
 	query += fmt.Sprintf(" WHERE id = $%d", argCounter)
 	args = append(args, venueID)
 
-	// Execute the query
-	_, err := s.db.Exec(ctx, query, args...)
-	if err != nil {
+	if _, err := s.db.Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("failed to update venue: %w", err)
 	}
-
 	return nil
 }
 
@@ -372,9 +354,8 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
 		LEFT JOIN venue_stats vs ON v.id = vs.venue_id
 	`
 
-	if len(where) > 0 {
-		query += " WHERE " + strings.Join(where, " AND ")
-	}
+	where = append(where, "v.status = 'active'")
+	query += " WHERE " + strings.Join(where, " AND ")
 
 	if hasLocation {
 		query += " ORDER BY " + orderBy
@@ -506,4 +487,17 @@ func (s *VenuesStore) GetVenueDetail(ctx context.Context, venueID int64) (*Venue
 	vd.Location = []float64{latitude, longitude}
 
 	return &vd, nil
+}
+
+func (s *VenuesStore) GetImageURLs(ctx context.Context, venueID int64) ([]string, error) {
+	query := `SELECT image_urls FROM venues WHERE id = $1`
+
+	var urls []string
+	if err := s.db.QueryRow(ctx, query, venueID).Scan(&urls); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("venue %d not found", venueID)
+		}
+		return nil, err
+	}
+	return urls, nil
 }

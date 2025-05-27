@@ -241,7 +241,7 @@ type VenueListResponse struct {
 // @Param			limit		query	int		false	"Items per page"	default(7)
 // @Success		200			{array}	VenueListResponse
 //
-//	@Security		ApiKeyAuth
+// @Security		ApiKeyAuth
 //
 // @Router			/venues/list-venues [get]
 func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
@@ -336,8 +336,6 @@ func nullString(s string) *string {
 // 3. Update the venue record with the returned image URLs.
 // If an error occurs at any external step, the venue is deleted to ensure consistency.
 func (app *application) CreateAndUploadVenue(ctx context.Context, venue *store.Venue, files []*multipart.FileHeader, w http.ResponseWriter, r *http.Request) error {
-	// Step 1: Create the venue in the database (without images).
-	fmt.Print("calling database for Create")
 	if err := app.store.Venues.Create(ctx, venue); err != nil {
 		return fmt.Errorf("error creating venue: %w", err)
 	}
@@ -352,7 +350,6 @@ func (app *application) CreateAndUploadVenue(ctx context.Context, venue *store.V
 		return fmt.Errorf("error uploading images: %w", err)
 	}
 
-	fmt.Print("calling database to updateImageURLs")
 	// Step 3: Update the venue with the uploaded image URLs.
 	if err := app.store.Venues.UpdateImageURLs(ctx, venue.ID, imageUrls); err != nil {
 		// Compensate: Delete the venue if updating image URLs fails.
@@ -390,6 +387,7 @@ func (app *application) CreateAndUploadVenue(ctx context.Context, venue *store.V
 //	@Security		ApiKeyAuth
 //	@Router			/venues [post]
 func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("🚀 Entering createVenueHandler")
 	var payload CreateVenuePayload
 
 	// Parse form and JSON payload from multipart form.
@@ -399,19 +397,15 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	fmt.Printf("🎾 Parsed payload: %+v, %d files\n", payload, len(files))
+	//for debug only
+	for _, fh := range files {
+		fmt.Printf("📷 got file: %q (%d bytes)\n", fh.Filename, fh.Size)
+	}
+
 	// Retrieve the current user (owner) from the request context.
 	user := getUserFromContext(r)
-
-	// Check for an existing venue with the same name for this owner.
-	exists, err := app.store.Venues.CheckIfVenueExists(r.Context(), payload.Name, user.ID)
-	if err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
-	if exists {
-		app.alreadyExistVenue(w, r, fmt.Errorf("a venue with this name already exists for this owner"))
-		return
-	}
+	fmt.Println("👤 current user:", user.ID)
 
 	// Prepare the venue model without image URLs initially.
 	venue := &store.Venue{
@@ -427,11 +421,15 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 		// ImageURLs field remains empty until updated.
 	}
 
+	fmt.Println("🏗️ About to Create venue in DB:", venue)
+
 	// Use the SAGA pattern to create the venue record and upload images externally.
 	if err := app.CreateAndUploadVenue(r.Context(), venue, files, w, r); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
+
+	fmt.Println("✅ Venue created successfully:", venue.ID)
 
 	// Return a JSON response with the created venue details.
 	if err := app.jsonResponse(w, http.StatusCreated, venue); err != nil {
@@ -514,4 +512,57 @@ func (app *application) getVenueDetailHandler(w http.ResponseWriter, r *http.Req
 		app.internalServerError(w, r, err)
 		return
 	}
+}
+
+// -----------------------------------------------
+// HTTP Handler for Venue Deletion
+// -----------------------------------------------
+
+// deleteVenueHandler handles deletion of a venue and its associated images from Cloudinary.
+
+// DeleteVenue godoc
+//
+//	@Summary		Delete a venue from the system
+//	@Description	Deletes a venue by ID and removes all associated images from Cloudinary.
+//	@Tags			Venue-Owner
+//	@Produce		json
+//	@Param			venueID	path		int					true	"Venue ID"
+//	@Success		200		{object}	map[string]string	"Venue deleted successfully"
+//	@Failure		400		{object}	error				"Invalid venue ID"
+//	@Failure		401		{object}	error				"Unauthorized"
+//	@Failure		404		{object}	error				"Venue not found"
+//	@Failure		500		{object}	error				"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID} [delete]
+func (app *application) deleteVenueHandler(w http.ResponseWriter, r *http.Request) {
+	venueIDStr := chi.URLParam(r, "venueID")
+
+	// Convert venueID to int64
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %v", err))
+		return
+	}
+	urls, err := app.store.Venues.GetImageURLs(r.Context(), venueID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 2) Delete each from Cloudinary
+	for _, url := range urls {
+		if err := app.deletePhotoFromCloudinary(url); err != nil {
+			app.logger.Warnw("failed to delete image from Cloudinary", "url", url, "err", err)
+			app.internalServerError(w, r, err)
+			return
+
+		}
+	}
+
+	if err := app.store.Venues.Delete(r.Context(), venueID); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Venue deleted successfully"})
 }
