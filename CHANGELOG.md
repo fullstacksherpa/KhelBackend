@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.12.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.11.0...v1.12.0) (2025-05-27)
+
+
+### Features
+
+* added status on venue ([638e0c4](https://github.com/fullstacksherpa/KhelBackend/commit/638e0c4bc71f280846a7a5bd97e00f3cf7973305))
+
+
+### Bug Fixes
+
+* remove CI error ([2ac4ec8](https://github.com/fullstacksherpa/KhelBackend/commit/2ac4ec877176359176875b1a546a1adfa547683e))
+
 ## [1.11.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.10.0...v1.11.0) (2025-05-25)
 
 
