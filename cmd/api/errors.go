@@ -4,15 +4,6 @@ import (
 	"net/http"
 )
 
-func (app *application) alreadyExistVenue(w http.ResponseWriter, r *http.Request, err error) {
-	app.logger.Warnw("venue already exists",
-		"method", r.Method,
-		"path", r.URL.Path,
-		"error", err.Error(),
-	)
-	writeJSONError(w, http.StatusConflict, "a venue with this name already exists for this owner")
-}
-
 func (app *application) internalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	app.logger.Errorw("internal error", "method", r.Method, "path", r.URL.Path,
 		"error", err.Error())
