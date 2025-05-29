@@ -13,6 +13,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+var ErrVenueNotFound = errors.New("venue not found")
+
 // Venue represents a venue in the database
 type Venue struct {
 	ID          int64     `json:"id"`
@@ -28,6 +30,18 @@ type Venue struct {
 	ImageURLs   []string  `json:"image_urls,omitempty"` // Array of image URLs
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type VenueInfo struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Address     string    `json:"address"`
+	Location    []float64 `json:"location"` // PostGIS point (longitude, latitude)
+	Description *string   `json:"description,omitempty"`
+	PhoneNumber string    `json:"phone_number"`
+	Amenities   []string  `json:"amenities,omitempty"` // Array of strings
+	OpenTime    *string   `json:"open_time,omitempty"`
+	Status      string    `json:"status"`
 }
 
 // VenueDetail extends Venue with aggregation fields from reviews and games.
@@ -500,4 +514,37 @@ func (s *VenuesStore) GetImageURLs(ctx context.Context, venueID int64) ([]string
 		return nil, err
 	}
 	return urls, nil
+}
+
+// just get basic venueinfo without images and rating and rate count, much
+// lighter than get venue details method.
+func (s *VenuesStore) GetVenueInfo(ctx context.Context, venueID int64) (*VenueInfo, error) {
+	query := `SELECT id, name, address, ST_X(location::geometry) as longitude,
+		ST_Y(location::geometry) as latitude, description, amenities, open_time, phone_number, status FROM venues WHERE venues.id = $1`
+
+	var VenueInfo VenueInfo
+	var longitude, latitude float64
+
+	err := s.db.QueryRow(ctx, query, venueID).Scan(
+		&VenueInfo.ID,
+		&VenueInfo.Name,
+		&VenueInfo.Address,
+		&longitude,
+		&latitude,
+		&VenueInfo.Description,
+		&VenueInfo.Amenities,
+		&VenueInfo.OpenTime,
+		&VenueInfo.PhoneNumber,
+		&VenueInfo.Status,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrVenueNotFound
+		}
+		return nil, err
+	}
+
+	VenueInfo.Location = []float64{latitude, longitude}
+
+	return &VenueInfo, nil
 }

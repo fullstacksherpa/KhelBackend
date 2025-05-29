@@ -97,6 +97,7 @@ func (app *application) deleteVenuePhotoHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	fmt.Println("Deleted photo from the cloudinary")
 	// Remove the photo URL from the database
 	ctx := r.Context()
 	if err := app.store.Venues.RemovePhotoURL(ctx, venueID, photoURL); err != nil {
@@ -141,6 +142,19 @@ func (app *application) uploadVenuePhotoHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// 🔍 Check how many images already exist
+	ctx := r.Context()
+	urls, err := app.store.Venues.GetImageURLs(ctx, venueID)
+	if err != nil {
+		app.internalServerError(w, r, fmt.Errorf("could not get image urls: %w", err))
+		return
+	}
+
+	if len(urls) >= 7 {
+		app.badRequestResponse(w, r, fmt.Errorf("venue %d already has the max of 7 photos", venueID))
+		return
+	}
+
 	// Get the file from the form
 	file, _, err := r.FormFile("photo")
 	if err != nil {
@@ -156,8 +170,6 @@ func (app *application) uploadVenuePhotoHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Add the new photo URL to the venue's image_urls in the database
-	ctx := r.Context()
 	if err := app.store.Venues.AddPhotoURL(ctx, venueID, newPhotoURL); err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -228,22 +240,22 @@ type VenueListResponse struct {
 	IsFavorite    bool      `json:"is_favorite"`
 }
 
-// @Summary		List venues
-// @Description	Get paginated list of venues with filters
-// @Tags			Venue
-// @Accept			json
-// @Produce		json
-// @Param			sport		query	string	false	"Filter by sport type"
-// @Param			lat			query	number	false	"Latitude for location filter"
-// @Param			lng			query	number	false	"Longitude for location filter"
-// @Param			distance	query	number	false	"Distance in meters from location"
-// @Param			page		query	int		false	"Page number"		default(1)
-// @Param			limit		query	int		false	"Items per page"	default(7)
-// @Success		200			{array}	VenueListResponse
+//	@Summary		List venues
+//	@Description	Get paginated list of venues with filters
+//	@Tags			Venue
+//	@Accept			json
+//	@Produce		json
+//	@Param			sport		query	string	false	"Filter by sport type"
+//	@Param			lat			query	number	false	"Latitude for location filter"
+//	@Param			lng			query	number	false	"Longitude for location filter"
+//	@Param			distance	query	number	false	"Distance in meters from location"
+//	@Param			page		query	int		false	"Page number"		default(1)
+//	@Param			limit		query	int		false	"Items per page"	default(7)
+//	@Success		200			{array}	VenueListResponse
 //
-// @Security		ApiKeyAuth
+//	@Security		ApiKeyAuth
 //
-// @Router			/venues/list-venues [get]
+//	@Router			/venues/list-venues [get]
 func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	q := r.URL.Query()
@@ -551,6 +563,7 @@ func (app *application) deleteVenueHandler(w http.ResponseWriter, r *http.Reques
 
 	// 2) Delete each from Cloudinary
 	for _, url := range urls {
+		fmt.Println(url)
 		if err := app.deletePhotoFromCloudinary(url); err != nil {
 			app.logger.Warnw("failed to delete image from Cloudinary", "url", url, "err", err)
 			app.internalServerError(w, r, err)
@@ -565,4 +578,77 @@ func (app *application) deleteVenueHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Venue deleted successfully"})
+}
+
+// getVenueAllPhotosHandler retrieves all photo URLs associated with a venue.
+//
+// GetVenuePhotos godoc
+//
+//	@Summary		Retrieve all venue photo URLs
+//	@Description	Returns a list of all image URLs associated with the specified venue.
+//	@Tags			Venue-Owner
+//	@Produce		json
+//	@Param			venueID	path		int64	true	"Venue ID"
+//	@Success		200		{array}		string	"List of image URLs"
+//	@Failure		400		{object}	error	"Invalid venue ID"
+//	@Failure		401		{object}	error	"Unauthorized"
+//	@Failure		404		{object}	error	"Venue not found"
+//	@Failure		500		{object}	error	"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/photos [get]
+func (app *application) getVenueAllPhotosHandler(w http.ResponseWriter, r *http.Request) {
+	venueIDStr := chi.URLParam(r, "venueID")
+
+	// Convert venueID to int64
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %v", err))
+		return
+	}
+
+	urls, err := app.store.Venues.GetImageURLs(r.Context(), venueID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusOK, urls)
+
+}
+
+// getVenueInfoHandler retrieves detailed information about a single venue.
+//
+//	@Summary		Get venue information
+//	@Description	Retrieves detailed information (name, address, description, status, etc.) about a venue by its ID.
+//	@Tags			Venue-Owner
+//	@Produce		json
+//	@Param			venueID	path		int64			true	"Venue ID"
+//	@Success		200		{object}	store.VenueInfo	"Detailed venue information"
+//	@Failure		400		{object}	error			"Invalid venue ID"
+//	@Failure		401		{object}	error			"Unauthorized"
+//	@Failure		404		{object}	error			"Venue not found"
+//	@Failure		500		{object}	error			"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/venue-info [get]
+func (app *application) getVenueInfoHandler(w http.ResponseWriter, r *http.Request) {
+	venueIDStr := chi.URLParam(r, "venueID")
+
+	// Convert venueID to int64
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %v", err))
+		return
+	}
+
+	venueInfo, err := app.store.Venues.GetVenueInfo(r.Context(), venueID)
+	if err != nil {
+		if errors.Is(err, store.ErrVenueNotFound) {
+			app.notFoundResponse(w, r, store.ErrNotFound)
+			return
+		}
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusOK, venueInfo)
 }

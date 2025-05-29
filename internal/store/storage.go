@@ -48,6 +48,7 @@ type Storage struct {
 		List(ctx context.Context, filter VenueFilter) ([]VenueListing, error)
 		GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error)
 		GetImageURLs(ctx context.Context, venueID int64) ([]string, error)
+		GetVenueInfo(ctx context.Context, venueID int64) (*VenueInfo, error)
 	}
 	Reviews interface {
 		CreateReview(context.Context, *Review) error
