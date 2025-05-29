@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/fullstacksherpa/KhelBackend/compare/v1.12.0...v1.12.1) (2025-05-29)
+
+
+### Bug Fixes
+
+* updated cloudinary delete method ([e435b76](https://github.com/fullstacksherpa/KhelBackend/commit/e435b7678561faa0e1b433f94dfbf6ac6c40beaf))
+
 ## [1.12.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.11.0...v1.12.0) (2025-05-27)
 
 
