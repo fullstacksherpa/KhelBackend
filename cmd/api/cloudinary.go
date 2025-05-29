@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,6 +21,8 @@ func (app *application) deletePhotoFromCloudinary(photoURL string) error {
 	if err != nil {
 		return fmt.Errorf("failed to extract public ID: %w", err)
 	}
+	//TODO: Delete later
+	fmt.Println(publicID)
 
 	// Delete the asset from Cloudinary
 	_, err = app.cld.Upload.Destroy(context.Background(), uploader.DestroyParams{
@@ -41,8 +44,13 @@ func (app *application) extractPublicIDFromURL(photoURL string) (string, error) 
 
 	pathParts := strings.Split(parsedURL.Path, "/")
 	for i, part := range pathParts {
-		if part == "upload" && i+1 < len(pathParts) {
-			return strings.Join(pathParts[i+1:], "/"), nil
+		if part == "upload" && i+2 < len(pathParts) {
+			publicIDParts := pathParts[i+2:] // Skip "v..." version part
+			publicID := strings.Join(publicIDParts, "/")
+
+			// Remove file extension
+			publicID = strings.TrimSuffix(publicID, filepath.Ext(publicID))
+			return publicID, nil
 		}
 	}
 

@@ -816,6 +816,33 @@ definitions:
       updated_at:
         type: string
     type: object
+  store.VenueInfo:
+    properties:
+      address:
+        type: string
+      amenities:
+        description: Array of strings
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      id:
+        type: integer
+      location:
+        description: PostGIS point (longitude, latitude)
+        items:
+          type: number
+        type: array
+      name:
+        type: string
+      open_time:
+        type: string
+      phone_number:
+        type: string
+      status:
+        type: string
+    type: object
 info:
   contact:
     email: support@swagger.io
@@ -2569,6 +2596,41 @@ paths:
       summary: Delete a venue photo
       tags:
       - Venue-Owner
+    get:
+      description: Returns a list of all image URLs associated with the specified
+        venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of image URLs
+          schema:
+            items:
+              type: string
+            type: array
+        "400":
+          description: Invalid venue ID
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Venue not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve all venue photo URLs
+      tags:
+      - Venue-Owner
     post:
       consumes:
       - multipart/form-data
@@ -2822,6 +2884,40 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List Scheduled booking requests for a venue
+      tags:
+      - Venue-Owner
+  /venues/{venueID}/venue-info:
+    get:
+      description: Retrieves detailed information (name, address, description, status,
+        etc.) about a venue by its ID.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Detailed venue information
+          schema:
+            $ref: '#/definitions/store.VenueInfo'
+        "400":
+          description: Invalid venue ID
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Venue not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get venue information
       tags:
       - Venue-Owner
   /venues/favorites:
