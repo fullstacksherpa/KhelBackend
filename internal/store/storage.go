@@ -89,7 +89,7 @@ type Storage struct {
 		GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error)
 		CreateBooking(ctx context.Context, booking *Booking) error
 		UpdatePricing(ctx context.Context, p *PricingSlot) error
-		CreatePricingSlot(ctx context.Context, p *PricingSlot) error
+		CreatePricingSlotsBatch(ctx context.Context, slots []*PricingSlot) error
 		GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error)
 		UpdateBookingStatus(ctx context.Context, venueID, bookingID int64, status string) error
 		AcceptBooking(ctx context.Context, venueID, bookingID int64) error

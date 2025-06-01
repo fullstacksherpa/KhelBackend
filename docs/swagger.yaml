@@ -17,6 +17,17 @@ definitions:
     - end_time
     - start_time
     type: object
+  main.BulkCreatePricingPayload:
+    properties:
+      slots:
+        description: we use dive, required to ensure each item inside the array is
+          individually validated.
+        items:
+          $ref: '#/definitions/main.CreatePricingPayload'
+        type: array
+    required:
+    - slots
+    type: object
   main.CreateGamePayload:
     properties:
       end_time:
@@ -2668,29 +2679,32 @@ paths:
       tags:
       - Venue-Owner
   /venues/{venueID}/pricing:
-    post:
+    get:
       consumes:
       - application/json
-      description: Adds a new day/time price rule to venue_pricing
+      description: Returns all pricing slots for the specified venue. If the optional
+        `day` query parameter is provided (e.g., `?day=monday`), only slots for that
+        day will be returned.
       parameters:
       - description: Venue ID
         in: path
         name: venueID
         required: true
         type: integer
-      - description: New pricing slot
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/main.CreatePricingPayload'
+      - description: Day of week (sunday, monday, tuesday, wednesday, thursday, friday,
+          saturday)
+        in: query
+        name: day
+        type: string
       produces:
       - application/json
       responses:
-        "201":
-          description: Pricing slot created
+        "200":
+          description: List of pricing slots
           schema:
-            $ref: '#/definitions/store.PricingSlot'
+            items:
+              $ref: '#/definitions/store.PricingSlot'
+            type: array
         "400":
           description: Bad Request
           schema: {}
@@ -2699,7 +2713,43 @@ paths:
           schema: {}
       security:
       - ApiKeyAuth: []
-      summary: Create a new pricing slot for a venue
+      summary: Retrieve pricing slots for a venue (optionally filtered by day)
+      tags:
+      - Venue-Owner
+    post:
+      consumes:
+      - application/json
+      description: Adds new day/time price rules to venue_pricing in bulk
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Pricing slots
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.BulkCreatePricingPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Pricing slots created
+          schema:
+            items:
+              $ref: '#/definitions/store.PricingSlot'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create one or more pricing slots for a venue
       tags:
       - Venue-Owner
   /venues/{venueID}/pricing/{pricingID}:

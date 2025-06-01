@@ -24,6 +24,7 @@ func writeJSON(w http.ResponseWriter, status int, data any) error {
 	return json.NewEncoder(w).Encode(data)
 }
 
+// it parses body into Go struct.
 func readJSON(w http.ResponseWriter, r *http.Request, data any) error {
 	maxBytes := 1_048_578 //1mb
 	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))

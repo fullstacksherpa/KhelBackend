@@ -2884,13 +2884,13 @@ const docTemplate = `{
             }
         },
         "/venues/{venueID}/pricing": {
-            "post": {
+            "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Adds a new day/time price rule to venue_pricing",
+                "description": "Returns all pricing slots for the specified venue. If the optional ` + "`" + `day` + "`" + ` query parameter is provided (e.g., ` + "`" + `?day=monday` + "`" + `), only slots for that day will be returned.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2900,7 +2900,7 @@ const docTemplate = `{
                 "tags": [
                     "Venue-Owner"
                 ],
-                "summary": "Create a new pricing slot for a venue",
+                "summary": "Retrieve pricing slots for a venue (optionally filtered by day)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2910,20 +2910,75 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "New pricing slot",
+                        "type": "string",
+                        "description": "Day of week (sunday, monday, tuesday, wednesday, thursday, friday, saturday)",
+                        "name": "day",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of pricing slots",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.PricingSlot"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Adds new day/time price rules to venue_pricing in bulk",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner"
+                ],
+                "summary": "Create one or more pricing slots for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Pricing slots",
                         "name": "payload",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/main.CreatePricingPayload"
+                            "$ref": "#/definitions/main.BulkCreatePricingPayload"
                         }
                     }
                 ],
                 "responses": {
                     "201": {
-                        "description": "Pricing slot created",
+                        "description": "Pricing slots created",
                         "schema": {
-                            "$ref": "#/definitions/store.PricingSlot"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/store.PricingSlot"
+                            }
                         }
                     },
                     "400": {
@@ -3285,6 +3340,21 @@ const docTemplate = `{
                 },
                 "start_time": {
                     "type": "string"
+                }
+            }
+        },
+        "main.BulkCreatePricingPayload": {
+            "type": "object",
+            "required": [
+                "slots"
+            ],
+            "properties": {
+                "slots": {
+                    "description": "we use dive, required to ensure each item inside the array is individually validated.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.CreatePricingPayload"
+                    }
                 }
             }
         },
