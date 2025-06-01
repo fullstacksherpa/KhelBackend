@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.12.1...v1.13.0) (2025-06-01)
+
+
+### Features
+
+* added venue pricing ([b29a2c5](https://github.com/fullstacksherpa/KhelBackend/commit/b29a2c52faa2ea38e952c1c627631863e57e52a6))
+
 ## [1.12.1](https://github.com/fullstacksherpa/KhelBackend/compare/v1.12.0...v1.12.1) (2025-05-29)
 
 
