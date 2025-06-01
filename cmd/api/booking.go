@@ -257,6 +257,40 @@ func intervalsOverlap(a, b store.Interval) bool {
 	return a.Start.Before(b.End) && b.Start.Before(a.End)
 }
 
+// GetVenuePricing godoc
+//
+//	@Summary		Retrieve pricing slots for a venue (optionally filtered by day)
+//	@Description	Returns all pricing slots for the specified venue. If the optional `day` query parameter is provided (e.g., `?day=monday`), only slots for that day will be returned.
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID	path		int					true	"Venue ID"
+//	@Param			day		query		string				false	"Day of week (sunday, monday, tuesday, wednesday, thursday, friday, saturday)"
+//	@Success		200		{array}		store.PricingSlot	"List of pricing slots"
+//	@Failure		400		{object}	error				"Bad Request"
+//	@Failure		500		{object}	error				"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/pricing [get]
+func (app *application) getVenuePricing(w http.ResponseWriter, r *http.Request) {
+	// Step 1: Parse venueID from URL path
+	venueID, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	dayOfWeek := r.URL.Query().Get("day")
+
+	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// Step 8: Encode the result as JSON and send response
+	app.jsonResponse(w, http.StatusOK, pricingSlots)
+}
+
 // UpdatePricingPayload represents the JSON payload to update pricing info.
 type UpdatePricingPayload struct {
 	DayOfWeek string `json:"day_of_week"`
@@ -331,6 +365,11 @@ func (app *application) updateVenuePricingHandler(w http.ResponseWriter, r *http
 	json.NewEncoder(w).Encode(pricing)
 }
 
+type BulkCreatePricingPayload struct {
+	//we use dive, required to ensure each item inside the array is individually validated.
+	Slots []CreatePricingPayload `json:"slots" validate:"required,dive,required"`
+}
+
 type CreatePricingPayload struct {
 	DayOfWeek string `json:"day_of_week" validate:"required,oneof=sunday monday tuesday wednesday thursday friday saturday"`
 	StartTime string `json:"start_time" validate:"required"` // format "15:04:05"
@@ -340,16 +379,16 @@ type CreatePricingPayload struct {
 
 // CreateVenuePricing godoc
 //
-//	@Summary		Create a new pricing slot for a venue
-//	@Description	Adds a new day/time price rule to venue_pricing
+//	@Summary		Create one or more pricing slots for a venue
+//	@Description	Adds new day/time price rules to venue_pricing in bulk
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID	path		int						true	"Venue ID"
-//	@Param			payload	body		CreatePricingPayload	true	"New pricing slot"
-//	@Success		201		{object}	store.PricingSlot		"Pricing slot created"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Param			venueID	path		int							true	"Venue ID"
+//	@Param			payload	body		BulkCreatePricingPayload	true	"Pricing slots"
+//	@Success		201		{array}		store.PricingSlot			"Pricing slots created"
+//	@Failure		400		{object}	error						"Bad Request"
+//	@Failure		500		{object}	error						"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/pricing [post]
 func (app *application) createVenuePricingHandler(w http.ResponseWriter, r *http.Request) {
@@ -361,8 +400,8 @@ func (app *application) createVenuePricingHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	// 2) Decode + validate payload
-	var payload CreatePricingPayload
+	// 2) Decode + validate bulk payload
+	var payload BulkCreatePricingPayload
 	if err := readJSON(w, r, &payload); err != nil {
 		app.badRequestResponse(w, r, err)
 		return
@@ -372,33 +411,42 @@ func (app *application) createVenuePricingHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	// 3) Parse times
-	startTime, err := time.Parse("15:04:05", payload.StartTime)
-	if err != nil {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid start_time: %w", err))
-		return
-	}
-	endTime, err := time.Parse("15:04:05", payload.EndTime)
-	if err != nil {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid end_time: %w", err))
-		return
+	// 3) Build slice of store.PricingSlot
+	slots := make([]*store.PricingSlot, 0, len(payload.Slots))
+	for i, in := range payload.Slots {
+		// parse times from string to time.time which is type for our model
+		st, err := time.Parse("15:04:05", in.StartTime)
+		if err != nil {
+			app.badRequestResponse(w, r, fmt.Errorf("slot %d: invalid start_time: %w", i, err))
+			return
+		}
+		et, err := time.Parse("15:04:05", in.EndTime)
+		if err != nil {
+			app.badRequestResponse(w, r, fmt.Errorf("slot %d: invalid end_time: %w", i, err))
+			return
+		}
+		if !st.Before(et) {
+			app.badRequestResponse(w, r, fmt.Errorf("slot %d: start_time must be before end_time", i))
+			return
+		}
+
+		slots = append(slots, &store.PricingSlot{
+			VenueID:   venueID,
+			DayOfWeek: strings.ToLower(strings.TrimSpace(in.DayOfWeek)),
+			StartTime: st,
+			EndTime:   et,
+			Price:     in.Price,
+		})
 	}
 
-	// 4) Build model and call store
-	ps := &store.PricingSlot{
-		VenueID:   venueID,
-		DayOfWeek: strings.ToLower(payload.DayOfWeek),
-		StartTime: startTime,
-		EndTime:   endTime,
-		Price:     payload.Price,
-	}
-	if err := app.store.Bookings.CreatePricingSlot(r.Context(), ps); err != nil {
+	// 4) Bulk insert in one transaction using batch
+	if err := app.store.Bookings.CreatePricingSlotsBatch(r.Context(), slots); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	// 5) Return
-	app.jsonResponse(w, http.StatusOK, ps)
+	// 5) Return 201 + full slice (with IDs)
+	app.jsonResponse(w, http.StatusCreated, slots)
 }
 
 // getPendingBookingsHandler godoc

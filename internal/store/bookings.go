@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -187,19 +188,44 @@ func (s *BookingStore) UpdatePricing(ctx context.Context, p *PricingSlot) error 
 	return nil
 }
 
-func (s *BookingStore) CreatePricingSlot(ctx context.Context, p *PricingSlot) error {
-	query := `
-    INSERT INTO venue_pricing
-      (venue_id, day_of_week, start_time, end_time, price)
-    VALUES ($1,$2,$3,$4,$5)
-    RETURNING id`
-	return s.db.QueryRow(ctx, query,
-		p.VenueID,
-		p.DayOfWeek,
-		p.StartTime.Format("15:04:05"),
-		p.EndTime.Format("15:04:05"),
-		p.Price,
-	).Scan(&p.ID)
+// CreatePricingSlotsBatch uses pgx.Batch to insert multiple pricing slots in one round-trip.
+func (s *BookingStore) CreatePricingSlotsBatch(ctx context.Context, slots []*PricingSlot) error {
+	// Use your withTx helper for transaction
+	return withTx(s.db, ctx, func(tx pgx.Tx) error {
+		// Prepare the SQL once
+		const sql = `
+		INSERT INTO venue_pricing
+		  (venue_id, day_of_week, start_time, end_time, price)
+		VALUES ($1,$2,$3,$4,$5)
+		RETURNING id;
+		`
+
+		// Build a batch
+		batch := &pgx.Batch{}
+		for _, slot := range slots {
+			batch.Queue(sql,
+				slot.VenueID,
+				slot.DayOfWeek,
+				slot.StartTime.Format("15:04:05"),
+				slot.EndTime.Format("15:04:05"),
+				slot.Price,
+			)
+		}
+
+		// Send the batch
+		br := tx.SendBatch(ctx, batch)
+		defer br.Close()
+
+		// Read all results and populate IDs
+		for i, slot := range slots {
+			// You can also use br.QueryRow()
+			if err := br.QueryRow().Scan(&slot.ID); err != nil {
+				return fmt.Errorf("batch insert slot[%d]: %w", i, err)
+			}
+		}
+
+		return nil
+	})
 }
 
 // GetPendingBookingsForVenueDate loads all bookings with status='pending'
