@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.1](https://github.com/fullstacksherpa/KhelBackend/compare/v1.13.0...v1.13.1) (2025-06-06)
+
+
+### Bug Fixes
+
+* change the docker compose file ([174f448](https://github.com/fullstacksherpa/KhelBackend/commit/174f44823fc237afd17e9ecafa63f200ddf0087d))
+
 ## [1.13.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.12.1...v1.13.0) (2025-06-01)
 
 
