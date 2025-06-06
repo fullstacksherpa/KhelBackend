@@ -1,0 +1,9 @@
+# .dockerignore
+.git
+build
+bin
+dist
+.github
+Dockerfile
+docker-compose.yml
+*.md
