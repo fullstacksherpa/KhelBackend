@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   reverse-proxy:
     image: traefik:v3.4
@@ -33,13 +31,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.khel.rule=Host(`gocloudnepal.com`)"
+      - "traefik.http.routers.khel.rule=Host(`api.gocloudnepal.com`)"
       - "traefik.http.routers.khel.entrypoints=websecure"
       - "traefik.http.routers.khel.tls.certresolver=myresolver"
+        # When you publish a single container port, Traefik will auto-detect it—
+      # but it’s still best practice to be explicit:
+      - "traefik.http.services.khel.loadbalancer.server.port=8080"
+    # mount your host .env into /app/.env (read-only)
+    volumes:
+      - ./.env:/app/.env:ro
+    # also inject those same vars into the process env
     env_file:
-      - .env
+      - ./.env
     restart: always
 
   watchtower:
