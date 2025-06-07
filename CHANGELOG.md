@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.2](https://github.com/fullstacksherpa/KhelBackend/compare/v1.13.1...v1.13.2) (2025-06-07)
+
+
+### Bug Fixes
+
+* debug compose file ([3cad46e](https://github.com/fullstacksherpa/KhelBackend/commit/3cad46efb92e8ab01bcb1a37c26d554cc54ce39e))
+
 ## [1.13.1](https://github.com/fullstacksherpa/KhelBackend/compare/v1.13.0...v1.13.1) (2025-06-06)
 
 
