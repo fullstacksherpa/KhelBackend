@@ -10,9 +10,9 @@ const docTemplate = `{
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
         "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
+            "name": "fullstacksherpa",
+            "url": "https://www.fullstacksherpa.tech/",
+            "email": "Ongchen10sherpa@gmail.com"
         },
         "license": {
             "name": "Apache 2.0",
@@ -289,7 +289,7 @@ const docTemplate = `{
         },
         "/authentication/user": {
             "post": {
-                "description": "Registers a user",
+                "description": "Registers a user via Mobile App, Server will send activation url on email and need to click there to verify its your email",
                 "consumes": [
                     "application/json"
                 ],
@@ -319,12 +319,16 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
-                        "schema": {}
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorBadRequestResponse"
+                        }
                     },
                     "500": {
                         "description": "Internal Server Error",
-                        "schema": {}
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorInternalServerResponse"
+                        }
                     }
                 }
             }
@@ -3480,6 +3484,42 @@ const docTemplate = `{
             "properties": {
                 "data": {
                     "$ref": "#/definitions/main.TokenResponse"
+                }
+            }
+        },
+        "main.ErrorBadRequestResponse": {
+            "description": "Standard error response format returned by all bad request API endpoints",
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "It show error from err.Error()"
+                },
+                "status": {
+                    "type": "integer",
+                    "example": 400
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "main.ErrorInternalServerResponse": {
+            "description": "Standard error response format returned by all internal server error API endpoints",
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "the server encountered a problem"
+                },
+                "status": {
+                    "type": "integer",
+                    "example": 500
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },

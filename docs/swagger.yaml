@@ -121,6 +121,33 @@ definitions:
       data:
         $ref: '#/definitions/main.TokenResponse'
     type: object
+  main.ErrorBadRequestResponse:
+    description: Standard error response format returned by all bad request API endpoints
+    properties:
+      message:
+        example: It show error from err.Error()
+        type: string
+      status:
+        example: 400
+        type: integer
+      success:
+        example: false
+        type: boolean
+    type: object
+  main.ErrorInternalServerResponse:
+    description: Standard error response format returned by all internal server error
+      API endpoints
+    properties:
+      message:
+        example: the server encountered a problem
+        type: string
+      status:
+        example: 500
+        type: integer
+      success:
+        example: false
+        type: boolean
+    type: object
   main.HourlySlot:
     properties:
       available:
@@ -856,9 +883,9 @@ definitions:
     type: object
 info:
   contact:
-    email: support@swagger.io
-    name: API Support
-    url: http://www.swagger.io/support
+    email: Ongchen10sherpa@gmail.com
+    name: fullstacksherpa
+    url: https://www.fullstacksherpa.tech/
   description: API for Khel, a complete sport application.
   license:
     name: Apache 2.0
@@ -1046,7 +1073,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Registers a user
+      description: Registers a user via Mobile App, Server will send activation url
+        on email and need to click there to verify its your email
       parameters:
       - description: User credentials
         in: body
@@ -1062,11 +1090,13 @@ paths:
           schema:
             $ref: '#/definitions/main.UserWithToken'
         "400":
-          description: Bad Request
-          schema: {}
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorBadRequestResponse'
         "500":
           description: Internal Server Error
-          schema: {}
+          schema:
+            $ref: '#/definitions/main.ErrorInternalServerResponse'
       summary: Registers a user
       tags:
       - authentication

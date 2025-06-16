@@ -82,9 +82,9 @@ var version = "1.2.0"
 //	@title			Khel API
 //	@description	API for Khel, a complete sport application.
 
-//	@contact.name	API Support
-//	@contact.url	http://www.swagger.io/support
-//	@contact.email	support@swagger.io
+//	@contact.name	fullstacksherpa
+//	@contact.url	https://www.fullstacksherpa.tech/
+//	@contact.email	Ongchen10sherpa@gmail.com
 
 //	@license.name	Apache 2.0
 //	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
@@ -212,6 +212,8 @@ func main() {
 	expvar.Publish("goroutines", expvar.Func(func() any {
 		return runtime.NumGoroutine()
 	}))
+
+	app.markCompletedGamesEvery30Mins()
 
 	mux := app.mount()
 

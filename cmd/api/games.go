@@ -435,10 +435,11 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) {
 	// Set default filter values.
 	fq := store.GameFilterQuery{
-		Limit:  10,
-		Offset: 0,
-		Sort:   "asc",
-		Radius: 0, // 0 means no location-based filtering.
+		Limit:      10,
+		Offset:     0,
+		Sort:       "asc",
+		Radius:     0, // 0 means no location-based filtering.
+		StartAfter: time.Now(),
 	}
 
 	// Parse query parameters from the request (overriding defaults if provided).
@@ -456,7 +457,6 @@ func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Get the currently logged in user.
 	user := getUserFromContext(r)
-	fmt.Printf("the getGame userID is %d", user.ID)
 
 	// Query the database for matching games.
 	games, err := app.store.Games.GetGames(r.Context(), fq)

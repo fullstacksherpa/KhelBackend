@@ -431,13 +431,13 @@ func (s *UsersStore) UpdateResetToken(ctx context.Context, email, resetToken str
 
 func (s *UsersStore) GetByResetToken(ctx context.Context, resetToken string) (*User, error) {
 	query := `
-        SELECT id, first_name, last_name, email, phone, password, profile_picture_url, skill_level, no_of_games, refresh_token, is_active, reset_password_token, reset_password_expires, created_at, updated_at
+        SELECT id, first_name, last_name, email, phone, password, profile_picture_url, skill_level, no_of_games, is_active, reset_password_token, reset_password_expires, created_at, updated_at
         FROM users
         WHERE reset_password_token = $1
     `
 	var user User
 	err := s.db.QueryRow(ctx, query, resetToken).Scan(
-		&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Phone, &user.Password.hash, &user.ProfilePictureURL, &user.SkillLevel, &user.NoOfGames, &user.RefreshToken, &user.IsActive, &user.ResetPasswordToken, &user.ResetPasswordExpires, &user.CreatedAt, &user.UpdatedAt,
+		&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Phone, &user.Password.hash, &user.ProfilePictureURL, &user.SkillLevel, &user.NoOfGames, &user.IsActive, &user.ResetPasswordToken, &user.ResetPasswordExpires, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
