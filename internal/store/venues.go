@@ -181,7 +181,15 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 			args = append(args, value)
 			argCounter++
 		case "amenities":
-			if amenities, ok := value.([]string); ok {
+			if raw, ok := value.([]interface{}); ok {
+				var amenities []string
+				for _, item := range raw {
+					if str, ok := item.(string); ok {
+						amenities = append(amenities, str)
+					} else {
+						return fmt.Errorf("invalid item in amenities array")
+					}
+				}
 				query += fmt.Sprintf("amenities = $%d, ", argCounter)
 				args = append(args, amenities)
 				argCounter++
@@ -190,10 +198,6 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 			}
 		case "open_time":
 			query += fmt.Sprintf("open_time = $%d, ", argCounter)
-			args = append(args, value)
-			argCounter++
-		case "sport":
-			query += fmt.Sprintf("sport = $%d, ", argCounter)
 			args = append(args, value)
 			argCounter++
 		case "phone_number":

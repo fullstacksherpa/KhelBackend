@@ -15,6 +15,26 @@ import (
 	"github.com/google/uuid"
 )
 
+// ErrorBadRequestResponse represents the standard error format for bad request API responses.
+//
+//	@name			ErrorBadRequestResponse
+//	@description	Standard error response format returned by all bad request API endpoints
+type ErrorBadRequestResponse struct {
+	Success bool   `json:"success" example:"false"`
+	Message string `json:"message" example:"It show error from err.Error()"`
+	Status  int    `json:"status" example:"400"`
+}
+
+// ErrorInternalServerResponse represents the standard error format for internal server API responses.
+//
+//	@name			ErrorInternalServerResponse
+//	@description	Standard error response format returned by all internal server error API endpoints
+type ErrorInternalServerResponse struct {
+	Success bool   `json:"success" example:"false"`
+	Message string `json:"message" example:"the server encountered a problem"`
+	Status  int    `json:"status" example:"500"`
+}
+
 type RegisterUserPayload struct {
 	FirstName string `json:"first_name" validate:"required,max=50"`
 	LastName  string `json:"last_name" validate:"required,max=50"`
@@ -32,14 +52,16 @@ type UserWithToken struct {
 // registerUserHandler godoc
 //
 //	@Summary		Registers a user
-//	@Description	Registers a user
+//	@Description	Registers a user via Mobile App, Server will send activation url on email and need to click there to verify its your email
 //	@Tags			authentication
 //	@Accept			json
 //	@Produce		json
-//	@Param			payload	body		RegisterUserPayload	true	"User credentials"
-//	@Success		201		{object}	UserWithToken		"User registered"
-//	@Failure		400		{object}	error
-//	@Failure		500		{object}	error
+//	@Param			payload	body		RegisterUserPayload			true	"User credentials"
+//	@Success		201		{object}	UserWithToken				"User registered"
+//
+//	@Failure		400		{object}	ErrorBadRequestResponse		"Bad request"
+//	@Failure		500		{object}	ErrorInternalServerResponse	"Internal Server Error"
+//
 //	@Router			/authentication/user [post]
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	var payload RegisterUserPayload
@@ -89,7 +111,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		Token: plainToken,
 	}
 
-	activationURL := fmt.Sprintf("%s/confirm/%s", app.config.frontendURL, plainToken)
+	activationURL := fmt.Sprintf("%s/confirm?token=%s", app.config.frontendURL, plainToken)
 
 	isProdEnv := app.config.env == "production"
 	vars := struct {
@@ -396,7 +418,7 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 	}
 
 	// Send reset email
-	resetURL := fmt.Sprintf("%s/reset-password/%s", app.config.frontendURL, resetToken)
+	resetURL := fmt.Sprintf("%s/reset-password/?token=%s", app.config.frontendURL, resetToken)
 
 	vars := struct {
 		Username string
@@ -416,7 +438,10 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 
 	app.logger.Infow("Reset password email sent", "status code", status)
 
-	if err := app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Reset token sent"}); err != nil {
+	if err := app.jsonResponse(w, http.StatusOK, map[string]string{
+		"message":    "Reset token sent",
+		"resetToken": resetToken, // unhashed token
+	}); err != nil {
 		app.internalServerError(w, r, err)
 	}
 }
@@ -455,6 +480,7 @@ func (app *application) resetPasswordHandler(w http.ResponseWriter, r *http.Requ
 	// Hash the token to compare with the stored hash
 	hash := sha256.Sum256([]byte(payload.Token))
 	hashToken := hex.EncodeToString(hash[:])
+	fmt.Printf("this is hashToken: %s", hashToken)
 
 	// Get user by reset token
 	user, err := app.store.Users.GetByResetToken(ctx, hashToken)
@@ -464,6 +490,7 @@ func (app *application) resetPasswordHandler(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		app.internalServerError(w, r, err)
+		fmt.Println(err)
 		return
 	}
 
@@ -490,6 +517,7 @@ func (app *application) resetPasswordHandler(w http.ResponseWriter, r *http.Requ
 	// Save the updated user
 	if err := app.store.Users.Update(ctx, user); err != nil {
 		app.internalServerError(w, r, err)
+		fmt.Println(err)
 		return
 	}
 

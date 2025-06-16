@@ -10,7 +10,6 @@ import (
 	"khel/internal/mailer"
 	"khel/internal/ratelimiter"
 	"khel/internal/store"
-	"log"
 
 	"net/http"
 	"os"
@@ -82,14 +81,6 @@ type dbConfig struct {
 func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
 
-	//TODO:remove later
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Incoming request: %s %s\n", r.Method, r.URL.Path)
-			next.ServeHTTP(w, r)
-		})
-	})
-
 	r.Use(middleware.RequestID)
 	r.Use(middleware.StripSlashes)
 	r.Use(middleware.RealIP)
@@ -99,7 +90,7 @@ func (app *application) mount() http.Handler {
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
@@ -112,8 +103,8 @@ func (app *application) mount() http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/venue/{id}", app.getVenueDetailHandler)
 		r.Get("/health", app.healthCheckHandler)
-		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
-		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
+		docsURL := fmt.Sprintf("%s/v1/swagger/doc.json", app.config.addr)
+		r.With(app.BasicAuthMiddleware()).Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
 
 		r.With(app.BasicAuthMiddleware()).Get("/debug/vars", expvar.Handler().ServeHTTP)
 

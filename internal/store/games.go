@@ -974,3 +974,22 @@ ORDER BY g.start_time ASC
 	}
 	return games, nil
 }
+
+func (s *GameStore) MarkCompletedGames() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	query := `
+		UPDATE games
+		SET status = 'completed'
+		WHERE end_time < NOW()
+		  AND status = 'active'
+	`
+
+	ct, err := s.db.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to update games: %w", err)
+	}
+	fmt.Printf("Marked %d games as completed at %s\n", ct.RowsAffected(), time.Now().Format(time.RFC1123))
+	return nil
+}

@@ -83,6 +83,7 @@ type Storage struct {
 		GetGameDetailsWithID(ctx context.Context, gameID int64) (*GameDetails, error)
 		GetUpcomingGamesByVenue(ctx context.Context, venueID int64) ([]GameSummary, error)
 		GetUpcomingGamesByUser(ctx context.Context, userID int64) ([]GameSummary, error)
+		MarkCompletedGames() error
 	}
 	Bookings interface {
 		GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error)
