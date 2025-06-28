@@ -2388,7 +2388,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Date in YYYY-MM-DD format",
+                        "description": "Date in 2025-06-28T00:00:00+05:45 format",
                         "name": "date",
                         "in": "query",
                         "required": true

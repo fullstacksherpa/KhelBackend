@@ -240,22 +240,22 @@ type VenueListResponse struct {
 	IsFavorite    bool      `json:"is_favorite"`
 }
 
-//	@Summary		List venues
-//	@Description	Get paginated list of venues with filters
-//	@Tags			Venue
-//	@Accept			json
-//	@Produce		json
-//	@Param			sport		query	string	false	"Filter by sport type"
-//	@Param			lat			query	number	false	"Latitude for location filter"
-//	@Param			lng			query	number	false	"Longitude for location filter"
-//	@Param			distance	query	number	false	"Distance in meters from location"
-//	@Param			page		query	int		false	"Page number"		default(1)
-//	@Param			limit		query	int		false	"Items per page"	default(7)
-//	@Success		200			{array}	VenueListResponse
+// @Summary		List venues
+// @Description	Get paginated list of venues with filters
+// @Tags			Venue
+// @Accept			json
+// @Produce		json
+// @Param			sport		query	string	false	"Filter by sport type"
+// @Param			lat			query	number	false	"Latitude for location filter"
+// @Param			lng			query	number	false	"Longitude for location filter"
+// @Param			distance	query	number	false	"Distance in meters from location"
+// @Param			page		query	int		false	"Page number"		default(1)
+// @Param			limit		query	int		false	"Items per page"	default(7)
+// @Success		200			{array}	VenueListResponse
 //
-//	@Security		ApiKeyAuth
+// @Security		ApiKeyAuth
 //
-//	@Router			/venues/list-venues [get]
+// @Router			/venues/list-venues [get]
 func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	q := r.URL.Query()
@@ -266,7 +266,7 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 	}
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	if limit < 1 || limit > 15 {
-		limit = 7
+		limit = 13
 	}
 
 	// Check for a location filter and adjust pagination accordingly.
@@ -274,8 +274,6 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 		// Override pagination for map queries.
 		limit = 1000 // Or another value that makes sense for your data size.
 	}
-
-	fmt.Printf("the query object of listVenuesHandler is %v", q)
 
 	filter := store.VenueFilter{
 		Sport: nullString(q.Get("sport")),
@@ -351,8 +349,7 @@ func (app *application) CreateAndUploadVenue(ctx context.Context, venue *store.V
 	if err := app.store.Venues.Create(ctx, venue); err != nil {
 		return fmt.Errorf("error creating venue: %w", err)
 	}
-	fmt.Printf("venue created, id is %v", venue.ID)
-	// Step 2: Upload images using the venue ID.
+
 	imageUrls, err := app.uploadImagesWithVenueID(files, venue.ID)
 	if err != nil {
 		// Compensate: Delete the venue if image upload fails.
@@ -399,7 +396,7 @@ func (app *application) CreateAndUploadVenue(ctx context.Context, venue *store.V
 //	@Security		ApiKeyAuth
 //	@Router			/venues [post]
 func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("🚀 Entering createVenueHandler")
+
 	var payload CreateVenuePayload
 
 	// Parse form and JSON payload from multipart form.
@@ -409,15 +406,12 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	fmt.Printf("🎾 Parsed payload: %+v, %d files\n", payload, len(files))
 	//for debug only
 	for _, fh := range files {
 		fmt.Printf("📷 got file: %q (%d bytes)\n", fh.Filename, fh.Size)
 	}
 
-	// Retrieve the current user (owner) from the request context.
 	user := getUserFromContext(r)
-	fmt.Println("👤 current user:", user.ID)
 
 	// Prepare the venue model without image URLs initially.
 	venue := &store.Venue{
@@ -433,15 +427,11 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 		// ImageURLs field remains empty until updated.
 	}
 
-	fmt.Println("🏗️ About to Create venue in DB:", venue)
-
 	// Use the SAGA pattern to create the venue record and upload images externally.
 	if err := app.CreateAndUploadVenue(r.Context(), venue, files, w, r); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
-
-	fmt.Println("✅ Venue created successfully:", venue.ID)
 
 	// Return a JSON response with the created venue details.
 	if err := app.jsonResponse(w, http.StatusCreated, venue); err != nil {

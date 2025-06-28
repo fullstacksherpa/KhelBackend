@@ -110,11 +110,8 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 		venue.Sport,
 		venue.PhoneNumber,
 	}
-	fmt.Println("🔨 Raw SQL:", query)
-	fmt.Printf("📦 ARGS: %#v\n", args)
 	row := s.db.QueryRow(ctx, query, args...)
 	if err := row.Scan(&venue.ID, &venue.CreatedAt, &venue.UpdatedAt); err != nil {
-		fmt.Println("❌ Scan error:", err)
 		if errors.Is(err, sql.ErrNoRows) {
 			// Insert succeeded, but didn’t RETURN any row
 			return fmt.Errorf("venue insert returned no rows — please verify the SQL & table schema: %w", err)

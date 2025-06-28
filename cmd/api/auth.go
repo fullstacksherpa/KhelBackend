@@ -113,7 +113,6 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	activationURL := fmt.Sprintf("%s/confirm?token=%s", app.config.frontendURL, plainToken)
 
-	isProdEnv := app.config.env == "production"
 	vars := struct {
 		Username      string
 		ActivationURL string
@@ -123,7 +122,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	//send email
-	status, err := app.mailer.Send(mailer.UserWelcomeTemplate, user.FirstName, user.Email, vars, !isProdEnv)
+	status, err := app.mailer.Send(mailer.UserWelcomeTemplate, user.FirstName, user.Email, vars)
 	if err != nil {
 		app.logger.Errorw("error sending welcome email", "error", err)
 
@@ -428,8 +427,7 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 		ResetURL: resetURL,
 	}
 
-	isProdEnv := app.config.env == "production"
-	status, err := app.mailer.Send(mailer.ResetPasswordTemplate, payload.Email, payload.Email, vars, !isProdEnv)
+	status, err := app.mailer.Send(mailer.ResetPasswordTemplate, payload.Email, payload.Email, vars)
 	if err != nil {
 		app.logger.Errorw("error sending reset password email", "error", err)
 		app.internalServerError(w, r, err)

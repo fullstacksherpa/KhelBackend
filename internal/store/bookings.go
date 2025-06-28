@@ -124,19 +124,33 @@ func (s *BookingStore) GetPricingSlots(ctx context.Context, venueID int64, dayOf
 	return slots, nil
 }
 
-// GetBookingsForDate retrieves existing bookings for a venue on a specific date.
-// Returns a slice of Interval representing booked time periods.
 func (s *BookingStore) GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error) {
-	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
-	endOfDay := startOfDay.Add(24 * time.Hour)
+	// Load Kathmandu location
+	loc, err := time.LoadLocation("Asia/Kathmandu")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load Kathmandu timezone: %w", err)
+	}
 
+	// Convert input date to Kathmandu time
+	localDate := date.In(loc)
+
+	// Compute start and end of day in Kathmandu time
+	startOfDayLocal := time.Date(localDate.Year(), localDate.Month(), localDate.Day(), 0, 0, 0, 0, loc)
+	endOfDayLocal := startOfDayLocal.Add(24 * time.Hour)
+
+	// Convert to UTC for querying Postgres
+	startOfDayUTC := startOfDayLocal.UTC()
+	endOfDayUTC := endOfDayLocal.UTC()
+
+	// Query for bookings
 	query := `
         SELECT start_time, end_time
         FROM bookings
-        WHERE venue_id = $1 AND start_time < $2 AND end_time > $3
+        WHERE venue_id = $1 AND status = 'confirmed'
+          AND start_time < $2 AND end_time > $3
         ORDER BY start_time
     `
-	rows, err := s.db.Query(ctx, query, venueID, endOfDay, startOfDay)
+	rows, err := s.db.Query(ctx, query, venueID, endOfDayUTC, startOfDayUTC)
 	if err != nil {
 		return nil, err
 	}
