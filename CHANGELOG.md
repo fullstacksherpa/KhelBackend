@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.14.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.13.2...v1.14.0) (2025-06-28)
+
+
+### Features
+
+* added background job ([235a9a2](https://github.com/fullstacksherpa/KhelBackend/commit/235a9a231dc82e6456481788ec1d557bf6f73090))
+
+
+### Bug Fixes
+
+* refactor availability logic for kathmandu/nepal time ([90b6218](https://github.com/fullstacksherpa/KhelBackend/commit/90b621875fed4150dc8d6035cb61bb5b92a53ff0))
+* remove unused variable ([1255b74](https://github.com/fullstacksherpa/KhelBackend/commit/1255b74f53f7366c24da5ac3d20eb8310fd4336e))
+
 ## [1.13.2](https://github.com/fullstacksherpa/KhelBackend/compare/v1.13.1...v1.13.2) (2025-06-07)
 
 
