@@ -178,9 +178,6 @@ func (app *application) IsOwnerMiddleware(next http.Handler) http.Handler {
 		user := getUserFromContext(r)
 		userID := user.ID
 
-		//TODO: delete later
-		fmt.Printf("IsOwnerMiddleware running 🔐🔐🔐🔐🔐🔐 for venueID: %d and userID: %d ", venueID, userID)
-
 		// Check if the user is the owner of the venue
 		isOwner, err := app.store.Venues.IsOwner(r.Context(), venueID, userID)
 		if err != nil || !isOwner {
