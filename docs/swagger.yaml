@@ -2367,7 +2367,7 @@ paths:
         name: venueID
         required: true
         type: integer
-      - description: Date in YYYY-MM-DD format
+      - description: Date in 2025-06-28T00:00:00+05:45 format
         in: query
         name: date
         required: true

@@ -27,7 +27,7 @@ func NewMailTrapClient(apiKey, fromEmail string) (mailtrapClient, error) {
 	}, nil
 }
 
-func (m mailtrapClient) Send(templateFile, username, email string, data any, isSandbox bool) (int, error) {
+func (m mailtrapClient) Send(templateFile, username, email string, data any) (int, error) {
 	// Template parsing and building
 	tmpl, err := template.ParseFS(FS, "templates/"+templateFile)
 	if err != nil {

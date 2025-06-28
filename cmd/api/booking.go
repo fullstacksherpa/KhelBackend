@@ -38,32 +38,49 @@ type HourlySlot struct {
 //	@Accept			json
 //	@Produce		json
 //	@Param			venueID	path		int			true	"Venue ID"
-//	@Param			date	query		string		true	"Date in YYYY-MM-DD format"
+//	@Param			date	query		string		true	"Date in 2025-06-28T00:00:00+05:45 format"
 //	@Success		200		{array}		HourlySlot	"Hourly availability"
 //	@Failure		400		{object}	error		"Bad Request"
 //	@Failure		500		{object}	error		"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/available-times [get]
 func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Request) {
-	// Step 1: Parse venueID from URL path
+	// Parse venueID from URL path to int64
 	venueID, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	// Step 2: Parse `date` from query param in format YYYY-MM-DD
+	//  Parse `date` from query param in format 2025-06-28T00:00:00+05:45
 	dateStr := r.URL.Query().Get("date")
 	if dateStr == "" {
 		app.badRequestResponse(w, r, fmt.Errorf("missing date"))
 		return
 	}
-	date, err := time.Parse("2006-01-02", dateStr)
+	fmt.Printf("⏰ dateStr: %s\n", dateStr)
+
+	//  Set the target timezone to Asia/Kathmandu
+	loc, err := time.LoadLocation("Asia/Kathmandu")
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.internalServerError(w, r, err)
 		return
 	}
-	dayOfWeek := strings.ToLower(date.Weekday().String())
+
+	// Parse into named location so date.Location()==Asia/Kathmandu date will be
+	// 2025-06-30 00:00:00 +0545 +0545. first +0545 is for offset and second is for location
+	date, err := time.ParseInLocation(time.RFC3339, dateStr, loc)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid date format: %w", err))
+		return
+	}
+
+	fmt.Printf("⏰ date after Parse: %s\n", date)
+
+	dateInKtm := date.In(loc)
+	fmt.Printf("⏰ date in Ktm: %s\n", dateInKtm)
+	dayOfWeek := strings.ToLower(dateInKtm.Weekday().String())
+	fmt.Printf("⏰day of week in ktm: %s\n", dayOfWeek)
 
 	// Step 3: Load pricing slots and bookings for the venue and the selected date
 	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
@@ -71,14 +88,37 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 		app.internalServerError(w, r, err)
 		return
 	}
-	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, date)
-	if err != nil {
-		app.internalServerError(w, r, err)
+	if len(pricingSlots) == 0 {
+		app.jsonResponse(w, http.StatusOK, []HourlySlot{}) // no slots for this day
 		return
 	}
 
-	// Step 4: Set the target timezone to Asia/Kathmandu
-	loc, err := time.LoadLocation("Asia/Kathmandu")
+	//Prevents generating duplicate time buckets in output.
+	// !unique[key]
+	//This line checks:
+	//unique[key] looks up the value for that key in the map.
+	//If it does not exist, Go returns the zero value for the type bool, which is false.
+	//!false → true
+	//So !unique[key] becomes true the first time you encounter that key.
+	unique := make(map[string]bool)
+	var filtered []store.PricingSlot
+
+	for _, ps := range pricingSlots {
+		key := fmt.Sprintf("%s-%s-%d", ps.StartTime.Format("15:04"), ps.EndTime.Format("15:04"), ps.Price)
+		if !unique[key] {
+			unique[key] = true
+			filtered = append(filtered, ps)
+		}
+	}
+
+	pricingSlots = filtered
+
+	fmt.Println("📊 Pricing slots:")
+	for _, ps := range pricingSlots {
+		fmt.Printf("- %s to %s at %d\n", ps.StartTime.Format("15:04"), ps.EndTime.Format("15:04"), ps.Price)
+	}
+
+	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -109,6 +149,14 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 
 	// Step 7: Generate hourly time slots and mark availability
 	var out []HourlySlot
+	// Round current time to the next full hour in Kathmandu timezone
+	now := time.Now().In(loc)
+	if now.Minute() > 0 || now.Second() > 0 || now.Nanosecond() > 0 {
+		now = now.Truncate(time.Hour).Add(time.Hour)
+	} else {
+		now = now.Truncate(time.Hour)
+	}
+
 	for _, ps := range pricingSlots {
 		// Convert pricing slot times into the selected date in Nepal timezone
 		slotStart := time.Date(date.Year(), date.Month(), date.Day(),
@@ -119,6 +167,10 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 		// Break the slot into 1-hour buckets
 		for t := slotStart; !t.Add(time.Hour).After(slotEnd); t = t.Add(time.Hour) {
 			tEnd := t.Add(time.Hour)
+
+			if t.Before(now) {
+				continue
+			}
 
 			out = append(out, HourlySlot{
 				StartTime:    t,

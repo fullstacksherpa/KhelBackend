@@ -119,7 +119,6 @@ func (app *application) mount() http.Handler {
 			r.Use(app.AuthTokenMiddleware)
 			r.Get("/list-venues", app.listVenuesHandler)
 			r.Get("/favorites", app.listFavoritesHandler)
-			// Expects URL: /venues/{venueID}/available-times?date=YYYY-MM-DD
 			r.Get("/{venueID}/available-times", app.availableTimesHandler)
 			r.Get("/is-venue-owner", app.isVenueOwnerHandler)
 			r.Post("/", app.createVenueHandler)
@@ -209,7 +208,6 @@ func (app *application) mount() http.Handler {
 		r.Post("/authentication/reset-password", app.requestResetPasswordHandler)
 		r.Patch("/authentication/reset-password", app.resetPasswordHandler)
 
-		// Public routes
 		r.Route("/authentication", func(r chi.Router) {
 			r.Post("/user", app.registerUserHandler)
 			r.Post("/token", app.createTokenHandler)
@@ -228,7 +226,7 @@ func (app *application) run(mux http.Handler) error {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // Fallback to 8080 if PORT is not set
+		port = "8080"
 	}
 
 	srv := &http.Server{
