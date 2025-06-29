@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // AvailableTimeSlot represents a free time interval for booking.
@@ -58,7 +59,6 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 		app.badRequestResponse(w, r, fmt.Errorf("missing date"))
 		return
 	}
-	fmt.Printf("⏰ dateStr: %s\n", dateStr)
 
 	//  Set the target timezone to Asia/Kathmandu
 	loc, err := time.LoadLocation("Asia/Kathmandu")
@@ -75,12 +75,9 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	fmt.Printf("⏰ date after Parse: %s\n", date)
-
 	dateInKtm := date.In(loc)
-	fmt.Printf("⏰ date in Ktm: %s\n", dateInKtm)
+
 	dayOfWeek := strings.ToLower(dateInKtm.Weekday().String())
-	fmt.Printf("⏰day of week in ktm: %s\n", dayOfWeek)
 
 	// Step 3: Load pricing slots and bookings for the venue and the selected date
 	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
@@ -112,11 +109,6 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	pricingSlots = filtered
-
-	fmt.Println("📊 Pricing slots:")
-	for _, ps := range pricingSlots {
-		fmt.Printf("- %s to %s at %d\n", ps.StartTime.Format("15:04"), ps.EndTime.Format("15:04"), ps.Price)
-	}
 
 	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, date)
 	if err != nil {
@@ -232,7 +224,14 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 
 	// Determine the day and fetch pricing slots for that day.
 	localStart := payload.StartTime.In(loc)
+
 	dayOfWeek := strings.ToLower(localStart.Weekday().String())
+
+	//sample data
+	//start_time 🎯: 2025-07-02 08:00:00 +0545 +0545
+	//end_time 🎯: 2025-07-02 09:00:00 +0545 +0545
+	//localStart 🎯: 2025-07-02 08:00:00 +0545 +0545
+	//dayOfWeek 🎯: wednesday
 	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
 	if err != nil || len(pricingSlots) == 0 {
 		http.Error(w, "No pricing available for this day", http.StatusBadRequest)
@@ -576,11 +575,16 @@ func (app *application) getScheduledBookingsHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	date, err := time.Parse("2006-01-02", dateStr)
+	loc, _ := time.LoadLocation("Asia/Kathmandu")
+
+	// Parse date string in Kathmandu local time
+	date, err := time.ParseInLocation("2006-01-02", dateStr, loc)
 	if err != nil {
 		app.badRequestResponse(w, r, fmt.Errorf("invalid date format: %w", err))
 		return
 	}
+
+	//date will be Parsed time is: 2025-06-29 00:00:00 +0545 +0545
 
 	// 3) fetch from store
 	bookings, err := app.store.Bookings.GetScheduledBookingsForVenueDate(r.Context(), vid, date)
@@ -623,10 +627,17 @@ func (app *application) acceptBookingHandler(w http.ResponseWriter, r *http.Requ
 	if err := app.store.Bookings.AcceptBooking(r.Context(), vid, bid); err != nil {
 		if err == sql.ErrNoRows {
 			app.notFoundResponse(w, r, errors.New("not found"))
+			return
+		}
+
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "unique_confirmed_bookings_per_venue_time" {
+			app.conflictResponse(w, r, errors.New("booking with this time already exists"))
+			return
 		} else {
 			app.internalServerError(w, r, err)
+			return
 		}
-		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
