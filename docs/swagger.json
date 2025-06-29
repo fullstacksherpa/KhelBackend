@@ -2465,6 +2465,68 @@
                 }
             }
         },
+        "/venues/{venueID}/bookings/manual": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Venue owners can create a confirmed booking manually by specifying start/end time, price, and optional customer details.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner"
+                ],
+                "summary": "Manually create a confirmed booking",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Manual booking payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ManualBookingPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Booking created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/store.Booking"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid input or validation failed",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized: Missing or invalid credentials",
+                        "schema": {}
+                    },
+                    "409": {
+                        "description": "Conflict: Time slot is already booked",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: Could not create booking",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venues/{venueID}/favorite": {
             "post": {
                 "security": [
@@ -3532,6 +3594,39 @@
                 }
             }
         },
+        "main.ManualBookingPayload": {
+            "type": "object",
+            "required": [
+                "end_time",
+                "price",
+                "start_time"
+            ],
+            "properties": {
+                "customer_email": {
+                    "type": "string"
+                },
+                "customer_name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "customer_number": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                }
+            }
+        },
         "main.PlayerResponse": {
             "type": "object",
             "properties": {
@@ -3864,11 +3959,23 @@
                 "created_at": {
                     "type": "string"
                 },
+                "customer_name": {
+                    "description": "optional",
+                    "type": "string"
+                },
+                "customer_phone": {
+                    "description": "optional",
+                    "type": "string"
+                },
                 "end_time": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
+                },
+                "note": {
+                    "description": "optional",
+                    "type": "string"
                 },
                 "start_time": {
                     "type": "string"
@@ -4323,7 +4430,19 @@
                 "booking_id": {
                     "type": "integer"
                 },
+                "customer_name": {
+                    "description": "optional",
+                    "type": "string"
+                },
+                "customer_phone": {
+                    "description": "optional",
+                    "type": "string"
+                },
                 "end_time": {
+                    "type": "string"
+                },
+                "note": {
+                    "description": "optional",
                     "type": "string"
                 },
                 "price": {

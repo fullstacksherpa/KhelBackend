@@ -308,6 +308,121 @@ func intervalsOverlap(a, b store.Interval) bool {
 	return a.Start.Before(b.End) && b.Start.Before(a.End)
 }
 
+type ManualBookingPayload struct {
+	StartTime     time.Time `json:"start_time" validate:"required"`
+	EndTime       time.Time `json:"end_time" validate:"required"`
+	Price         int       `json:"price" validate:"required,gt=0"`
+	Email         string    `json:"customer_email" validate:"omitempty,email"`
+	CustomerName  string    `json:"customer_name" validate:"omitempty,max=100"`
+	CustomerPhone string    `json:"customer_number" validate:"omitempty,nepaliphone"`
+	Note          string    `json:"note" validate:"omitempty,max=255"`
+}
+
+// CreateManualBooking godoc
+//
+//	@Summary		Manually create a confirmed booking
+//	@Description	Venue owners can create a confirmed booking manually by specifying start/end time, price, and optional customer details.
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID	path		int						true	"Venue ID"
+//	@Param			payload	body		ManualBookingPayload	true	"Manual booking payload"
+//	@Success		201		{object}	store.Booking			"Booking created successfully"
+//	@Failure		400		{object}	error					"Bad Request: Invalid input or validation failed"
+//	@Failure		401		{object}	error					"Unauthorized: Missing or invalid credentials"
+//	@Failure		409		{object}	error					"Conflict: Time slot is already booked"
+//	@Failure		500		{object}	error					"Internal Server Error: Could not create booking"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/bookings/manual [post]
+func (app *application) createManualBookingHandler(w http.ResponseWriter, r *http.Request) {
+	venueIDStr := chi.URLParam(r, "venueID")
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid venue ID", http.StatusBadRequest)
+		return
+	}
+	var payload ManualBookingPayload
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	fmt.Printf("⏰Start_time manualBooking: %s\n", payload.StartTime)
+	fmt.Printf("⏰End_time manualBooking: %s\n", payload.EndTime)
+
+	if err := Validate.Struct(payload); err != nil {
+		app.badRequestResponse(w, r, err)
+	}
+
+	//sample data
+	//frontend send like start_time 🎯 : 2025-06-29T11:00:00+05:45
+	//end_time 🎯 : 2025-06-29T12:00:00+05:45
+	//serverlog start_time 🎯: 2025-07-02 08:00:00 +0545 +0545
+	//serverlog end_time 🎯: 2025-07-02 09:00:00 +0545 +0545
+
+	// Check for overlapping bookings.
+	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
+	if err != nil {
+		http.Error(w, "Error checking bookings", http.StatusInternalServerError)
+		return
+	}
+	requestedInterval := store.Interval{Start: payload.StartTime, End: payload.EndTime}
+	for _, b := range bookings {
+		if intervalsOverlap(requestedInterval, b) {
+			http.Error(w, "Time slot is already booked", http.StatusConflict)
+			return
+		}
+	}
+
+	user := getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Determine userID
+	var bookingUserID int64 = user.ID
+	if payload.Email != "" {
+		targetUser, err := app.store.Users.GetByEmail(r.Context(), payload.Email)
+		if err == nil && targetUser != nil {
+			bookingUserID = targetUser.ID
+			fmt.Printf("Target user name is: %s targetUserID 🎯: %d\n ", targetUser.FirstName, targetUser.ID)
+		} else {
+			log.Printf("Email %s not found, using owner ID", payload.Email)
+		}
+	}
+	//Trim empty strings before setting pointer fields (to avoid storing "" instead of NULL)
+	var namePtr, phonePtr, notePtr *string
+	if strings.TrimSpace(payload.CustomerName) != "" {
+		namePtr = &payload.CustomerName
+	}
+	if strings.TrimSpace(payload.CustomerPhone) != "" {
+		phonePtr = &payload.CustomerPhone
+	}
+	if strings.TrimSpace(payload.Note) != "" {
+		notePtr = &payload.Note
+	}
+
+	booking := &store.Booking{
+		VenueID:       venueID,
+		UserID:        bookingUserID,
+		StartTime:     payload.StartTime,
+		EndTime:       payload.EndTime,
+		TotalPrice:    payload.Price,
+		Status:        "confirmed",
+		CustomerName:  namePtr,
+		CustomerPhone: phonePtr,
+		Note:          notePtr,
+	}
+
+	if err := app.store.Bookings.CreateBooking(r.Context(), booking); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusCreated, booking)
+}
+
 // GetVenuePricing godoc
 //
 //	@Summary		Retrieve pricing slots for a venue (optionally filtered by day)

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -16,6 +17,14 @@ var Validate *validator.Validate
 
 func init() {
 	Validate = validator.New(validator.WithRequiredStructEnabled())
+
+	// Register custom validation for Nepali phone numbers
+	Validate.RegisterValidation("nepaliphone", func(fl validator.FieldLevel) bool {
+		phone := fl.Field().String()
+		// Matches 98[4-9] followed by 7 digits (e.g., 9841234567)
+		matched, _ := regexp.MatchString(`^98[4-9][0-9]{7}$`, phone)
+		return matched
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) error {
