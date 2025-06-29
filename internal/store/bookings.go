@@ -22,15 +22,18 @@ type PricingSlot struct {
 
 // Booking represents a booking record.
 type Booking struct {
-	ID         int64     `json:"id"`
-	VenueID    int64     `json:"venue_id"`
-	UserID     int64     `json:"user_id"`
-	StartTime  time.Time `json:"start_time"`
-	EndTime    time.Time `json:"end_time"`
-	TotalPrice int       `json:"total_price"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID            int64     `json:"id"`
+	VenueID       int64     `json:"venue_id"`
+	UserID        int64     `json:"user_id"`
+	StartTime     time.Time `json:"start_time"`
+	EndTime       time.Time `json:"end_time"`
+	TotalPrice    int       `json:"total_price"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	CustomerName  *string   `json:"customer_name,omitempty" swaggertype:"string"`  // optional
+	CustomerPhone *string   `json:"customer_phone,omitempty" swaggertype:"string"` // optional
+	Note          *string   `json:"note,omitempty" swaggertype:"string"`           // optional
 }
 
 // AvailableTimeSlot represents a free time interval for booking.
@@ -60,15 +63,18 @@ type PendingBooking struct {
 }
 
 type ScheduledBooking struct {
-	BookingID    int64     `json:"booking_id"`
-	UserID       int64     `json:"user_id"`
-	UserName     string    `json:"user_name"`
-	UserImageURL *string   `json:"user_image"`
-	UserPhone    string    `json:"user_number"`
-	Price        int       `json:"price"`
-	AcceptedAt   time.Time `json:"accepted_at"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
+	BookingID     int64     `json:"booking_id"`
+	UserID        int64     `json:"user_id"`
+	UserName      string    `json:"user_name"`
+	UserImageURL  *string   `json:"user_image"`
+	UserPhone     string    `json:"user_number"`
+	Price         int       `json:"price"`
+	AcceptedAt    time.Time `json:"accepted_at"`
+	StartTime     time.Time `json:"start_time"`
+	EndTime       time.Time `json:"end_time"`
+	CustomerName  *string   `json:"customer_name,omitempty" swaggertype:"string"`  // optional
+	CustomerPhone *string   `json:"customer_phone,omitempty" swaggertype:"string"` // optional
+	Note          *string   `json:"note,omitempty" swaggertype:"string"`           // optional
 }
 
 type UserBooking struct {
@@ -170,8 +176,10 @@ func (s *BookingStore) GetBookingsForDate(ctx context.Context, venueID int64, da
 // CreateBooking inserts a booking record into the database.
 func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) error {
 	query := `
-        INSERT INTO bookings (venue_id, user_id, start_time, end_time, total_price, status)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO bookings (
+            venue_id, user_id, start_time, end_time, total_price, status,
+            customer_name, customer_phone, note
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id, created_at, updated_at
     `
 	return s.db.QueryRow(ctx, query,
@@ -181,6 +189,9 @@ func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) erro
 		booking.EndTime,
 		booking.TotalPrice,
 		booking.Status,
+		booking.CustomerName,
+		booking.CustomerPhone,
+		booking.Note,
 	).Scan(&booking.ID, &booking.CreatedAt, &booking.UpdatedAt)
 }
 
@@ -311,7 +322,10 @@ func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, ven
         b.total_price,
         b.updated_at,
         b.start_time,
-        b.end_time
+        b.end_time,
+		b.customer_name,
+			b.customer_phone,
+			b.note
       FROM bookings b
       JOIN users u ON u.id = b.user_id
       WHERE
@@ -340,6 +354,9 @@ func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, ven
 			&sb.AcceptedAt,
 			&sb.StartTime,
 			&sb.EndTime,
+			&sb.CustomerName,
+			&sb.CustomerPhone,
+			&sb.Note,
 		); err != nil {
 			return nil, err
 		}
