@@ -298,8 +298,8 @@ func (s *BookingStore) GetPendingBookingsForVenueDate(ctx context.Context, venue
 
 func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error) {
 	// normalize to date only
-	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
-	endOfDay := startOfDay.Add(24 * time.Hour)
+	startOfDay := date.In(time.UTC)
+	endOfDay := date.Add(24 * time.Hour).In(time.UTC)
 
 	const q = `
       SELECT
