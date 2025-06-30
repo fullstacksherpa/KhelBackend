@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.15.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.14.0...v1.15.0) (2025-06-30)
+
+
+### Features
+
+* added unique confirm booking migration ([8cd5ffe](https://github.com/fullstacksherpa/KhelBackend/commit/8cd5ffe30e7c22ae30a1e0d8ceedaa97f7cc4d47))
+* added venue owner manual booking ([94f9679](https://github.com/fullstacksherpa/KhelBackend/commit/94f96796741af14b2e51c9167f3ec965b91aa84d))
+
 ## [1.14.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.13.2...v1.14.0) (2025-06-28)
 
 
