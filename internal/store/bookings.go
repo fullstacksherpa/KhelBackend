@@ -62,6 +62,18 @@ type PendingBooking struct {
 	EndTime      time.Time `json:"end_time"`
 }
 
+type CanceledBooking struct {
+	BookingID    int64     `json:"booking_id"`
+	UserID       int64     `json:"user_id"`
+	UserName     string    `json:"user_name"`
+	UserImageURL *string   `json:"user_image"` // nullable
+	UserPhone    string    `json:"user_number"`
+	Price        int       `json:"price"`
+	RequestedAt  time.Time `json:"requested_at"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+}
+
 type ScheduledBooking struct {
 	BookingID     int64     `json:"booking_id"`
 	UserID        int64     `json:"user_id"`
@@ -101,6 +113,16 @@ func (f BookingFilter) offset() int {
 
 type BookingStore struct {
 	db *pgxpool.Pool
+}
+
+func (s *BookingStore) GetBookingOwner(ctx context.Context, venueID, bookingID int64) (int64, error) {
+	const query = `SELECT user_id FROM bookings WHERE id = $1 AND venue_id = $2`
+	var userID int64
+	err := s.db.QueryRow(ctx, query, bookingID, venueID).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
 }
 
 func (s *BookingStore) GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error) {
@@ -307,6 +329,58 @@ func (s *BookingStore) GetPendingBookingsForVenueDate(ctx context.Context, venue
 	return out, rows.Err()
 }
 
+func (s *BookingStore) GetCanceledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]CanceledBooking, error) {
+	// normalize to date only
+	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	const q = `
+      SELECT
+        b.id,
+        b.user_id,
+        u.first_name || ' ' || u.last_name   AS user_name,
+        u.profile_picture_url,
+        u.phone,
+        b.total_price,
+        b.created_at,
+        b.start_time,
+        b.end_time
+      FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      WHERE
+        b.venue_id    = $1
+        AND b.status  = 'canceled'
+        AND b.start_time >= $2
+        AND b.start_time <  $3
+      ORDER BY b.created_at
+    `
+	rows, err := s.db.Query(ctx, q, venueID, startOfDay, endOfDay)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []CanceledBooking
+	for rows.Next() {
+		var pb CanceledBooking
+		if err := rows.Scan(
+			&pb.BookingID,
+			&pb.UserID,
+			&pb.UserName,
+			&pb.UserImageURL,
+			&pb.UserPhone,
+			&pb.Price,
+			&pb.RequestedAt,
+			&pb.StartTime,
+			&pb.EndTime,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, pb)
+	}
+	return out, rows.Err()
+}
+
 func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error) {
 	// normalize to date only
 	startOfDay := date.In(time.UTC)
@@ -394,6 +468,11 @@ func (s *BookingStore) AcceptBooking(ctx context.Context, venueID, bookingID int
 // RejectBooking marks a pending booking as rejected.
 func (s *BookingStore) RejectBooking(ctx context.Context, venueID, bookingID int64) error {
 	return s.UpdateBookingStatus(ctx, venueID, bookingID, "rejected")
+}
+
+// RejectBooking marks a pending booking as rejected.
+func (s *BookingStore) CancelBooking(ctx context.Context, venueID, bookingID int64) error {
+	return s.UpdateBookingStatus(ctx, venueID, bookingID, "canceled")
 }
 
 func (s *BookingStore) GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error) {

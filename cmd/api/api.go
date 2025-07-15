@@ -123,6 +123,7 @@ func (app *application) mount() http.Handler {
 			r.Get("/is-venue-owner", app.isVenueOwnerHandler)
 			r.Post("/", app.createVenueHandler)
 			r.Post("/{venueID}/reviews", app.createVenueReviewHandler)
+			r.Post("/{venueID}/cancel-bookings/{bookingID}", app.cancelBookingHandler)
 			r.Post("/{venueID}/bookings", app.bookVenueHandler)
 			r.Get("/{venueID}/reviews", app.getVenueReviewsHandler)
 			r.Post("/{venueID}/favorite", app.addFavoriteHandler)      // Add favorite
@@ -135,6 +136,7 @@ func (app *application) mount() http.Handler {
 				r.Get("/pricing", app.getVenuePricing)
 				r.Delete("/", app.deleteVenueHandler)
 				r.Get("/pending-bookings", app.getPendingBookingsHandler)
+				r.Get("/canceled-bookings", app.getCanceledBookingsHandler)
 				r.Get("/venue-info", app.getVenueInfoHandler)
 				r.Get("/scheduled-bookings", app.getScheduledBookingsHandler)
 				r.Post("/pending-bookings/{bookingID}/accept", app.acceptBookingHandler)
@@ -219,7 +221,7 @@ func (app *application) mount() http.Handler {
 	return r
 }
 
-func (app *application) run(mux http.Handler) error {
+func (app *application) run(mux http.Handler, cancel context.CancelFunc) error {
 	// Docs
 	docs.SwaggerInfo.Version = version
 	docs.SwaggerInfo.Host = app.config.apiURL
@@ -243,21 +245,21 @@ func (app *application) run(mux http.Handler) error {
 
 	go func() {
 		quit := make(chan os.Signal, 1)
-
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
 		s := <-quit
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
 		app.logger.Infow("signal caught", "signal", s.String())
+
+		cancel()
+
+		ctx, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelTimeout()
 
 		if err := srv.Shutdown(ctx); err != nil {
 			shutdown <- err
 		}
 
 		close(shutdown)
-
 	}()
 
 	app.logger.Infow("server has started", "addr", app.config.addr, "env", app.config.env)
