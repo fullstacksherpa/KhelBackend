@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"expvar"
 	"fmt"
 	"khel/internal/auth"
@@ -97,7 +98,7 @@ var version = "1.2.0"
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+		log.Fatalf("Error loading .env file via godotenv.load: %v", err)
 	}
 	// Retrieve and convert maxOpenConns
 	maxOpenConnsStr := os.Getenv("DB_MAX_OPEN_CONNS")
@@ -213,9 +214,12 @@ func main() {
 		return runtime.NumGoroutine()
 	}))
 
-	app.markCompletedGamesEvery30Mins()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	app.markCompletedGamesEvery30Mins(ctx)
 
 	mux := app.mount()
 
-	logger.Fatal(app.run(mux))
+	logger.Fatal(app.run(mux, cancel))
 }

@@ -712,6 +712,57 @@ func (app *application) getScheduledBookingsHandler(w http.ResponseWriter, r *ht
 	app.jsonResponse(w, http.StatusOK, bookings)
 }
 
+// getCanceledBookingsHandler godoc
+//
+//	@Summary		List Canceled booking requests for a venue
+//	@Description	Returns all bookings with status="canceled" for a given venue and date.
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID	path		int						true	"Venue ID"
+//	@Param			date	query		string					true	"Date in YYYY-MM-DD format"
+//	@Success		200		{array}		store.ScheduledBooking	"Scheduled bookings"
+//	@Failure		400		{object}	error					"Bad Request"
+//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/canceled-bookings [get]
+func (app *application) getCanceledBookingsHandler(w http.ResponseWriter, r *http.Request) {
+	// 1) parse venueID
+	vid, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
+		return
+	}
+
+	// 2) parse date query
+	dateStr := r.URL.Query().Get("date")
+	if dateStr == "" {
+		app.badRequestResponse(w, r, errors.New("missing date"))
+		return
+	}
+
+	loc, _ := time.LoadLocation("Asia/Kathmandu")
+
+	// Parse date string in Kathmandu local time
+	date, err := time.ParseInLocation("2006-01-02", dateStr, loc)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid date format: %w", err))
+		return
+	}
+
+	//date will be Parsed time is: 2025-06-29 00:00:00 +0545 +0545
+
+	// 3) fetch from store
+	bookings, err := app.store.Bookings.GetCanceledBookingsForVenueDate(r.Context(), vid, date)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 4) respond JSON
+	app.jsonResponse(w, http.StatusOK, bookings)
+}
+
 // acceptBookingHandler godoc
 //
 //	@Summary		Accept a pending booking request
@@ -791,6 +842,65 @@ func (app *application) rejectBookingHandler(w http.ResponseWriter, r *http.Requ
 		} else {
 			app.internalServerError(w, r, err)
 		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// cancelBookingHandler godoc
+//
+//	@Summary		Cancel a pending booking request or confirmed booking
+//	@Description	Marks the booking with status="pending or confirmed" as "canceled".
+//	@Tags			Venue
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID		path	int	true	"Venue ID"
+//	@Param			bookingID	path	int	true	"Booking ID"
+//	@Success		204
+//	@Failure		400	{object}	error	"Bad Request"
+//	@Failure		404	{object}	error	"Not Found"
+//	@Failure		500	{object}	error	"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/cancel-bookings/{bookingID} [post]
+func (app *application) cancelBookingHandler(w http.ResponseWriter, r *http.Request) {
+	vid, err := strconv.ParseInt(chi.URLParam(r, "venueID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
+		return
+	}
+	bid, err := strconv.ParseInt(chi.URLParam(r, "bookingID"), 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid bookingID: %w", err))
+		return
+	}
+
+	// 🔐 Step 1: Extract userID from context (set by your auth middleware)
+	authUser := getUserFromContext(r) // assuming this returns a struct with ID
+	if authUser == nil {
+		app.unauthorizedErrorResponse(w, r, errors.New("check Bearer token"))
+		return
+	}
+
+	// 🔍 Step 2: Check ownership
+	ownerID, err := app.store.Bookings.GetBookingOwner(r.Context(), vid, bid)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			app.notFoundResponse(w, r, errors.New("booking not found"))
+		} else {
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	if ownerID != authUser.ID {
+		app.forbiddenResponse(w, r)
+		return
+	}
+
+	// ✅ Step 3: Cancel booking
+	if err := app.store.Bookings.CancelBooking(r.Context(), vid, bid); err != nil {
+		app.internalServerError(w, r, err)
 		return
 	}
 

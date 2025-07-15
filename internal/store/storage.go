@@ -86,15 +86,18 @@ type Storage struct {
 		MarkCompletedGames() error
 	}
 	Bookings interface {
+		GetBookingOwner(ctx context.Context, venueID, bookingID int64) (int64, error)
 		GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error)
 		GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error)
 		CreateBooking(ctx context.Context, booking *Booking) error
 		UpdatePricing(ctx context.Context, p *PricingSlot) error
 		CreatePricingSlotsBatch(ctx context.Context, slots []*PricingSlot) error
 		GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error)
+		GetCanceledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]CanceledBooking, error)
 		UpdateBookingStatus(ctx context.Context, venueID, bookingID int64, status string) error
 		AcceptBooking(ctx context.Context, venueID, bookingID int64) error
 		RejectBooking(ctx context.Context, venueID, bookingID int64) error
+		CancelBooking(ctx context.Context, venueID, bookingID int64) error
 		GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error)
 		GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error)
 	}

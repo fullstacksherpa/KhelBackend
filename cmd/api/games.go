@@ -54,13 +54,9 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	//TODO: delete later
-	fmt.Printf("validated payload is %v:", payload)
 
 	// 2. Get the authenticated user
 	user := getUserFromContext(r)
-	//TODO: delete later
-	fmt.Printf("the user to create game is %v", user.FirstName)
 
 	// 4. Create the game
 	game := &store.Game{
