@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.15.0...v1.16.0) (2025-07-15)
+
+
+### Features
+
+* added cancel enums to booking ([c0adc5a](https://github.com/fullstacksherpa/KhelBackend/commit/c0adc5a5d7778433cac1da3d1707d7a1a4ca7483))
+
 ## [1.15.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.14.0...v1.15.0) (2025-06-30)
 
 
