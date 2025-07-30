@@ -75,6 +75,7 @@ type Storage struct {
 		InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error
 		UpdateRequestStatus(ctx context.Context, gameID, userID int64, status GameRequestStatus) error
 		GetJoinRequest(ctx context.Context, gameID, userID int64) (*GameRequest, error)
+		DeleteJoinRequest(ctx context.Context, gameID, userID int64) error
 		GetAllJoinRequests(ctx context.Context, gameID int64) ([]*GameRequestWithUser, error)
 		GetPlayerCount(ctx context.Context, gameID int) (int, error)
 		GetGamePlayers(ctx context.Context, gameID int64) ([]*User, error)
@@ -91,6 +92,7 @@ type Storage struct {
 		GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error)
 		CreateBooking(ctx context.Context, booking *Booking) error
 		UpdatePricing(ctx context.Context, p *PricingSlot) error
+		DeletePricingSlot(ctx context.Context, venueID, pricingID int64) error
 		CreatePricingSlotsBatch(ctx context.Context, slots []*PricingSlot) error
 		GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error)
 		GetCanceledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]CanceledBooking, error)

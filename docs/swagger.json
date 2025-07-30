@@ -1248,6 +1248,50 @@
                         "schema": {}
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows a user to delete their previously sent join request for a specific game.",
+                "tags": [
+                    "Games"
+                ],
+                "summary": "Delete a join request for a game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Join request deleted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid game ID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Join request not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
             }
         },
         "/games/{gameID}/requests": {
@@ -3214,6 +3258,57 @@
                     },
                     "500": {
                         "description": "Internal Server Error: Could not update pricing",
+                        "schema": {}
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Allows venue owners to delete a specific pricing slot.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner"
+                ],
+                "summary": "Delete a pricing slot for a venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pricing Slot ID",
+                        "name": "pricingID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request: Invalid input",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found: No such pricing slot",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {}
                     }
                 }

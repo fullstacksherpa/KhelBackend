@@ -275,6 +275,22 @@ func (s *BookingStore) CreatePricingSlotsBatch(ctx context.Context, slots []*Pri
 	})
 }
 
+func (s *BookingStore) DeletePricingSlot(ctx context.Context, venueID, pricingID int64) error {
+	const q = `
+         DELETE FROM venue_pricing WHERE id = $1 AND venue_id = $2
+`
+
+	res, err := s.db.Exec(ctx, q, pricingID, venueID)
+	if err != nil {
+		return fmt.Errorf("failed to delete pricing slot: %w", err)
+	}
+
+	if res.RowsAffected() == 0 {
+		return fmt.Errorf("no pricing slot found with  id=%d for venue_id=%d", pricingID, venueID)
+	}
+	return nil
+}
+
 // GetPendingBookingsForVenueDate loads all bookings with status='pending'
 // for the given venue on the given date.
 func (s *BookingStore) GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error) {
