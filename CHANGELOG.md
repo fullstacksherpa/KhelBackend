@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.16.0...v1.17.0) (2025-07-30)
+
+
+### Features
+
+* add cancel booking features ([b2fbbb5](https://github.com/fullstacksherpa/KhelBackend/commit/b2fbbb547170d1ca42dc0e64b3c0daa6a9d3ea03))
+
 ## [1.16.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.15.0...v1.16.0) (2025-07-15)
 
 
