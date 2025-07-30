@@ -62,7 +62,7 @@ command:
 
 ## 2. Production API <a id="production-api"></a>
 
-Function: Main application deployment.
+Function: Main application deployment
 
 yaml
 build:
