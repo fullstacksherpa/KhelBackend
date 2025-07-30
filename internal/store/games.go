@@ -250,6 +250,27 @@ func (s *GameStore) AddToGameRequest(ctx context.Context, gameID int64, UserID i
 	return nil
 }
 
+func (s *GameStore) DeleteJoinRequest(ctx context.Context, gameID, userID int64) error {
+	query := `
+		DELETE FROM game_join_requests
+		WHERE game_id = $1 AND user_id = $2
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	result, err := s.db.Exec(ctx, query, gameID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete join request: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("no join request found to delete for game_id=%d and user_id=%d", gameID, userID)
+	}
+
+	return nil
+}
+
 func (s *GameStore) IsAdminAssistant(ctx context.Context, gameID int64, userID int64) (bool, error) {
 	query := `
 		SELECT EXISTS (

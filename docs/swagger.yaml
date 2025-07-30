@@ -1544,6 +1544,36 @@ paths:
       tags:
       - Games
   /games/{gameID}/request:
+    delete:
+      description: Allows a user to delete their previously sent join request for
+        a specific game.
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameID
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Join request deleted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid game ID
+          schema: {}
+        "404":
+          description: Join request not found
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a join request for a game
+      tags:
+      - Games
     post:
       consumes:
       - application/json
@@ -2938,6 +2968,40 @@ paths:
       tags:
       - Venue-Owner
   /venues/{venueID}/pricing/{pricingID}:
+    delete:
+      consumes:
+      - application/json
+      description: Allows venue owners to delete a specific pricing slot.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Pricing Slot ID
+        in: path
+        name: pricingID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "404":
+          description: 'Not Found: No such pricing slot'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a pricing slot for a venue
+      tags:
+      - Venue-Owner
     put:
       consumes:
       - application/json

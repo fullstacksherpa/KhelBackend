@@ -531,6 +531,50 @@ func (app *application) updateVenuePricingHandler(w http.ResponseWriter, r *http
 	json.NewEncoder(w).Encode(pricing)
 }
 
+// DeleteVenuePricing godoc
+//
+//	@Summary		Delete a pricing slot for a venue
+//	@Description	Allows venue owners to delete a specific pricing slot.
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID		path	int	true	"Venue ID"
+//	@Param			pricingID	path	int	true	"Pricing Slot ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	error	"Bad Request: Invalid input"
+//	@Failure		404			{object}	error	"Not Found: No such pricing slot"
+//	@Failure		500			{object}	error	"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/pricing/{pricingID} [delete]
+func (app *application) deleteVenuePricingHandler(w http.ResponseWriter, r *http.Request) {
+	venueIDStr := chi.URLParam(r, "venueID")
+	pricingIDStr := chi.URLParam(r, "pricingID")
+
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	pricingID, err := strconv.ParseInt(pricingIDStr, 10, 64)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	err = app.store.Bookings.DeletePricingSlot(r.Context(), venueID, pricingID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no pricing slot found") {
+			http.Error(w, err.Error(), http.StatusNotFound)
+		} else {
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type BulkCreatePricingPayload struct {
 	//we use dive, required to ensure each item inside the array is individually validated.
 	Slots []CreatePricingPayload `json:"slots" validate:"required,dive,required"`

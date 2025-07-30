@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -224,6 +225,46 @@ func (app *application) AcceptJoinRequest(w http.ResponseWriter, r *http.Request
 
 	app.jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"message": fmt.Sprintf("Successfully added userID: %d to the gameID: %d ✅", req.UserID, req.GameID),
+	})
+}
+
+// DeleteJoinRequest godoc
+//
+//	@Summary		Delete a join request for a game
+//	@Description	Allows a user to delete their previously sent join request for a specific game.
+//	@Tags			Games
+//	@Param			gameID	path		int					true	"Game ID"
+//	@Success		200		{object}	map[string]string	"Join request deleted"
+//	@Failure		400		{object}	error				"Invalid game ID"
+//	@Failure		404		{object}	error				"Join request not found"
+//	@Failure		500		{object}	error				"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/games/{gameID}/request [delete]
+func (app *application) DeleteJoinRequest(w http.ResponseWriter, r *http.Request) {
+	user := getUserFromContext(r)
+
+	// Parse gameID from URL
+	gameIDStr := chi.URLParam(r, "gameID")
+	gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid game ID", http.StatusBadRequest)
+		return
+	}
+
+	// Attempt to delete join request
+	err = app.store.Games.DeleteJoinRequest(r.Context(), gameID, user.ID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no join request found") {
+			app.notFoundResponse(w, r, fmt.Errorf("no join request found for game_id=%d", gameID))
+			return
+		}
+		app.logger.Errorf("Error deleting join request: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Join request deleted",
 	})
 }
 
