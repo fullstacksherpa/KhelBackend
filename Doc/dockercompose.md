@@ -84,7 +84,7 @@ labels:
 - "traefik.http.routers.khel-staging.rule=Host(`staging.example.com`)"
 
 4. Watchtower <a id="watchtower"></a>
-   Function: Automatic container updates.
+   Function: Automatic container updates
 
 yaml
 command:
