@@ -1,4 +1,7 @@
 services:
+  # ================================
+  # Traefik reverse proxy
+  # ================================
   reverse-proxy:
     image: traefik:v3.4
     command:
@@ -16,6 +19,7 @@ services:
       - "80:80"
       - "443:443"
     labels:
+      # Secure Traefik Dashboard
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.gocloudnepal.com`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
@@ -27,27 +31,49 @@ services:
       - letsencrypt:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock
 
-  khel:
-    image: khel
+  # ================================
+  # Production API
+  # ================================
+  khel-prod:
+    image: khel:latest
+    user: "nonroot:nonroot"
+    container_name: khel-prod
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - /opt/khel/.env.prod # Inject prod secrets at runtime
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.khel.rule=Host(`api.gocloudnepal.com`)"
-      - "traefik.http.routers.khel.entrypoints=websecure"
-      - "traefik.http.routers.khel.tls.certresolver=myresolver"
-        # When you publish a single container port, Traefik will auto-detect it—
-      # but it’s still best practice to be explicit:
-      - "traefik.http.services.khel.loadbalancer.server.port=8080"
-    # mount your host .env into /app/.env (read-only)
-    volumes:
-      - ./.env:/app/.env:ro
-    # also inject those same vars into the process env
-    env_file:
-      - ./.env
+      - "traefik.http.routers.khel-prod.rule=Host(`api.gocloudnepal.com`)"
+      - "traefik.http.routers.khel-prod.entrypoints=websecure"
+      - "traefik.http.routers.khel-prod.tls.certresolver=myresolver"
+      - "traefik.http.services.khel-prod.loadbalancer.server.port=8080"
     restart: always
 
+  # ================================
+  # Staging API
+  # ================================
+  khel-staging:
+    image: khel:latest
+    user: "nonroot:nonroot"
+    container_name: khel-staging
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - /opt/khel/.env.staging # Inject staging secrets at runtime
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.khel-staging.rule=Host(`api.staging.gocloudnepal.com`)"
+      - "traefik.http.routers.khel-staging.entrypoints=websecure"
+      - "traefik.http.routers.khel-staging.tls.certresolver=myresolver"
+      - "traefik.http.services.khel-staging.loadbalancer.server.port=8080"
+    restart: always
+
+  # ================================
+  # Watchtower: Auto-update containers
+  # ================================
   watchtower:
     image: containrrr/watchtower
     command:
@@ -56,5 +82,6 @@ services:
       - "--rolling-restart"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   letsencrypt:

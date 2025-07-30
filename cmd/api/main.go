@@ -96,9 +96,8 @@ var version = "1.2.0"
 // @name						Authorization
 // @description
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file via godotenv.load: %v", err)
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("No .env file found, relying on environment variables from Docker")
 	}
 	// Retrieve and convert maxOpenConns
 	maxOpenConnsStr := os.Getenv("DB_MAX_OPEN_CONNS")

@@ -1,26 +1,78 @@
-include .env
+# -------------------------------
+# Environment Configuration
+# -------------------------------
 MIGRATIONS_PATH = ./cmd/migrate/migrations
+ENV ?= staging  # Default to staging if not specified
 
-.PHONY: test
-test:
-	@go test -v ./...
+# Debug output showing which environment is being loaded
+$(info Loading $(ENV) environment...)
 
+# Load the appropriate environment file
+ifeq ($(ENV),prod)
+include .env.prod
+$(info Using production database configuration)
+else
+include .env.staging
+$(info Using staging database configuration)
+endif
+
+# -------------------------------
+# Migration Targets
+# -------------------------------
 .PHONY: migrate-create
 migration:
 	@migrate create -seq -ext sql -dir $(MIGRATIONS_PATH) $(filter-out $@,$(MAKECMDGOALS))
 
 .PHONY: migrate-up
 migrate-up:
-	@migrate -path=$(MIGRATIONS_PATH) -database=$(DB_ADDR_NO_POOL) up
+	@echo "Applying migrations to $(ENV) environment (DB: $(DB_ADDR_NO_POOL))"
+	@migrate -path=$(MIGRATIONS_PATH) -database="$(DB_ADDR_NO_POOL)" up
 
 .PHONY: migrate-down
 migrate-down:
-	@migrate -path=$(MIGRATIONS_PATH) -database=$(DB_ADDR_NO_POOL) down $(filter-out $@,$(MAKECMDGOALS))
+	@echo "Rolling back migrations in $(ENV) environment (DB: $(DB_ADDR_NO_POOL))"
+	@migrate -path=$(MIGRATIONS_PATH) -database="$(DB_ADDR_NO_POOL)" down $(filter-out $@,$(MAKECMDGOALS))
+
+# -------------------------------
+# Environment-Specific Shortcuts
+# -------------------------------
+.PHONY: prod-up
+prod-up:
+	@$(MAKE) migrate-up ENV=prod
+
+.PHONY: prod-down
+prod-down:
+	@$(MAKE) migrate-down ENV=prod
+
+.PHONY: staging-up
+staging-up:
+	@$(MAKE) migrate-up ENV=staging
+
+.PHONY: staging-down
+staging-down:
+	@$(MAKE) migrate-down ENV=staging
+
+# -------------------------------
+# Other Commands
+# -------------------------------
+.PHONY: test
+test:
+	@go test -v ./...
 
 .PHONY: seed
-seed: 
-	@go run cmd/migrate/seed/main.go
+seed:
+	@echo "Seeding $(ENV) database"
+	@go run cmd/migrate/seed/main.go --env=$(ENV)
 
 .PHONY: gen-docs
 gen-docs:
-		@swag init -g ./api/main.go -d cmd,internal && swag fmt
+	@swag init -g ./api/main.go -d cmd,internal && swag fmt
+
+# -------------------------------
+# Debug Helpers
+# -------------------------------
+.PHONY: show-env
+show-env:
+	@echo "Current Environment: $(ENV)"
+	@echo "DB Connection: $(DB_ADDR_NO_POOL)"
+	@echo "Migrations Path: $(MIGRATIONS_PATH)"
