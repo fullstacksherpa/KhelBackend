@@ -2156,6 +2156,26 @@ paths:
       tags:
       - authentication
   /users/me:
+    delete:
+      description: Deletes the logged-in user's account and Cloudinary profile photo
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: User deleted
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal server error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete current user account
+      tags:
+      - users
     get:
       consumes:
       - application/json

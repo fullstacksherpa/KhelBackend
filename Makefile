@@ -2,7 +2,7 @@
 # Environment Configuration
 # -------------------------------
 MIGRATIONS_PATH = ./cmd/migrate/migrations
-ENV ?= staging  # Default to staging if not specified
+ENV ?= development  # Default to development if not specified
 
 # Debug output showing which environment is being loaded
 $(info Loading $(ENV) environment...)
@@ -11,15 +11,18 @@ $(info Loading $(ENV) environment...)
 ifeq ($(ENV),prod)
 include .env.prod
 $(info Using production database configuration)
-else
+else ifeq ($(ENV),staging)
 include .env.staging
 $(info Using staging database configuration)
+else
+include .env.development
+$(info Using development database configuration)
 endif
 
 # -------------------------------
 # Migration Targets
 # -------------------------------
-.PHONY: migrate-create
+.PHONY: migration
 migration:
 	@migrate create -seq -ext sql -dir $(MIGRATIONS_PATH) $(filter-out $@,$(MAKECMDGOALS))
 
@@ -51,6 +54,14 @@ staging-up:
 .PHONY: staging-down
 staging-down:
 	@$(MAKE) migrate-down ENV=staging
+
+.PHONY: dev-up
+dev-up:
+	@$(MAKE) migrate-up ENV=development
+
+.PHONY: dev-down
+dev-down:
+	@$(MAKE) migrate-down ENV=development
 
 # -------------------------------
 # Other Commands

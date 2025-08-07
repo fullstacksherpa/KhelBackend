@@ -458,3 +458,44 @@ func (app *application) getCurrentUserHandler(w http.ResponseWriter, r *http.Req
 		app.internalServerError(w, r, err)
 	}
 }
+
+// deleteUserAccountHandler godoc
+//
+//	@Summary		Delete current user account
+//	@Description	Deletes the logged-in user's account and Cloudinary profile photo
+//	@Tags			users
+//	@Produce		json
+//	@Success		204	{string}	string	"User deleted"
+//	@Failure		401	{object}	error	"Unauthorized"
+//	@Failure		500	{object}	error	"Internal server error"
+//	@Security		ApiKeyAuth
+//	@Router			/users/me [delete]
+func (app *application) deleteUserAccountHandler(w http.ResponseWriter, r *http.Request) {
+	user := getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Delete profile picture if one exists
+	if user.ProfilePictureURL.Valid {
+		err := app.deletePhotoFromCloudinary(user.ProfilePictureURL.String)
+		if err != nil {
+			app.logger.Error(err, nil) // Log failure, don't block deletion
+		} else {
+			app.logger.Info("Successfully deleted profile picture from Cloudinary", map[string]any{
+				"user_id": user.ID,
+				"url":     user.ProfilePictureURL.String,
+			})
+		}
+	}
+
+	// Delete user from DB
+	err := app.store.Users.Delete(r.Context(), user.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -160,6 +160,7 @@ func (app *application) mount() http.Handler {
 			r.Use(app.AuthTokenMiddleware)
 			r.Get("/bookings", app.getBookingsByUserHandler)
 			r.Get("/me", app.getCurrentUserHandler)
+			r.Delete("/me", app.deleteUserAccountHandler)
 			r.Patch("/update-profile", app.editProfileHandler)
 			r.Put("/", app.updateUserHandler)
 			r.Post("/profile-picture", app.uploadProfilePictureHandler)
