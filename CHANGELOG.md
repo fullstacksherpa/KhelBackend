@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.5.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.0...v1.5.0) (2025-08-07)
+## [1.18.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.4.0...v1.18.0) (2025-08-07)
 
 
 ### Features
