@@ -4,20 +4,23 @@
 MIGRATIONS_PATH = ./cmd/migrate/migrations
 ENV ?= development  # Default to development if not specified
 
-# Debug output showing which environment is being loaded
-$(info Loading $(ENV) environment...)
-
-# Load the appropriate environment file
-ifeq ($(ENV),prod)
+define load_env
+$(info Loading $(1) environment...)
+$(if $(filter $(1),prod staging development),,$(error Invalid ENV specified))
+ifeq ($(1),prod)
 include .env.prod
 $(info Using production database configuration)
-else ifeq ($(ENV),staging)
+else ifeq ($(1),staging)
 include .env.staging
 $(info Using staging database configuration)
 else
 include .env.development
 $(info Using development database configuration)
 endif
+endef
+
+# Evaluate when ENV is finalized
+$(eval $(call load_env,$(ENV)))
 
 # -------------------------------
 # Migration Targets

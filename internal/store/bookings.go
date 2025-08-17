@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -289,6 +290,64 @@ func (s *BookingStore) DeletePricingSlot(ctx context.Context, venueID, pricingID
 		return fmt.Errorf("no pricing slot found with  id=%d for venue_id=%d", pricingID, venueID)
 	}
 	return nil
+}
+
+// GetBookingByID retrieves a single booking by its ID
+func (s *BookingStore) GetBookingByID(ctx context.Context, bookingID int64) (*Booking, error) {
+	const query = `
+        SELECT 
+            id, venue_id, user_id, start_time, end_time, 
+            total_price, status, created_at, updated_at,
+            customer_name, customer_phone, note
+        FROM bookings
+        WHERE id = $1
+    `
+
+	var booking Booking
+	err := s.db.QueryRow(ctx, query, bookingID).Scan(
+		&booking.ID,
+		&booking.VenueID,
+		&booking.UserID,
+		&booking.StartTime,
+		&booking.EndTime,
+		&booking.TotalPrice,
+		&booking.Status,
+		&booking.CreatedAt,
+		&booking.UpdatedAt,
+		&booking.CustomerName,
+		&booking.CustomerPhone,
+		&booking.Note,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("booking not found")
+		}
+		return nil, fmt.Errorf("failed to get booking: %w", err)
+	}
+
+	return &booking, nil
+}
+
+func (s *BookingStore) GetVenueOwnerIDFromBookingID(ctx context.Context, bookingID int64) (int64, error) {
+	const query = `
+        SELECT v.owner_id
+        FROM bookings b
+        JOIN venues v ON b.venue_id = v.id
+        WHERE b.id = $1
+    `
+
+	var ownerID int64
+	err := s.db.QueryRow(ctx, query, bookingID).Scan(&ownerID)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, fmt.Errorf("booking not found or has no associated venue")
+		}
+		return 0, fmt.Errorf("failed to get venue owner: %w", err)
+	}
+
+	return ownerID, nil
 }
 
 // GetPendingBookingsForVenueDate loads all bookings with status='pending'

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -49,6 +50,7 @@ type Storage struct {
 		GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error)
 		GetImageURLs(ctx context.Context, venueID int64) ([]string, error)
 		GetVenueInfo(ctx context.Context, venueID int64) (*VenueInfo, error)
+		GetOwnerIDFromVenueID(ctx context.Context, venueID int64) (int64, error)
 	}
 	Reviews interface {
 		CreateReview(context.Context, *Review) error
@@ -102,6 +104,8 @@ type Storage struct {
 		CancelBooking(ctx context.Context, venueID, bookingID int64) error
 		GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error)
 		GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error)
+		GetBookingByID(ctx context.Context, bookingID int64) (*Booking, error)
+		GetVenueOwnerIDFromBookingID(ctx context.Context, bookingID int64) (int64, error)
 	}
 	FavoriteVenues interface {
 		AddFavorite(ctx context.Context, userID, venueID int64) error
@@ -129,6 +133,13 @@ type Storage struct {
 		AddReview(ctx context.Context, userID int64, rating int, feedback string) error
 		GetAllReviews(ctx context.Context) ([]AppReview, error)
 	}
+	PushTokens interface {
+		AddOrUpdatePushToken(ctx context.Context, userID int64, token string, deviceInfo json.RawMessage) error
+		RemovePushToken(ctx context.Context, userID int64, token string) error
+		RemoveTokensByTokenList(ctx context.Context, tokens []string) error
+		GetTokensByUserIDs(ctx context.Context, userIDs []int64) (map[int64][]string, error)
+		PruneStaleTokens(ctx context.Context, olderThan time.Duration) error
+	}
 }
 
 func NewStorage(db *pgxpool.Pool) Storage {
@@ -143,6 +154,7 @@ func NewStorage(db *pgxpool.Pool) Storage {
 		ShortlistedGames: &ShortlistGamesStore{db},
 		GameQA:           &QuestionStore{db},
 		AppReviews:       &AppReviewStore{db},
+		PushTokens:       &PushTokensStore{db},
 	}
 }
 

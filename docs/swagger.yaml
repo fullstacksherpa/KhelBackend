@@ -28,6 +28,16 @@ definitions:
     required:
     - slots
     type: object
+  main.BulkRemoveTokensRequest:
+    properties:
+      tokens:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - tokens
+    type: object
   main.CreateGamePayload:
     properties:
       end_time:
@@ -195,6 +205,13 @@ definitions:
       skill_level:
         type: string
     type: object
+  main.PruneStaleTokensRequest:
+    properties:
+      older_than:
+        type: string
+    required:
+    - older_than
+    type: object
   main.QuestionPayload:
     properties:
       question:
@@ -234,6 +251,13 @@ definitions:
     - password
     - phone
     type: object
+  main.RemovePushTokenRequest:
+    properties:
+      token:
+        type: string
+    required:
+    - token
+    type: object
   main.ReplyPayload:
     properties:
       reply:
@@ -261,6 +285,8 @@ definitions:
     required:
     - password
     - token
+    type: object
+  main.SavePushTokenRequest:
     type: object
   main.TokenResponse:
     properties:
@@ -1962,6 +1988,37 @@ paths:
       summary: Healthcheckk
       tags:
       - ops
+  /push-tokens:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a specific push token for the current user
+      parameters:
+      - description: Token to remove
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.RemovePushTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Remove a push notification token
+      tags:
+      - Notifications
   /users:
     put:
       consumes:
@@ -2257,6 +2314,106 @@ paths:
       summary: Update profile picture
       tags:
       - users
+  /users/push-tokens:
+    post:
+      consumes:
+      - application/json
+      description: Stores or updates a user's Expo push token along with optional
+        device info
+      parameters:
+      - description: Push token data
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.SavePushTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Save or update a push notification token
+      tags:
+      - Notifications
+  /users/push-tokens/bulk-remove:
+    post:
+      consumes:
+      - application/json
+      description: Deletes multiple push tokens (admin-only)
+      parameters:
+      - description: Tokens to remove
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.BulkRemoveTokensRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Bulk remove push notification tokens
+      tags:
+      - Notifications
+  /users/push-tokens/prune:
+    post:
+      consumes:
+      - application/json
+      description: Removes push tokens not updated within the specified duration (admin-only)
+      parameters:
+      - description: Duration criteria
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.PruneStaleTokensRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Prune stale push tokens
+      tags:
+      - Notifications
   /users/update-profile:
     patch:
       consumes:

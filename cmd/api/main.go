@@ -7,18 +7,20 @@ import (
 	"khel/internal/auth"
 	"khel/internal/db"
 	"khel/internal/mailer"
+	"khel/internal/notifications"
 	"khel/internal/ratelimiter"
 	"khel/internal/store"
 	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"strconv"
 	"time"
 
+	"github.com/9ssi7/exponent"
 	"github.com/cloudinary/cloudinary-go/v2"
 	_ "github.com/lib/pq"
 
-	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -78,7 +80,7 @@ func NewLogger() (*zap.SugaredLogger, error) {
 	return logger.Sugar(), nil
 }
 
-var version = "1.2.0"
+var version = "1.6.0"
 
 //	@title			Khel API
 //	@description	API for Khel, a complete sport application.
@@ -100,8 +102,8 @@ func main() {
 	if env == "" {
 		env = "development"
 	}
-	envFile := fmt.Sprintf(".env.%s", env)
-	godotenv.Load(envFile)
+	// envFile := fmt.Sprintf(".env.%s", env)
+	// godotenv.Load(envFile)
 	fmt.Println("Running in", env, "mode")
 	// Retrieve and convert maxOpenConns
 	maxOpenConnsStr := os.Getenv("DB_MAX_OPEN_CONNS")
@@ -176,6 +178,20 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	//expo push message (notification)
+
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	client := exponent.NewClient(
+		exponent.WithHttpClient(httpClient),
+	)
+
+	//wrap it with your adapter
+
+	sender := notifications.NewExpoAdapter(client)
+
 	// client to send email for activation
 	// mailer := mailer.NewSendgrid(cfg.mail.sendGrid.apiKey, cfg.mail.fromEmail)
 
@@ -206,6 +222,7 @@ func main() {
 		mailer:        mailtrap,
 		authenticator: jwtAuthenticator,
 		rateLimiter:   rateLimiter,
+		push:          sender,
 	}
 
 	//Metrics collected http://localhost:8080/v1/debug/vars

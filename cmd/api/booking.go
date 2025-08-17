@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"khel/internal/notifications"
 	"khel/internal/store"
 	"log"
 	"net/http"
@@ -297,6 +299,28 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Error creating booking", http.StatusInternalServerError)
 		return
 	}
+
+	ownerID, err := app.store.Venues.GetOwnerIDFromVenueID(r.Context(), venueID)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+	}
+
+	// Send push notification
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		err := notifications.SendBookingNotification(
+			ctx,
+			app.push,
+			app.store,
+			ownerID, //owner is the one receiving notification
+			notifications.BookingCreated,
+			444,
+		)
+		if err != nil {
+			fmt.Printf("❌ Failed to send booking created notification: %v\n", err)
+		}
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -834,6 +858,12 @@ func (app *application) acceptBookingHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	booking, err := app.store.Bookings.GetBookingByID(r.Context(), bid)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
 	if err := app.store.Bookings.AcceptBooking(r.Context(), vid, bid); err != nil {
 		if err == sql.ErrNoRows {
 			app.notFoundResponse(w, r, errors.New("not found"))
@@ -849,6 +879,23 @@ func (app *application) acceptBookingHandler(w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
+
+	// Send push notification
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		err := notifications.SendBookingNotification(
+			ctx,
+			app.push,
+			app.store,
+			booking.UserID,
+			notifications.BookingAccepted,
+			booking.ID,
+		)
+		if err != nil {
+			fmt.Printf("❌ Failed to send booking accepted notification: %v\n", err)
+		}
+	}()
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -880,6 +927,12 @@ func (app *application) rejectBookingHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	booking, err := app.store.Bookings.GetBookingByID(r.Context(), bid)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
 	if err := app.store.Bookings.RejectBooking(r.Context(), vid, bid); err != nil {
 		if err == sql.ErrNoRows {
 			app.notFoundResponse(w, r, errors.New("not found"))
@@ -888,6 +941,23 @@ func (app *application) rejectBookingHandler(w http.ResponseWriter, r *http.Requ
 		}
 		return
 	}
+
+	// Send push notification
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		err := notifications.SendBookingNotification(
+			ctx,
+			app.push,
+			app.store,
+			booking.UserID,
+			notifications.BookingRejected,
+			booking.ID,
+		)
+		if err != nil {
+			fmt.Printf("❌ Failed to send booking accepted notification: %v\n", err)
+		}
+	}()
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -919,8 +989,7 @@ func (app *application) cancelBookingHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// 🔐 Step 1: Extract userID from context (set by your auth middleware)
-	authUser := getUserFromContext(r) // assuming this returns a struct with ID
+	authUser := getUserFromContext(r)
 	if authUser == nil {
 		app.unauthorizedErrorResponse(w, r, errors.New("check Bearer token"))
 		return
@@ -947,6 +1016,28 @@ func (app *application) cancelBookingHandler(w http.ResponseWriter, r *http.Requ
 		app.internalServerError(w, r, err)
 		return
 	}
+
+	venueOwnerID, err := app.store.Bookings.GetVenueOwnerIDFromBookingID(r.Context(), bid)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+	// Send push notification
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		err := notifications.SendBookingNotification(
+			ctx,
+			app.push,
+			app.store,
+			venueOwnerID,
+			notifications.BookingCanceled,
+			bid,
+		)
+		if err != nil {
+			fmt.Printf("❌ Failed to send booking accepted notification: %v\n", err)
+		}
+	}()
 
 	w.WriteHeader(http.StatusNoContent)
 }

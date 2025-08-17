@@ -10,6 +10,7 @@ import (
 	"time"
 
 	// For PostGIS GEOGRAPHY
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -548,4 +549,17 @@ func (s *VenuesStore) GetVenueInfo(ctx context.Context, venueID int64) (*VenueIn
 	VenueInfo.Location = []float64{latitude, longitude}
 
 	return &VenueInfo, nil
+}
+
+// GetOwnerIDFromVenueID returns a OwnerID from the provided venueID
+func (s *VenuesStore) GetOwnerIDFromVenueID(ctx context.Context, venueID int64) (int64, error) {
+	var ownerID int64
+	err := s.db.QueryRow(ctx, `SELECT owner_id FROM venues WHERE id = $1`, venueID).Scan(&ownerID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return 0, fmt.Errorf("venue not found")
+		}
+		return 0, err
+	}
+	return ownerID, nil
 }

@@ -1,25 +1,25 @@
 services:
   # ================================
-  # Traefik reverse proxy
+  # Traefik Reverse Proxy
   # ================================
   reverse-proxy:
     image: traefik:v3.4
     command:
-      - "--providers.docker"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entryPoints.web.address=:80"
-      - "--entryPoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.email=ongchen10sherpa@gmail.com"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--api.dashboard=true"
+      - "--providers.docker" # Enable Docker provider
+      - "--providers.docker.exposedbydefault=false" # Only expose labeled containers
+      - "--entryPoints.web.address=:80" # HTTP entry point
+      - "--entryPoints.websecure.address=:443" # HTTPS entry point
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true" # ACME TLS challenge
+      - "--certificatesresolvers.myresolver.acme.email=ongchen10sherpa@gmail.com" # Let's Encrypt email
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json" # Cert storage
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure" # HTTP→HTTPS redirect
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https" # Force HTTPS
+      - "--api.dashboard=true" # Enable dashboard
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:80" # HTTP port
+      - "443:443" # HTTPS port
     labels:
-      # Secure Traefik Dashboard
+      # Traefik Dashboard Configuration
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.gocloudnepal.com`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
@@ -29,51 +29,74 @@ services:
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$2y$05$2hQXRr9Rpo8aJs0ERvDMauAwYEHPh7eSvTY.CTzLyBYKr.mkGInKO"
     restart: always
     volumes:
-      - letsencrypt:/letsencrypt
-      - /var/run/docker.sock:/var/run/docker.sock
+      - letsencrypt:/letsencrypt # Persistent cert storage
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Read-only Docker socket
 
   # ================================
-  # Production API
+  # Production API Service
   # ================================
   khel-prod:
-    image: khel:latest
-    user: "nonroot:nonroot"
+    image: khel:prod
+    user: "nonroot:nonroot" # Run as non-root for security
     container_name: khel-prod
     build:
       context: .
       dockerfile: Dockerfile
     env_file:
-      - /opt/khel/.env.prod # Inject prod secrets at runtime
+      - /opt/khel/.env.prod # Production environment variables
+    deploy:
+      update_config:
+        failure_action: rollback
+        monitor: 5m
+        parallelism: 1 # Update one container at a time
+        delay: 10s # Wait 10s between updates
+        order: stop-first # Stop old container before starting new one
+      restart_policy:
+        condition: on-failure # Only restart on failure
+        max_attempts: 3 # Max restart attempts before giving up
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.khel-prod.rule=Host(`api.gocloudnepal.com`)"
       - "traefik.http.routers.khel-prod.entrypoints=websecure"
       - "traefik.http.routers.khel-prod.tls.certresolver=myresolver"
       - "traefik.http.services.khel-prod.loadbalancer.server.port=8080"
-    restart: always
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"] # Health endpoint
+      interval: 30s # Check every 30 seconds
+      timeout: 5s # Timeout after 5 seconds
+      retries: 3 # Retry 3 times before marking unhealthy
+      start_period: 20s # Wait 20s before first check
 
   # ================================
-  # Staging API
+  # Staging API Service
   # ================================
   khel-staging:
-    image: khel:latest
-    user: "nonroot:nonroot"
+    image: khel:staging
+    user: "nonroot:nonroot" # Run as non-root for security
     container_name: khel-staging
     build:
       context: .
       dockerfile: Dockerfile
     env_file:
-      - /opt/khel/.env.staging # Inject staging secrets at runtime
+      - /opt/khel/.env.staging # Staging environment variables
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.khel-staging.rule=Host(`api.staging.gocloudnepal.com`)"
       - "traefik.http.routers.khel-staging.entrypoints=websecure"
       - "traefik.http.routers.khel-staging.tls.certresolver=myresolver"
       - "traefik.http.services.khel-staging.loadbalancer.server.port=8080"
-    restart: always
+      - "com.centurylinklabs.watchtower.enable=true" # Enable auto-updates
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"] # Health endpoint
+      interval: 30s # Check every 30 seconds
+      timeout: 5s # Timeout after 5 seconds
+      retries: 3 # Retry 3 times before marking unhealthy
+      start_period: 20s # Wait 20s before first check
 
   # ================================
-  # Watchtower: Auto-update containers
+  # Watchtower: Auto-update Service
   # ================================
   watchtower:
     image: containrrr/watchtower
@@ -83,7 +106,7 @@ services:
       - "--rolling-restart"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    restart: always
+    restart: on-failure
 
 volumes:
-  letsencrypt:
+  letsencrypt: # Persistent volume for SSL certificates

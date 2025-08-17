@@ -5,7 +5,7 @@ FROM golang:1.24-bookworm AS deps
 
 WORKDIR /app
 
-# Copy only go.mod and go.sum first for dependency caching
+# Copy go.mod and go.sum for caching
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -16,31 +16,38 @@ FROM golang:1.24-bookworm AS builder
 
 WORKDIR /app
 
-# Copy cached dependencies from deps stage
+# Copy cached dependencies
 COPY --from=deps /go/pkg /go/pkg
 
 # Copy the entire project
 COPY . .
 
-# Disable CGO to build static binary
+# Disable CGO for static binary
 ENV CGO_ENABLED=0
 ENV GOOS=linux
 
-# Build the Go binary with optimizations
+# Build the binary
 RUN go build -ldflags="-w -s" -o main ./cmd/api
 
 # ================================
 # Stage 3: Final lightweight image
 # ================================
-FROM gcr.io/distroless/base-debian12
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Copy the binary and set permissions (no need to create user/group manually)
-COPY --from=builder --chown=nonroot:nonroot /app/main .
+# Install curl for healthchecks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Run as non-root user for security
-USER nonroot:nonroot
+# Add a non-root user
+RUN useradd -ms /bin/bash nonroot
+
+# Copy binary from builder
+COPY --from=builder /app/main .
+
+
+# Switch to non-root
+USER nonroot
 
 # Run the app
 CMD ["./main"]

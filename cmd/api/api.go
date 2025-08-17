@@ -8,6 +8,7 @@ import (
 	"khel/docs" //this is required to generate swagger docs
 	"khel/internal/auth"
 	"khel/internal/mailer"
+	"khel/internal/notifications"
 	"khel/internal/ratelimiter"
 	"khel/internal/store"
 
@@ -33,6 +34,7 @@ type application struct {
 	mailer        mailer.Client
 	authenticator auth.Authenticator
 	rateLimiter   ratelimiter.Limiter
+	push          *notifications.ExpoAdapter
 }
 
 type config struct {
@@ -158,6 +160,10 @@ func (app *application) mount() http.Handler {
 		r.Route("/users", func(r chi.Router) {
 
 			r.Use(app.AuthTokenMiddleware)
+			r.Post("/push-tokens", app.savePushTokenHandler)
+			r.Post("/push-tokens/prune", app.pruneStaleTokensHandler)
+			r.Post("/push-tokens/bulk-remove", app.bulkRemoveTokensHandler)
+			r.Delete("/push-tokens", app.removePushTokenHandler)
 			r.Get("/bookings", app.getBookingsByUserHandler)
 			r.Get("/me", app.getCurrentUserHandler)
 			r.Delete("/me", app.deleteUserAccountHandler)
