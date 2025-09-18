@@ -311,8 +311,10 @@ func (app *application) unfollowUserHandler(w http.ResponseWriter, r *http.Reque
 }
 
 func getUserFromContext(r *http.Request) *store.User {
-	user, _ := r.Context().Value(userCtx).(*store.User)
-	return user
+	if user, ok := r.Context().Value(userCtx).(*store.User); ok {
+		return user
+	}
+	return nil
 }
 
 // editProfileHandler godoc

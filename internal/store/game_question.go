@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -126,6 +127,21 @@ func (s *QuestionStore) CreateReply(ctx context.Context, reply *Reply) error {
 	}
 
 	return nil
+}
+
+func (s *QuestionStore) GetUserIDByQuestionID(ctx context.Context, questionID int64) (int64, error) {
+	query := `SELECT user_id FROM game_questions WHERE id = $1`
+	var userID int64
+
+	err := s.db.QueryRow(ctx, query, questionID).Scan(&userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, fmt.Errorf("question not found: %w", ErrNotFound)
+		}
+		return 0, fmt.Errorf("error querying user_id from game_questions: %w", err)
+	}
+
+	return userID, nil
 }
 
 // GetRepliesByQuestion returns all replies for a question

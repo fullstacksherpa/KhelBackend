@@ -3,16 +3,17 @@ module khel
 go 1.24.0
 
 require (
+	github.com/9ssi7/exponent v0.0.3
 	github.com/cloudinary/cloudinary-go/v2 v2.9.1
 	github.com/go-playground/validator/v10 v10.25.0
 	github.com/google/uuid v1.5.0
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/lib/pq v1.10.9
+	github.com/speps/go-hashids/v2 v2.0.1
 	github.com/swaggo/swag v1.16.4
 )
 
 require (
-	github.com/9ssi7/exponent v0.0.3 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect

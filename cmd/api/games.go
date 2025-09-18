@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"khel/internal/notifications"
 	"khel/internal/store"
 	"log"
 	"net/http"
@@ -119,6 +121,7 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 //	@Router			/games/{gameID}/request [post]
 func (app *application) CreateJoinRequest(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(r)
+	userName := user.FirstName
 
 	// Parse gameID from URL
 	gameIDStr := chi.URLParam(r, "gameID")
@@ -129,11 +132,17 @@ func (app *application) CreateJoinRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Check if game exists and is active
-	_, err = app.store.Games.GetGameByID(r.Context(), gameID)
+	game, err := app.store.Games.GetGameByID(r.Context(), gameID)
 	if err != nil {
-		app.notFoundResponse(w, r, errors.New("game not found or is inactive"))
+		if errors.Is(err, store.ErrNotFound) {
+			app.notFoundResponse(w, r, errors.New("game not found or is inactive"))
+		} else {
+			app.internalServerError(w, r, err)
+		}
+
 		return
 	}
+	adminID := game.AdminID
 
 	// Check if a join request already exists
 	exists, err := app.store.Games.CheckRequestExist(r.Context(), gameID, user.ID)
@@ -155,6 +164,11 @@ func (app *application) CreateJoinRequest(w http.ResponseWriter, r *http.Request
 		writeJSONError(w, http.StatusInternalServerError, "Failed to create request")
 		return
 	}
+
+	//that anonymous function is a closure because it refers to variable from the outer scope: app.push, app.store, adminID, gameID. The closure captures the variables it needs from the surrounding scope.
+	notifications.CallAsync(func(ctx context.Context) error {
+		return notifications.SendJoinRequestToAdmin(ctx, app.push, app.store, adminID, gameID, userName)
+	}, "SendingJoinRequestToAdmin")
 
 	// Success response
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
@@ -217,6 +231,10 @@ func (app *application) AcceptJoinRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	notifications.CallAsync(func(ctx context.Context) error {
+		return notifications.SendAcceptJoinRequestToUser(ctx, app.push, app.store, req.UserID, gameID)
+	}, "SendingAcceptJoinRequestToUser")
+
 	err = app.store.Games.InsertNewPlayer(r.Context(), gameID, payload.UserID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Failed to add player")
@@ -262,6 +280,10 @@ func (app *application) DeleteJoinRequest(w http.ResponseWriter, r *http.Request
 		writeJSONError(w, http.StatusInternalServerError, "Internal server error")
 		return
 	}
+
+	notifications.CallAsync(func(ctx context.Context) error {
+		return notifications.SendDeleteJoinRequestToAdmin(ctx, app.push, app.store, gameID, user.FirstName)
+	}, "SendingDeleteJoinRequestToAdmin")
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message": "Join request deleted",
@@ -385,6 +407,10 @@ func (app *application) RejectJoinRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	notifications.CallAsync(func(ctx context.Context) error {
+		return notifications.SendRejectJoinRequestToUser(ctx, app.push, app.store, payload.UserID, gameID)
+	}, "SendingRejectJoinRequestToUser")
+
 	app.jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"message": fmt.Sprintf("Successfully rejected userID: %d from gameID: %d ❌", payload.UserID, gameID),
 	})
@@ -445,7 +471,9 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 // GetGames godoc
 //
 //	@Summary		Retrieve a list of games
-//	@Description	Returns a list of games based on filters such as sport type, game level, venue, booking status, location, time range, and status.
+//
+// @Description Returns a list of games. Authentication is optional; if an API key is provided, user's shortlisted games will be included.
+//
 //	@Tags			Games
 //	@Accept			json
 //	@Produce		json
@@ -467,55 +495,51 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 //	@Success		200			{object}	[]store.GameSummary	"List of games and GeoJSON features"
 //	@Failure		400			{object}	error				"Invalid request parameters"
 //	@Failure		500			{object}	error				"Internal server error"
-//	@Security		ApiKeyAuth
 //	@Router			/games/get-games [get]
 func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) {
-	// Set default filter values.
 	fq := store.GameFilterQuery{
 		Limit:      10,
 		Offset:     0,
 		Sort:       "asc",
-		Radius:     0, // 0 means no location-based filtering.
+		Radius:     0,
 		StartAfter: time.Now(),
 	}
 
-	// Parse query parameters from the request (overriding defaults if provided).
 	fq, err := fq.Parse(r)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	// Validate the filter query.
 	if err := Validate.Struct(fq); err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	// Get the currently logged in user.
-	user := getUserFromContext(r)
+	user := getUserFromContext(r) // Can be nil
 
-	// Query the database for matching games.
 	games, err := app.store.Games.GetGames(r.Context(), fq)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	// Get the shortlisted games for the user.
-	shortlistedGames, err := app.store.ShortlistedGames.GetShortlistedGamesByUser(r.Context(), user.ID)
-	if err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
-
-	// Build a set of shortlisted game IDs for fast lookup.
+	// Prepare shortlisted map
 	shortlistedIDs := make(map[int64]struct{})
-	for _, sg := range shortlistedGames {
-		shortlistedIDs[sg.ID] = struct{}{}
+
+	if user != nil { // Only fetch if authenticated
+		shortlistedGames, err := app.store.ShortlistedGames.GetShortlistedGamesByUser(r.Context(), user.ID)
+		if err != nil {
+			app.internalServerError(w, r, err)
+			return
+		}
+
+		for _, sg := range shortlistedGames {
+			shortlistedIDs[sg.ID] = struct{}{}
+		}
 	}
 
-	// Mark games as shortlisted if they appear in the user's shortlist.
+	// Mark shortlisted
 	for i, game := range games {
 		if _, found := shortlistedIDs[game.GameID]; found {
 			games[i].Shortlisted = true
@@ -598,6 +622,10 @@ func (app *application) cancelGameHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	notifications.CallAsync(func(ctx context.Context) error {
+		return notifications.SendCancelGameToPlayers(ctx, app.push, app.store, gameID)
+	}, "SendingCancelGameNotificationToAllPlayers")
+
 	app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Game cancelled successfully"})
 }
 
@@ -649,7 +677,6 @@ func (app *application) getAllGameJoinRequestsHandler(w http.ResponseWriter, r *
 //	@Failure		400		{object}	error	"Invalid game ID"
 //	@Failure		404		{object}	error	"Game not found"
 //	@Failure		500		{object}	error	"Internal server error"
-//	@Security		ApiKeyAuth
 //	@Router			/games/{gameID} [get]
 func (app *application) getGameDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse gameID from URL
@@ -731,8 +758,8 @@ func (app *application) getUpcomingGamesByVenueHandler(w http.ResponseWriter, r 
 func (app *application) getUpcomingGamesForUser(w http.ResponseWriter, r *http.Request) {
 
 	user := getUserFromContext(r)
-	if user == nil {
-		app.unauthorizedErrorResponse(w, r, errors.New("Unauthorized"))
+	if user == nil || user.ID == 0 {
+		app.unauthorizedErrorResponse(w, r, errors.New("unauthorized or invalid user"))
 		return
 	}
 

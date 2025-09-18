@@ -18,7 +18,7 @@ const (
 	BookingCanceled BookingEvent = "CANCELED"
 )
 
-func SendBookingNotification(ctx context.Context, push PushSender, store store.Storage, userID int64, event BookingEvent, bookingID int64) error {
+func SendBookingNotification(ctx context.Context, push PushSender, store store.Storage, userID int64, event BookingEvent, bookingID string) error {
 	// Fetch tokens for the user
 	tokensMap, err := store.PushTokens.GetTokensByUserIDs(ctx, []int64{userID})
 	if err != nil {
@@ -37,16 +37,16 @@ func SendBookingNotification(ctx context.Context, push PushSender, store store.S
 		body = "You have a new booking request"
 	case BookingAccepted:
 		title = "Booking Accepted"
-		body = fmt.Sprintf("Your booking #%d has been accepted.", bookingID)
+		body = fmt.Sprintf("Your booking (ID: %s) has been confirmed! 🎉", bookingID)
 	case BookingRejected:
 		title = "Booking Rejected"
-		body = fmt.Sprintf("Your booking #%d has been rejected. ", bookingID)
+		body = fmt.Sprintf("Your booking (ID: %s) has been rejected. ", bookingID)
 	case BookingCanceled:
 		title = "Booking Cancelled"
-		body = fmt.Sprintf("Your booking #%d has been cancelled", bookingID)
+		body = fmt.Sprintf("Your booking (ID: %s) has been cancelled", bookingID)
 	default:
 		title = "Booking Update"
-		body = fmt.Sprintf("Your booking #%d has an update. ", bookingID)
+		body = fmt.Sprintf("Your booking (ID: %s) has an update. ", bookingID)
 	}
 
 	// Prepare Expo messages
@@ -62,7 +62,7 @@ func SendBookingNotification(ctx context.Context, push PushSender, store store.S
 			Data: map[string]string{
 				"type":      "booking",
 				"event":     string(event),
-				"bookingId": fmt.Sprintf("%d", bookingID),
+				"bookingId": bookingID,
 				"screen":    "user-bookings-screen", // / is already at client router.push(`/${data.screen}`);
 			},
 		}

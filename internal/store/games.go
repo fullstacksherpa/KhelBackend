@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 
 	"errors"
 	"fmt"
@@ -176,6 +177,21 @@ func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
 	}
 
 	return game.ID, nil
+}
+
+func (s *GameStore) GetAdminID(ctx context.Context, gameID int64) (int64, error) {
+	query := `SELECT admin_id FROM games WHERE id = $1`
+
+	var adminID int64
+
+	err := s.db.QueryRow(ctx, query, gameID).Scan(&adminID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("game not found or deleted: %w", ErrNotFound)
+		}
+		return 0, fmt.Errorf("failed to get admin ID: %w", err)
+	}
+	return adminID, nil
 }
 
 func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error) {
@@ -435,6 +451,47 @@ func (s *GameStore) GetPlayerCount(ctx context.Context, gameID int) (int, error)
 		return 0, fmt.Errorf("error getting player count: %w", err)
 	}
 	return count, nil
+}
+
+// GetAllGamePlayerIDs retrieves all player IDs for a specific game
+func (s *GameStore) GetAllGamePlayerIDs(ctx context.Context, gameID int64) ([]int64, error) {
+	query := `
+		SELECT 
+			user_id
+		FROM 
+			game_players 
+		WHERE 
+			game_id = $1
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	rows, err := s.db.Query(ctx, query, gameID)
+	if err != nil {
+		return nil, fmt.Errorf("error querying game player IDs: %w", err)
+	}
+	defer rows.Close()
+
+	playerIDs := make([]int64, 0)
+	for rows.Next() {
+		var playerID int64
+		err := rows.Scan(&playerID)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning player ID: %w", err)
+		}
+		playerIDs = append(playerIDs, playerID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over rows: %w", err)
+	}
+
+	if len(playerIDs) == 0 {
+		return nil, ErrNotFound
+	}
+
+	return playerIDs, nil
 }
 
 func (s *GameStore) GetGamePlayers(ctx context.Context, gameID int64) ([]*User, error) {
@@ -912,6 +969,7 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
 // GetUpcomingGamesByUser returns all active games the user has joined
 // whose start_time is in the future, ordered soonest-first.
 func (s *GameStore) GetUpcomingGamesByUser(ctx context.Context, userID int64) ([]GameSummary, error) {
+
 	const query = `
 SELECT 
     g.id                AS game_id,

@@ -390,12 +390,7 @@ const docTemplate = `{
         },
         "/games/get-games": {
             "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Returns a list of games based on filters such as sport type, game level, venue, booking status, location, time range, and status.",
+                "description": "Returns a list of games. Authentication is optional; if an API key is provided, user's shortlisted games will be included.",
                 "consumes": [
                     "application/json"
                 ],
@@ -602,11 +597,6 @@ const docTemplate = `{
         },
         "/games/{gameID}": {
             "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
                 "description": "Returns detailed information for a specific game including venue details and player images",
                 "consumes": [
                     "application/json"
@@ -882,11 +872,6 @@ const docTemplate = `{
         },
         "/games/{gameID}/qa": {
             "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
                 "description": "Get all questions with replies for a game",
                 "consumes": [
                     "application/json"
@@ -1762,7 +1747,10 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.UserBooking"
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/main.UserBookingResponse"
+                                }
                             }
                         }
                     },
@@ -2730,7 +2718,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Booking created successfully",
                         "schema": {
-                            "$ref": "#/definitions/store.Booking"
+                            "$ref": "#/definitions/main.BookingResponse"
                         }
                     },
                     "400": {
@@ -2788,7 +2776,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Booking created successfully",
                         "schema": {
-                            "$ref": "#/definitions/store.Booking"
+                            "$ref": "#/definitions/main.BookingResponse"
                         }
                     },
                     "400": {
@@ -3052,7 +3040,10 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.PendingBooking"
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/main.PendingBookingResponse"
+                                }
                             }
                         }
                     },
@@ -3555,11 +3546,6 @@ const docTemplate = `{
         },
         "/venues/{venueID}/reviews": {
             "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
                 "description": "Retrieves all reviews for a specific venue along with the total count and average rating.",
                 "consumes": [
                     "application/json"
@@ -3750,7 +3736,10 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.ScheduledBooking"
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/main.ScheduledBookingResponse"
+                                }
                             }
                         }
                     },
@@ -3840,6 +3829,47 @@ const docTemplate = `{
                 },
                 "start_time": {
                     "type": "string"
+                }
+            }
+        },
+        "main.BookingResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "customer_phone": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total_price": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "venue_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -4084,6 +4114,40 @@ const docTemplate = `{
                 }
             }
         },
+        "main.PendingBookingResponse": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "description": "now encoded string",
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "requested_at": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_image": {
+                    "description": "nullable",
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_number": {
+                    "type": "string"
+                }
+            }
+        },
         "main.PlayerResponse": {
             "type": "object",
             "properties": {
@@ -4225,6 +4289,50 @@ const docTemplate = `{
         "main.SavePushTokenRequest": {
             "type": "object"
         },
+        "main.ScheduledBookingResponse": {
+            "type": "object",
+            "properties": {
+                "accepted_at": {
+                    "type": "string"
+                },
+                "booking_id": {
+                    "type": "string"
+                },
+                "customer_name": {
+                    "description": "optional",
+                    "type": "string"
+                },
+                "customer_phone": {
+                    "description": "optional",
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "note": {
+                    "description": "optional",
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_image": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_number": {
+                    "type": "string"
+                }
+            }
+        },
         "main.TokenResponse": {
             "type": "object",
             "properties": {
@@ -4257,6 +4365,39 @@ const docTemplate = `{
                 },
                 "start_time": {
                     "description": "Format \"15:04:05\"",
+                    "type": "string"
+                }
+            }
+        },
+        "main.UserBookingResponse": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "description": "encoded",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total_price": {
+                    "type": "integer"
+                },
+                "venue_address": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                },
+                "venue_name": {
                     "type": "string"
                 }
             }
@@ -4431,50 +4572,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "store.Booking": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "customer_name": {
-                    "description": "optional",
-                    "type": "string"
-                },
-                "customer_phone": {
-                    "description": "optional",
-                    "type": "string"
-                },
-                "end_time": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "note": {
-                    "description": "optional",
-                    "type": "string"
-                },
-                "start_time": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "total_price": {
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                },
-                "venue_id": {
                     "type": "integer"
                 }
             }
@@ -4742,39 +4839,6 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "venue_name": {
-                    "type": "string"
-                }
-            }
-        },
-        "store.PendingBooking": {
-            "type": "object",
-            "properties": {
-                "booking_id": {
-                    "type": "integer"
-                },
-                "end_time": {
-                    "type": "string"
-                },
-                "price": {
-                    "type": "integer"
-                },
-                "requested_at": {
-                    "type": "string"
-                },
-                "start_time": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                },
-                "user_image": {
-                    "description": "nullable",
-                    "type": "string"
-                },
-                "user_name": {
-                    "type": "string"
-                },
-                "user_number": {
                     "type": "string"
                 }
             }
@@ -5060,38 +5124,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "store.UserBooking": {
-            "type": "object",
-            "properties": {
-                "booking_id": {
-                    "type": "integer"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "end_time": {
-                    "type": "string"
-                },
-                "start_time": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "total_price": {
-                    "type": "integer"
-                },
-                "venue_address": {
-                    "type": "string"
-                },
-                "venue_id": {
-                    "type": "integer"
-                },
-                "venue_name": {
                     "type": "string"
                 }
             }

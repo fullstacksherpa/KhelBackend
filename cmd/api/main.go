@@ -20,6 +20,7 @@ import (
 	"github.com/9ssi7/exponent"
 	"github.com/cloudinary/cloudinary-go/v2"
 	_ "github.com/lib/pq"
+	"github.com/speps/go-hashids/v2"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -53,7 +54,7 @@ func LoadRateLimiterConfig() ratelimiter.Config {
 
 	return ratelimiter.Config{
 		RequestsPerTimeFrame: requestsPerTimeFrame,
-		TimeFrame:            5 * time.Second,
+		TimeFrame:            1 * time.Minute,
 		Enabled:              enabled,
 	}
 }
@@ -80,7 +81,7 @@ func NewLogger() (*zap.SugaredLogger, error) {
 	return logger.Sugar(), nil
 }
 
-var version = "1.6.0"
+var version = "1.7.0"
 
 //	@title			Khel API
 //	@description	API for Khel, a complete sport application.
@@ -104,7 +105,16 @@ func main() {
 	}
 	// envFile := fmt.Sprintf(".env.%s", env)
 	// godotenv.Load(envFile)
-	fmt.Println("Running in", env, "mode")
+
+	hashSalt := os.Getenv("HASHIDS_SALT")
+	hd := hashids.NewData()
+	hd.Salt = hashSalt
+	hd.MinLength = 8
+	h, err := hashids.NewWithData(hd)
+	if err != nil {
+		log.Fatal("Failed to initialize HashID:", err)
+	}
+
 	// Retrieve and convert maxOpenConns
 	maxOpenConnsStr := os.Getenv("DB_MAX_OPEN_CONNS")
 	maxOpenConns, err := strconv.Atoi(maxOpenConnsStr)
@@ -223,6 +233,7 @@ func main() {
 		authenticator: jwtAuthenticator,
 		rateLimiter:   rateLimiter,
 		push:          sender,
+		hashID:        h,
 	}
 
 	//Metrics collected http://localhost:8080/v1/debug/vars

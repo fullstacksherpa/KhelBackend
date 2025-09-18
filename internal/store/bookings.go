@@ -197,7 +197,7 @@ func (s *BookingStore) GetBookingsForDate(ctx context.Context, venueID int64, da
 }
 
 // CreateBooking inserts a booking record into the database.
-func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) error {
+func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) (int64, error) {
 	query := `
         INSERT INTO bookings (
             venue_id, user_id, start_time, end_time, total_price, status,
@@ -205,7 +205,7 @@ func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) erro
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id, created_at, updated_at
     `
-	return s.db.QueryRow(ctx, query,
+	err := s.db.QueryRow(ctx, query,
 		booking.VenueID,
 		booking.UserID,
 		booking.StartTime,
@@ -216,6 +216,10 @@ func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) erro
 		booking.CustomerPhone,
 		booking.Note,
 	).Scan(&booking.ID, &booking.CreatedAt, &booking.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return booking.ID, nil
 }
 
 // UpdatePricing updates a pricing slot in the database.

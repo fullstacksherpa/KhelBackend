@@ -89,7 +89,6 @@ func (app *application) createVenueReviewHandler(w http.ResponseWriter, r *http.
 //	@Success		200		{object}	map[string]interface{}	"Reviews, total review count, and average rating"
 //	@Failure		400		{object}	error					"Bad Request: Invalid venue ID"
 //	@Failure		500		{object}	error					"Internal Server Error"
-//	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/reviews [get]
 func (app *application) getVenueReviewsHandler(w http.ResponseWriter, r *http.Request) {
 	venueID := chi.URLParam(r, "venueID")

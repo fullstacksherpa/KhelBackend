@@ -5,11 +5,13 @@ services:
   reverse-proxy:
     image: traefik:v3.4
     command:
-      - "--providers.docker" # Enable Docker provider
+      - "--providers.docker" # Enable Docker provider i.e --providers.docker lets Traefik read labels from Docker containers and auto-configure routes.
       - "--providers.docker.exposedbydefault=false" # Only expose labeled containers
       - "--entryPoints.web.address=:80" # HTTP entry point
       - "--entryPoints.websecure.address=:443" # HTTPS entry point
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true" # ACME TLS challenge
+      - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=digitalocean"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.delaybeforecheck=10"
       - "--certificatesresolvers.myresolver.acme.email=ongchen10sherpa@gmail.com" # Let's Encrypt email
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json" # Cert storage
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure" # HTTP→HTTPS redirect
@@ -28,8 +30,10 @@ services:
       - "traefik.http.routers.traefik.middlewares=dashboard-auth"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$2y$05$2hQXRr9Rpo8aJs0ERvDMauAwYEHPh7eSvTY.CTzLyBYKr.mkGInKO"
     restart: always
+    env_file:
+      - /opt/khel/.env.prod # Production environment variables
     volumes:
-      - letsencrypt:/letsencrypt # Persistent cert storage
+      - /opt/khel/letsencrypt:/letsencrypt # Persistent cert storage
       - /var/run/docker.sock:/var/run/docker.sock:ro # Read-only Docker socket
 
   # ================================
@@ -63,7 +67,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"] # Health endpoint
-      interval: 30s # Check every 30 seconds
+      interval: 120s # Check every 30 seconds
       timeout: 5s # Timeout after 5 seconds
       retries: 3 # Retry 3 times before marking unhealthy
       start_period: 20s # Wait 20s before first check
@@ -90,7 +94,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"] # Health endpoint
-      interval: 30s # Check every 30 seconds
+      interval: 120s # Check every 30 seconds
       timeout: 5s # Timeout after 5 seconds
       retries: 3 # Retry 3 times before marking unhealthy
       start_period: 20s # Wait 20s before first check

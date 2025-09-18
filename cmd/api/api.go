@@ -22,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/speps/go-hashids/v2"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
 )
@@ -35,6 +36,7 @@ type application struct {
 	authenticator auth.Authenticator
 	rateLimiter   ratelimiter.Limiter
 	push          *notifications.ExpoAdapter
+	hashID        *hashids.HashID
 }
 
 type config struct {
@@ -116,10 +118,13 @@ func (app *application) mount() http.Handler {
 			r.Get("/", app.getAllAppReviewsHandler)
 		})
 
+		r.With(app.optionalAuth).Get("/venues/list-venues", app.listVenuesHandler)
+
+		r.With(app.optionalAuth).Get("/venues/{venueID}/reviews", app.getVenueReviewsHandler)
 		r.Route("/venues", func(r chi.Router) {
 
 			r.Use(app.AuthTokenMiddleware)
-			r.Get("/list-venues", app.listVenuesHandler)
+
 			r.Get("/favorites", app.listFavoritesHandler)
 			r.Get("/{venueID}/available-times", app.availableTimesHandler)
 			r.Get("/is-venue-owner", app.isVenueOwnerHandler)
@@ -127,7 +132,7 @@ func (app *application) mount() http.Handler {
 			r.Post("/{venueID}/reviews", app.createVenueReviewHandler)
 			r.Post("/{venueID}/cancel-bookings/{bookingID}", app.cancelBookingHandler)
 			r.Post("/{venueID}/bookings", app.bookVenueHandler)
-			r.Get("/{venueID}/reviews", app.getVenueReviewsHandler)
+
 			r.Post("/{venueID}/favorite", app.addFavoriteHandler)      // Add favorite
 			r.Delete("/{venueID}/favorite", app.removeFavoriteHandler) // Remove favorite
 
@@ -179,16 +184,28 @@ func (app *application) mount() http.Handler {
 			})
 		})
 
+		r.With(app.optionalAuth).Get("/games/get-games", app.getGamesHandler)
+
+		r.With(app.optionalAuth).Get("/games/{venueID}/upcoming", app.getUpcomingGamesByVenueHandler)
+
 		r.Route("/games", func(r chi.Router) {
-			r.Use(app.AuthTokenMiddleware)
-			r.Get("/get-games", app.getGamesHandler)
-			r.Get("/get-upcoming", app.getUpcomingGamesForUser)
-			r.Get("/shortlist", app.listShortlistedGamesHandler)
-			r.Post("/create", app.createGameHandler)
-			r.Get("/{venueID}/upcoming", app.getUpcomingGamesByVenueHandler)
+			// Routes requiring authentication
+			r.Group(func(r chi.Router) {
+				r.Use(app.AuthTokenMiddleware)
+				r.Get("/get-upcoming", app.getUpcomingGamesForUser)
+				r.Get("/shortlist", app.listShortlistedGamesHandler)
+				r.Post("/create", app.createGameHandler)
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(app.optionalAuth)
+				r.Get("/games/{gameID}", app.getGameDetailsHandler)
+				r.Get("/games/{gameID}/qa", app.getGameQAHandler)
+
+			})
+
 			r.Route("/{gameID}", func(r chi.Router) {
-				r.Get("/qa", app.getGameQAHandler)
-				r.Get("/", app.getGameDetailsHandler)
+				r.Use(app.AuthTokenMiddleware)
 				r.Post("/shortlist", app.addShortlistedGameHandler)      // Add game to shortlist
 				r.Delete("/shortlist", app.removeShortlistedGameHandler) // Remove game from shortlist
 				r.With(app.CheckAdmin).Post("/assign-assistant/{playerID}", app.AssignAssistantHandler)
@@ -214,8 +231,6 @@ func (app *application) mount() http.Handler {
 			})
 		})
 
-		//secure routes
-		//TODO: Add with(authtokenmiddleware)
 		r.Post("/authentication/refresh", app.refreshTokenHandler)
 		r.Post("/authentication/reset-password", app.requestResetPasswordHandler)
 		r.Patch("/authentication/reset-password", app.resetPasswordHandler)

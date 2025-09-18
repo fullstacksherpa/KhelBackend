@@ -87,11 +87,63 @@ func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 		ctx := r.Context()
 
 		user, err := app.store.Users.GetByID(ctx, userID)
-		if err != nil {
-			app.unauthorizedErrorResponse(w, r, err)
+		if err != nil || user == nil {
+			app.unauthorizedErrorResponse(w, r, fmt.Errorf("user not found"))
 			return
 		}
 
+		ctx = context.WithValue(ctx, userCtx, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (app *application) optionalAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+
+		// If no authorization header, just continue without user
+		if strings.TrimSpace(authHeader) == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Validate the authorization header format
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			// For optional auth, we just continue without user instead of returning error
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		token := parts[1]
+		jwtToken, err := app.authenticator.ValidateAccessToken(token)
+		if err != nil {
+			// Token is invalid, but since this is optional auth, just continue
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		claims, ok := jwtToken.Claims.(jwt.MapClaims)
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		userID, err := strconv.ParseInt(fmt.Sprintf("%.f", claims["sub"]), 10, 64)
+		if err != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		ctx := r.Context()
+		user, err := app.store.Users.GetByID(ctx, userID)
+		if err != nil {
+			// User not found or other error, but continue without user
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// If we successfully got the user, add to context
 		ctx = context.WithValue(ctx, userCtx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

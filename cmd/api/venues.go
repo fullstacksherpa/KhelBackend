@@ -305,10 +305,15 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 
 	var favMap map[int64]struct{}
 	user := getUserFromContext(r)
-	favMap, err = app.store.FavoriteVenues.GetFavoriteVenueIDsByUser(r.Context(), user.ID)
-	if err != nil {
-		app.internalServerError(w, r, err)
-		return
+
+	if user != nil {
+		favMap, err = app.store.FavoriteVenues.GetFavoriteVenueIDsByUser(r.Context(), user.ID)
+		if err != nil {
+			app.internalServerError(w, r, err)
+			return
+		}
+	} else {
+		favMap = make(map[int64]struct{}) // empty map for non-auth users
 	}
 
 	// Convert to response format

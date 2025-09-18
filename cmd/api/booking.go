@@ -18,6 +18,130 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+type UserBookingResponse struct {
+	BookingID    string    `json:"booking_id"` // encoded
+	VenueID      int64     `json:"venue_id"`
+	VenueName    string    `json:"venue_name"`
+	VenueAddress string    `json:"venue_address"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+	TotalPrice   int       `json:"total_price"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+type BookingResponse struct {
+	ID            string    `json:"id"`
+	VenueID       int64     `json:"venue_id"`
+	UserID        int64     `json:"user_id"`
+	StartTime     time.Time `json:"start_time"`
+	EndTime       time.Time `json:"end_time"`
+	TotalPrice    int       `json:"total_price"`
+	Status        string    `json:"status"`
+	CustomerName  *string   `json:"customer_name,omitempty"`
+	CustomerPhone *string   `json:"customer_phone,omitempty"`
+	Note          *string   `json:"note,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type PendingBookingResponse struct {
+	BookingID    string    `json:"booking_id"` // now encoded string
+	UserID       int64     `json:"user_id"`
+	UserName     string    `json:"user_name"`
+	UserImageURL *string   `json:"user_image"` // nullable
+	UserPhone    string    `json:"user_number"`
+	Price        int       `json:"price"`
+	RequestedAt  time.Time `json:"requested_at"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+}
+
+type ScheduledBookingResponse struct {
+	BookingID     string    `json:"booking_id"`
+	UserID        int64     `json:"user_id"`
+	UserName      string    `json:"user_name"`
+	UserImageURL  *string   `json:"user_image"`
+	UserPhone     string    `json:"user_number"`
+	Price         int       `json:"price"`
+	AcceptedAt    time.Time `json:"accepted_at"`
+	StartTime     time.Time `json:"start_time"`
+	EndTime       time.Time `json:"end_time"`
+	CustomerName  *string   `json:"customer_name,omitempty" swaggertype:"string"`  // optional
+	CustomerPhone *string   `json:"customer_phone,omitempty" swaggertype:"string"` // optional
+	Note          *string   `json:"note,omitempty" swaggertype:"string"`           // optional
+}
+
+type CanceledBookingResponse struct {
+	BookingID    string    `json:"booking_id"`
+	UserID       int64     `json:"user_id"`
+	UserName     string    `json:"user_name"`
+	UserImageURL *string   `json:"user_image"` // nullable
+	UserPhone    string    `json:"user_number"`
+	Price        int       `json:"price"`
+	RequestedAt  time.Time `json:"requested_at"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
+}
+
+func (app *application) EncodeBookingID(id int64) string {
+	// Check if the int64 fits into int
+	if id > int64(^uint(0)>>1) || id < int64(^int(^uint(0)>>1)) {
+		app.logger.Errorw("Booking ID too large to encode", "id", id)
+		return ""
+	}
+
+	hash, err := app.hashID.Encode([]int{int(id)})
+	if err != nil {
+		app.logger.Errorw("Failed to encode booking ID", "id", id, "error", err)
+		return ""
+	}
+	return hash
+}
+
+func (app *application) DecodeBookingHash(hash string) (int64, error) {
+	ids, err := app.hashID.DecodeWithError(hash)
+	if err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, fmt.Errorf("no ID found in hash")
+	}
+	return int64(ids[0]), nil
+}
+
+// parseBookingParam tries to decode `param` as hash; if that fails, tries numeric parse.
+// Returns bookingID (int64) or error.
+func (app *application) parseBookingParam(param string) (int64, error) {
+	// try decode as hash first
+	if id, err := app.DecodeBookingHash(param); err == nil && id != 0 {
+		return id, nil
+	}
+
+	// fallback: parse numeric id
+	if numeric, err := strconv.ParseInt(param, 10, 64); err == nil {
+		return numeric, nil
+	}
+
+	return 0, fmt.Errorf("invalid booking id: %s", param)
+}
+
+func (app *application) bookingToResponse(b *store.Booking) BookingResponse {
+	return BookingResponse{
+		ID:            app.EncodeBookingID(b.ID),
+		VenueID:       b.VenueID,
+		UserID:        b.UserID,
+		StartTime:     b.StartTime,
+		EndTime:       b.EndTime,
+		TotalPrice:    b.TotalPrice,
+		Status:        b.Status,
+		CustomerName:  b.CustomerName,
+		CustomerPhone: b.CustomerPhone,
+		Note:          b.Note,
+		CreatedAt:     b.CreatedAt,
+		UpdatedAt:     b.UpdatedAt,
+	}
+}
+
 // AvailableTimeSlot represents a free time interval for booking.
 type AvailableTimeSlot struct {
 	StartTime    time.Time `json:"start_time"`
@@ -194,7 +318,7 @@ type BookVenuePayload struct {
 //	@Produce		json
 //	@Param			venueID	path		int					true	"Venue ID"
 //	@Param			payload	body		BookVenuePayload	true	"Booking details payload"
-//	@Success		201		{object}	store.Booking		"Booking created successfully"
+//	@Success		201		{object}	BookingResponse		"Booking created successfully"
 //	@Failure		400		{object}	error				"Bad Request: Invalid input"
 //	@Failure		409		{object}	error				"Conflict: Time slot is already booked"
 //	@Failure		500		{object}	error				"Internal Server Error: Could not create booking"
@@ -294,7 +418,9 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 		TotalPrice: totalPrice,
 		Status:     "pending",
 	}
-	if err := app.store.Bookings.CreateBooking(r.Context(), booking); err != nil {
+
+	bookingID, err := app.store.Bookings.CreateBooking(r.Context(), booking)
+	if err != nil {
 		log.Printf("CreateBooking failed: %v", err)
 		http.Error(w, "Error creating booking", http.StatusInternalServerError)
 		return
@@ -315,7 +441,7 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 			app.store,
 			ownerID, //owner is the one receiving notification
 			notifications.BookingCreated,
-			444,
+			app.EncodeBookingID(bookingID),
 		)
 		if err != nil {
 			fmt.Printf("❌ Failed to send booking created notification: %v\n", err)
@@ -323,8 +449,9 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	}()
 
 	w.Header().Set("Content-Type", "application/json")
+	resp := app.bookingToResponse(booking)
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(booking)
+	json.NewEncoder(w).Encode(resp)
 }
 
 // intervalsOverlap checks whether two intervals overlap.
@@ -351,7 +478,7 @@ type ManualBookingPayload struct {
 //	@Produce		json
 //	@Param			venueID	path		int						true	"Venue ID"
 //	@Param			payload	body		ManualBookingPayload	true	"Manual booking payload"
-//	@Success		201		{object}	store.Booking			"Booking created successfully"
+//	@Success		201		{object}	BookingResponse			"Booking created successfully"
 //	@Failure		400		{object}	error					"Bad Request: Invalid input or validation failed"
 //	@Failure		401		{object}	error					"Unauthorized: Missing or invalid credentials"
 //	@Failure		409		{object}	error					"Conflict: Time slot is already booked"
@@ -370,9 +497,6 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 		app.badRequestResponse(w, r, err)
 		return
 	}
-
-	fmt.Printf("⏰Start_time manualBooking: %s\n", payload.StartTime)
-	fmt.Printf("⏰End_time manualBooking: %s\n", payload.EndTime)
 
 	if err := Validate.Struct(payload); err != nil {
 		app.badRequestResponse(w, r, err)
@@ -439,12 +563,14 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 		Note:          notePtr,
 	}
 
-	if err := app.store.Bookings.CreateBooking(r.Context(), booking); err != nil {
+	if _, err := app.store.Bookings.CreateBooking(r.Context(), booking); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	app.jsonResponse(w, http.StatusCreated, booking)
+	resp := app.bookingToResponse(booking)
+
+	app.jsonResponse(w, http.StatusCreated, resp)
 }
 
 // GetVenuePricing godoc
@@ -690,11 +816,11 @@ func (app *application) createVenuePricingHandler(w http.ResponseWriter, r *http
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID	path		int						true	"Venue ID"
-//	@Param			date	query		string					true	"Date in YYYY-MM-DD format"
-//	@Success		200		{array}		store.PendingBooking	"Pending bookings"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Param			venueID	path		int							true	"Venue ID"
+//	@Param			date	query		string						true	"Date in YYYY-MM-DD format"
+//	@Success		200		{array}		[]PendingBookingResponse	"Pending bookings"
+//	@Failure		400		{object}	error						"Bad Request"
+//	@Failure		500		{object}	error						"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/pending-bookings [get]
 func (app *application) getPendingBookingsHandler(w http.ResponseWriter, r *http.Request) {
@@ -724,9 +850,23 @@ func (app *application) getPendingBookingsHandler(w http.ResponseWriter, r *http
 		app.internalServerError(w, r, err)
 		return
 	}
+	// encode booking IDs
+	var resp []PendingBookingResponse
+	for _, b := range bookings {
+		resp = append(resp, PendingBookingResponse{
+			BookingID:    app.EncodeBookingID(b.BookingID),
+			UserID:       b.UserID,
+			UserName:     b.UserName,
+			UserImageURL: b.UserImageURL,
+			UserPhone:    b.UserPhone,
+			Price:        b.Price,
+			RequestedAt:  b.RequestedAt,
+			StartTime:    b.StartTime,
+			EndTime:      b.EndTime,
+		})
+	}
 
-	// 4) respond JSON
-	app.jsonResponse(w, http.StatusOK, bookings)
+	app.jsonResponse(w, http.StatusOK, resp)
 }
 
 // getScheduledBookingsHandler godoc
@@ -736,11 +876,11 @@ func (app *application) getPendingBookingsHandler(w http.ResponseWriter, r *http
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID	path		int						true	"Venue ID"
-//	@Param			date	query		string					true	"Date in YYYY-MM-DD format"
-//	@Success		200		{array}		store.ScheduledBooking	"Scheduled bookings"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Param			venueID	path		int							true	"Venue ID"
+//	@Param			date	query		string						true	"Date in YYYY-MM-DD format"
+//	@Success		200		{array}		[]ScheduledBookingResponse	"Scheduled bookings"
+//	@Failure		400		{object}	error						"Bad Request"
+//	@Failure		500		{object}	error						"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/scheduled-bookings [get]
 func (app *application) getScheduledBookingsHandler(w http.ResponseWriter, r *http.Request) {
@@ -776,8 +916,26 @@ func (app *application) getScheduledBookingsHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// 4) respond JSON
-	app.jsonResponse(w, http.StatusOK, bookings)
+	// encode booking IDs
+	var resp []ScheduledBookingResponse
+	for _, b := range bookings {
+		resp = append(resp, ScheduledBookingResponse{
+			BookingID:     app.EncodeBookingID(b.BookingID),
+			UserID:        b.UserID,
+			UserName:      b.UserName,
+			UserImageURL:  b.UserImageURL,
+			UserPhone:     b.UserPhone,
+			Price:         b.Price,
+			AcceptedAt:    b.AcceptedAt,
+			StartTime:     b.StartTime,
+			EndTime:       b.EndTime,
+			CustomerName:  b.CustomerName,
+			CustomerPhone: b.CustomerPhone,
+			Note:          b.Note,
+		})
+	}
+
+	app.jsonResponse(w, http.StatusOK, resp)
 }
 
 // getCanceledBookingsHandler godoc
@@ -827,8 +985,35 @@ func (app *application) getCanceledBookingsHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// 4) respond JSON
-	app.jsonResponse(w, http.StatusOK, bookings)
+	type CanceledBookingResponse struct {
+		BookingID    string    `json:"booking_id"`
+		UserID       int64     `json:"user_id"`
+		UserName     string    `json:"user_name"`
+		UserImageURL *string   `json:"user_image"` // nullable
+		UserPhone    string    `json:"user_number"`
+		Price        int       `json:"price"`
+		RequestedAt  time.Time `json:"requested_at"`
+		StartTime    time.Time `json:"start_time"`
+		EndTime      time.Time `json:"end_time"`
+	}
+
+	// encode booking IDs
+	var resp []CanceledBookingResponse
+	for _, b := range bookings {
+		resp = append(resp, CanceledBookingResponse{
+			BookingID:    app.EncodeBookingID(b.BookingID),
+			UserID:       b.UserID,
+			UserName:     b.UserName,
+			UserImageURL: b.UserImageURL,
+			UserPhone:    b.UserPhone,
+			Price:        b.Price,
+			RequestedAt:  b.RequestedAt,
+			StartTime:    b.StartTime,
+			EndTime:      b.EndTime,
+		})
+	}
+
+	app.jsonResponse(w, http.StatusOK, resp)
 }
 
 // acceptBookingHandler godoc
@@ -852,9 +1037,10 @@ func (app *application) acceptBookingHandler(w http.ResponseWriter, r *http.Requ
 		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
 		return
 	}
-	bid, err := strconv.ParseInt(chi.URLParam(r, "bookingID"), 10, 64)
+	raw := chi.URLParam(r, "bookingID")
+	bid, err := app.parseBookingParam(raw)
 	if err != nil {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid bookingID: %w", err))
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -890,7 +1076,7 @@ func (app *application) acceptBookingHandler(w http.ResponseWriter, r *http.Requ
 			app.store,
 			booking.UserID,
 			notifications.BookingAccepted,
-			booking.ID,
+			app.EncodeBookingID(booking.ID),
 		)
 		if err != nil {
 			fmt.Printf("❌ Failed to send booking accepted notification: %v\n", err)
@@ -921,9 +1107,10 @@ func (app *application) rejectBookingHandler(w http.ResponseWriter, r *http.Requ
 		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
 		return
 	}
-	bid, err := strconv.ParseInt(chi.URLParam(r, "bookingID"), 10, 64)
+	raw := chi.URLParam(r, "bookingID")
+	bid, err := app.parseBookingParam(raw)
 	if err != nil {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid bookingID: %w", err))
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -952,7 +1139,7 @@ func (app *application) rejectBookingHandler(w http.ResponseWriter, r *http.Requ
 			app.store,
 			booking.UserID,
 			notifications.BookingRejected,
-			booking.ID,
+			app.EncodeBookingID(booking.ID),
 		)
 		if err != nil {
 			fmt.Printf("❌ Failed to send booking accepted notification: %v\n", err)
@@ -983,9 +1170,10 @@ func (app *application) cancelBookingHandler(w http.ResponseWriter, r *http.Requ
 		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID: %w", err))
 		return
 	}
-	bid, err := strconv.ParseInt(chi.URLParam(r, "bookingID"), 10, 64)
+	raw := chi.URLParam(r, "bookingID")
+	bid, err := app.parseBookingParam(raw)
 	if err != nil {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid bookingID: %w", err))
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -1032,7 +1220,7 @@ func (app *application) cancelBookingHandler(w http.ResponseWriter, r *http.Requ
 			app.store,
 			venueOwnerID,
 			notifications.BookingCanceled,
-			bid,
+			app.EncodeBookingID(bid),
 		)
 		if err != nil {
 			fmt.Printf("❌ Failed to send booking accepted notification: %v\n", err)
@@ -1052,7 +1240,7 @@ func (app *application) cancelBookingHandler(w http.ResponseWriter, r *http.Requ
 //	@Param			page	query		int		false	"Page number (1-based)"		default(1)	minimum(1)
 //	@Param			limit	query		int		false	"Items per page (max 50)"	default(7)	minimum(1)	maximum(50)
 //	@Param			status	query		string	false	"Filter by booking status"	Enums(confirmed, pending, rejected, done)
-//	@Success		200		{array}		store.UserBooking
+//	@Success		200		{array}		[]UserBookingResponse
 //	@Failure		400		{object}	error	"Bad Request"
 //	@Failure		401		{object}	error	"Unauthorized"
 //	@Failure		500		{object}	error	"Internal Server Error"
@@ -1093,5 +1281,21 @@ func (app *application) getBookingsByUserHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	app.jsonResponse(w, http.StatusOK, bookings)
+	// Map to response with encoded BookingID
+	var resp []UserBookingResponse
+	for _, b := range bookings {
+		resp = append(resp, UserBookingResponse{
+			BookingID:    app.EncodeBookingID(b.BookingID),
+			VenueID:      b.VenueID,
+			VenueName:    b.VenueName,
+			VenueAddress: b.VenueAddress,
+			StartTime:    b.StartTime,
+			EndTime:      b.EndTime,
+			TotalPrice:   b.TotalPrice,
+			Status:       b.Status,
+			CreatedAt:    b.CreatedAt,
+		})
+	}
+
+	app.jsonResponse(w, http.StatusOK, resp)
 }

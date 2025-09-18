@@ -67,6 +67,7 @@ type Storage struct {
 	Games interface {
 		GetGames(ctx context.Context, q GameFilterQuery) ([]GameSummary, error)
 		Create(ctx context.Context, game *Game) (int64, error)
+		GetAdminID(ctx context.Context, gameID int64) (int64, error)
 		GetGameByID(ctx context.Context, gameID int64) (*Game, error)
 		CheckRequestExist(ctx context.Context, gameID int64, userID int64) (bool, error)
 		AddToGameRequest(ctx context.Context, gameID int64, UserID int64) error
@@ -87,12 +88,13 @@ type Storage struct {
 		GetUpcomingGamesByVenue(ctx context.Context, venueID int64) ([]GameSummary, error)
 		GetUpcomingGamesByUser(ctx context.Context, userID int64) ([]GameSummary, error)
 		MarkCompletedGames() error
+		GetAllGamePlayerIDs(ctx context.Context, gameID int64) ([]int64, error)
 	}
 	Bookings interface {
 		GetBookingOwner(ctx context.Context, venueID, bookingID int64) (int64, error)
 		GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error)
 		GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error)
-		CreateBooking(ctx context.Context, booking *Booking) error
+		CreateBooking(ctx context.Context, booking *Booking) (int64, error)
 		UpdatePricing(ctx context.Context, p *PricingSlot) error
 		DeletePricingSlot(ctx context.Context, venueID, pricingID int64) error
 		CreatePricingSlotsBatch(ctx context.Context, slots []*PricingSlot) error
@@ -123,6 +125,7 @@ type Storage struct {
 	}
 	GameQA interface {
 		CreateQuestion(ctx context.Context, question *Question) error
+		GetUserIDByQuestionID(ctx context.Context, questionID int64) (int64, error)
 		GetQuestionsByGame(ctx context.Context, gameID int64) ([]Question, error)
 		CreateReply(ctx context.Context, reply *Reply) error
 		GetRepliesByQuestion(ctx context.Context, questionID int64) ([]Reply, error)

@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -63,11 +64,18 @@ func (app *application) extractPublicIDFromURL(photoURL string) (string, error) 
 
 // uploadToCloudinaryWithID uploads a file to Cloudinary using a custom public ID.
 func (app *application) uploadToCloudinaryWithID(file io.Reader, publicID string) (string, error) {
+
+	env := os.Getenv("APP_ENV")
+
+	folder := "testVenues"
+	if env == "prod" || env == "production" {
+		folder = "venues"
+	}
 	resp, err := app.cld.Upload.Upload(
 		context.Background(), // using a background context for external call
 		file,
 		uploader.UploadParams{
-			Folder:    "venues",
+			Folder:    folder,
 			PublicID:  publicID, // Set custom name (e.g., "venue_12_image_1")
 			Overwrite: api.Bool(false),
 		},

@@ -17,6 +17,33 @@ definitions:
     - end_time
     - start_time
     type: object
+  main.BookingResponse:
+    properties:
+      created_at:
+        type: string
+      customer_name:
+        type: string
+      customer_phone:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      total_price:
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+      venue_id:
+        type: integer
+    type: object
   main.BulkCreatePricingPayload:
     properties:
       slots:
@@ -192,6 +219,29 @@ definitions:
     - price
     - start_time
     type: object
+  main.PendingBookingResponse:
+    properties:
+      booking_id:
+        description: now encoded string
+        type: string
+      end_time:
+        type: string
+      price:
+        type: integer
+      requested_at:
+        type: string
+      start_time:
+        type: string
+      user_id:
+        type: integer
+      user_image:
+        description: nullable
+        type: string
+      user_name:
+        type: string
+      user_number:
+        type: string
+    type: object
   main.PlayerResponse:
     properties:
       first_name:
@@ -288,6 +338,36 @@ definitions:
     type: object
   main.SavePushTokenRequest:
     type: object
+  main.ScheduledBookingResponse:
+    properties:
+      accepted_at:
+        type: string
+      booking_id:
+        type: string
+      customer_name:
+        description: optional
+        type: string
+      customer_phone:
+        description: optional
+        type: string
+      end_time:
+        type: string
+      note:
+        description: optional
+        type: string
+      price:
+        type: integer
+      start_time:
+        type: string
+      user_id:
+        type: integer
+      user_image:
+        type: string
+      user_name:
+        type: string
+      user_number:
+        type: string
+    type: object
   main.TokenResponse:
     properties:
       access_token:
@@ -310,6 +390,28 @@ definitions:
         type: integer
       start_time:
         description: Format "15:04:05"
+        type: string
+    type: object
+  main.UserBookingResponse:
+    properties:
+      booking_id:
+        description: encoded
+        type: string
+      created_at:
+        type: string
+      end_time:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      total_price:
+        type: integer
+      venue_address:
+        type: string
+      venue_id:
+        type: integer
+      venue_name:
         type: string
     type: object
   main.UserWithToken:
@@ -426,36 +528,6 @@ definitions:
       rating:
         type: integer
       user_id:
-        type: integer
-    type: object
-  store.Booking:
-    properties:
-      created_at:
-        type: string
-      customer_name:
-        description: optional
-        type: string
-      customer_phone:
-        description: optional
-        type: string
-      end_time:
-        type: string
-      id:
-        type: integer
-      note:
-        description: optional
-        type: string
-      start_time:
-        type: string
-      status:
-        type: string
-      total_price:
-        type: integer
-      updated_at:
-        type: string
-      user_id:
-        type: integer
-      venue_id:
         type: integer
     type: object
   store.Game:
@@ -641,28 +713,6 @@ definitions:
         description: Venue longitude
         type: number
       venue_name:
-        type: string
-    type: object
-  store.PendingBooking:
-    properties:
-      booking_id:
-        type: integer
-      end_time:
-        type: string
-      price:
-        type: integer
-      requested_at:
-        type: string
-      start_time:
-        type: string
-      user_id:
-        type: integer
-      user_image:
-        description: nullable
-        type: string
-      user_name:
-        type: string
-      user_number:
         type: string
     type: object
   store.PricingSlot:
@@ -860,27 +910,6 @@ definitions:
       skill_level:
         type: string
       updated_at:
-        type: string
-    type: object
-  store.UserBooking:
-    properties:
-      booking_id:
-        type: integer
-      created_at:
-        type: string
-      end_time:
-        type: string
-      start_time:
-        type: string
-      status:
-        type: string
-      total_price:
-        type: integer
-      venue_address:
-        type: string
-      venue_id:
-        type: integer
-      venue_name:
         type: string
     type: object
   store.Venue:
@@ -1195,8 +1224,6 @@ paths:
         "500":
           description: Internal server error
           schema: {}
-      security:
-      - ApiKeyAuth: []
       summary: Get detailed game information
       tags:
       - Games
@@ -1381,8 +1408,6 @@ paths:
         "400":
           description: Bad Request
           schema: {}
-      security:
-      - ApiKeyAuth: []
       summary: Get all Q&A for a game
       tags:
       - Questions
@@ -1839,8 +1864,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Returns a list of games based on filters such as sport type, game
-        level, venue, booking status, location, time range, and status.
+      description: Returns a list of games. Authentication is optional; if an API
+        key is provided, user's shortlisted games will be included.
       parameters:
       - description: Sport type to filter games (e.g., basketball)
         in: query
@@ -1917,8 +1942,6 @@ paths:
         "500":
           description: Internal server error
           schema: {}
-      security:
-      - ApiKeyAuth: []
       summary: Retrieve a list of games
       tags:
       - Games
@@ -2176,7 +2199,9 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/store.UserBooking'
+              items:
+                $ref: '#/definitions/main.UserBookingResponse'
+              type: array
             type: array
         "400":
           description: Bad Request
@@ -2664,7 +2689,7 @@ paths:
         "201":
           description: Booking created successfully
           schema:
-            $ref: '#/definitions/store.Booking'
+            $ref: '#/definitions/main.BookingResponse'
         "400":
           description: 'Bad Request: Invalid input'
           schema: {}
@@ -2703,7 +2728,7 @@ paths:
         "201":
           description: Booking created successfully
           schema:
-            $ref: '#/definitions/store.Booking'
+            $ref: '#/definitions/main.BookingResponse'
         "400":
           description: 'Bad Request: Invalid input or validation failed'
           schema: {}
@@ -2879,7 +2904,9 @@ paths:
           description: Pending bookings
           schema:
             items:
-              $ref: '#/definitions/store.PendingBooking'
+              items:
+                $ref: '#/definitions/main.PendingBookingResponse'
+              type: array
             type: array
         "400":
           description: Bad Request
@@ -3245,8 +3272,6 @@ paths:
         "500":
           description: Internal Server Error
           schema: {}
-      security:
-      - ApiKeyAuth: []
       summary: Retrieve reviews for a venue
       tags:
       - Venue
@@ -3349,7 +3374,9 @@ paths:
           description: Scheduled bookings
           schema:
             items:
-              $ref: '#/definitions/store.ScheduledBooking'
+              items:
+                $ref: '#/definitions/main.ScheduledBookingResponse'
+              type: array
             type: array
         "400":
           description: Bad Request

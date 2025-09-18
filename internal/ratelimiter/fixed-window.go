@@ -13,10 +13,21 @@ type FixedWindowRateLimiter struct {
 }
 
 func NewFixedWindowLimiter(limit int, window time.Duration) *FixedWindowRateLimiter {
-	return &FixedWindowRateLimiter{
+	rl := &FixedWindowRateLimiter{
 		clients: make(map[string]int),
 		limit:   limit,
 		window:  window,
+	}
+	go rl.cleanup()
+	return rl
+}
+
+func (rl *FixedWindowRateLimiter) cleanup() {
+	ticker := time.NewTicker(rl.window)
+	for range ticker.C {
+		rl.Lock()
+		rl.clients = make(map[string]int) // reset all
+		rl.Unlock()
 	}
 }
 
