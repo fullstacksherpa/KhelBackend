@@ -63,20 +63,20 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 
 	// 4. Create the game
 	game := &store.Game{
-		SportType:   payload.SportType,
-		Price:       payload.Price,
-		Format:      payload.Format,
-		VenueID:     payload.VenueID,
-		AdminID:     user.ID, // Set the authenticated user as the game admin
-		MaxPlayers:  payload.MaxPlayers,
-		GameLevel:   payload.GameLevel,
-		StartTime:   payload.StartTime,
-		EndTime:     payload.EndTime,
-		Visibility:  payload.Visibility,
-		Instruction: payload.Instruction,
-		Status:      "active", // Default status
-		IsBooked:    false,    // Default value
-		MatchFull:   false,    // Default value
+		SportType:     payload.SportType,
+		Price:         payload.Price,
+		Format:        payload.Format,
+		VenueID:       payload.VenueID,
+		AdminID:       user.ID, // Set the authenticated user as the game admin
+		MaxPlayers:    payload.MaxPlayers,
+		GameLevel:     payload.GameLevel,
+		StartTime:     payload.StartTime,
+		EndTime:       payload.EndTime,
+		Visibility:    payload.Visibility,
+		Instruction:   payload.Instruction,
+		Status:        "active",  // Default status
+		BookingStatus: "pending", // Default value
+		MatchFull:     false,     // Default value
 	}
 
 	// 5. Save the game to the database
@@ -472,29 +472,31 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 //
 //	@Summary		Retrieve a list of games
 //
-// @Description Returns a list of games. Authentication is optional; if an API key is provided, user's shortlisted games will be included.
+//	@Description	Returns a list of games. Authentication is optional; if an API key is provided, user's shortlisted games will be included.
 //
 //	@Tags			Games
 //	@Accept			json
 //	@Produce		json
-//	@Param			sport_type	query		string				false	"Sport type to filter games (e.g., basketball)"
-//	@Param			game_level	query		string				false	"Game level (e.g., intermediate)"
-//	@Param			venue_id	query		int					false	"Venue ID to filter games"
-//	@Param			is_booked	query		boolean				false	"Filter games based on booking status"
-//	@Param			status		query		string				false	"Game status: active, cancelled, completed"
-//	@Param			lat			query		number				false	"User latitude for location filtering"
-//	@Param			lon			query		number				false	"User longitude for location filtering"
-//	@Param			radius		query		int					false	"Radius in kilometers for location-based filtering (0 for no filter)"
-//	@Param			start_after	query		string				false	"Filter games starting after this time (RFC3339 format)"
-//	@Param			end_before	query		string				false	"Filter games ending before this time (RFC3339 format)"
-//	@Param			min_price	query		int					false	"Minimum price"
-//	@Param			max_price	query		int					false	"Maximum price"
-//	@Param			limit		query		int					false	"Maximum number of results to return"
-//	@Param			offset		query		int					false	"Pagination offset"
-//	@Param			sort		query		string				false	"Sort order, either 'asc' or 'desc'"
-//	@Success		200			{object}	[]store.GameSummary	"List of games and GeoJSON features"
-//	@Failure		400			{object}	error				"Invalid request parameters"
-//	@Failure		500			{object}	error				"Internal server error"
+//	@Param			sport_type		query		string				false	"Sport type to filter games (e.g., basketball)"
+//	@Param			game_level		query		string				false	"Game level (e.g., intermediate)"
+//	@Param			venue_id		query		int					false	"Venue ID to filter games"
+//
+//	@Param			booking_status	query		string				false	"Filter games based on booking status (e.g., available, booked, pending)"
+//
+//	@Param			status			query		string				false	"Game status: active, cancelled, completed"
+//	@Param			lat				query		number				false	"User latitude for location filtering"
+//	@Param			lon				query		number				false	"User longitude for location filtering"
+//	@Param			radius			query		int					false	"Radius in kilometers for location-based filtering (0 for no filter)"
+//	@Param			start_after		query		string				false	"Filter games starting after this time (RFC3339 format)"
+//	@Param			end_before		query		string				false	"Filter games ending before this time (RFC3339 format)"
+//	@Param			min_price		query		int					false	"Minimum price"
+//	@Param			max_price		query		int					false	"Maximum price"
+//	@Param			limit			query		int					false	"Maximum number of results to return"
+//	@Param			offset			query		int					false	"Pagination offset"
+//	@Param			sort			query		string				false	"Sort order, either 'asc' or 'desc'"
+//	@Success		200				{object}	[]store.GameSummary	"List of games and GeoJSON features"
+//	@Failure		400				{object}	error				"Invalid request parameters"
+//	@Failure		500				{object}	error				"Internal server error"
 //	@Router			/games/get-games [get]
 func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) {
 	fq := store.GameFilterQuery{
@@ -689,6 +691,7 @@ func (app *application) getGameDetailsHandler(w http.ResponseWriter, r *http.Req
 
 	// Fetch game details
 	game, err := app.store.Games.GetGameDetailsWithID(r.Context(), gameID)
+
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			app.notFoundResponse(w, r, errors.New("game not found"))

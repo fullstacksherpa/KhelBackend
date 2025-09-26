@@ -8,14 +8,14 @@ import (
 )
 
 type GameFilterQuery struct {
-	Limit     int     `validate:"gte=1"`          // Maximum number of results to return
-	Offset    int     `validate:"gte=0"`          // Pagination offset
-	Sort      string  `validate:"oneof=asc desc"` // Sorting order for start_time
-	SportType string  // Filter by sport type (e.g., "basketball")
-	GameLevel string  // Filter by game level (e.g., "intermediate")
-	VenueID   int     // Filter by a specific venue id
-	IsBooked  *bool   // Filter based on booking status (nil = no filter)
-	Status    *string `validate:"omitempty,oneof=active cancelled completed"`
+	Limit         int            `validate:"gte=1"`          // Maximum number of results to return
+	Offset        int            `validate:"gte=0"`          // Pagination offset
+	Sort          string         `validate:"oneof=asc desc"` // Sorting order for start_time
+	SportType     string         // Filter by sport type (e.g., "basketball")
+	GameLevel     string         // Filter by game level (e.g., "intermediate")
+	VenueID       int            // Filter by a specific venue id
+	BookingStatus *BookingStatus // Filter based on booking status (nil = no filter)
+	Status        *string        `validate:"omitempty,oneof=active cancelled completed"`
 
 	// Location-based filtering
 	UserLat float64 // User's latitude for radius filter
@@ -51,12 +51,14 @@ func (q GameFilterQuery) Parse(r *http.Request) (GameFilterQuery, error) {
 		q.VenueID = venueID
 	}
 
-	if isBookedStr := params.Get("is_booked"); isBookedStr != "" {
-		isBooked, err := strconv.ParseBool(isBookedStr)
-		if err != nil {
-			return q, fmt.Errorf("invalid is_booked value: %w", err)
+	if status := params.Get("booking_status"); status != "" {
+		bs := BookingStatus(status) // convert string -> BookingStatus
+		switch bs {
+		case BookingPending, BookingRequested, BookingBooked, BookingRejected, BookingCancelled:
+			q.BookingStatus = &bs
+		default:
+			return q, fmt.Errorf("invalid booking_status value: %s", status)
 		}
-		q.IsBooked = &isBooked
 	}
 
 	if status := params.Get("status"); status != "" {

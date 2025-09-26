@@ -3,5 +3,9 @@
     "titleBar.inactiveBackground": "#220031",
     "titleBar.activeBackground": "#450362",
     "activityBar.border": "#450362"
+  },
+  "go.goroot": "",
+  "go.alternateTools": {
+    "go": "/opt/homebrew/bin/go"
   }
 }

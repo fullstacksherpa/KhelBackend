@@ -19,6 +19,7 @@ import (
 
 	"github.com/9ssi7/exponent"
 	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/speps/go-hashids/v2"
 
@@ -29,7 +30,7 @@ import (
 // LoadRateLimiterConfig retrieves rate limiter settings from environment variables
 func LoadRateLimiterConfig() ratelimiter.Config {
 	// Default values
-	defaultRequests := 200
+	defaultRequests := 300
 	defaultEnabled := false
 
 	// Retrieve request count with error handling
@@ -103,8 +104,8 @@ func main() {
 	if env == "" {
 		env = "development"
 	}
-	// envFile := fmt.Sprintf(".env.%s", env)
-	// godotenv.Load(envFile)
+	envFile := fmt.Sprintf(".env.%s", env)
+	godotenv.Load(envFile)
 
 	hashSalt := os.Getenv("HASHIDS_SALT")
 	hd := hashids.NewData()

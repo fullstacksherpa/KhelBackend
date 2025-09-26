@@ -143,6 +143,19 @@ type Storage struct {
 		GetTokensByUserIDs(ctx context.Context, userIDs []int64) (map[int64][]string, error)
 		PruneStaleTokens(ctx context.Context, olderThan time.Duration) error
 	}
+	Ads interface {
+		GetActiveAds(ctx context.Context) ([]Ad, error)
+		GetAllAds(ctx context.Context, limit, offset int) ([]Ad, int, error)
+		GetAdByID(ctx context.Context, id int64) (*Ad, error)
+		CreateAd(ctx context.Context, req CreateAdRequest) (*Ad, error)
+		UpdateAd(ctx context.Context, id int64, req UpdateAdRequest) (*Ad, error)
+		DeleteAd(ctx context.Context, id int64) error
+		ToggleAdStatus(ctx context.Context, id int64) (*Ad, error)
+		IncrementImpressions(ctx context.Context, id int64) error
+		IncrementClicks(ctx context.Context, id int64) error
+		GetAdsAnalytics(ctx context.Context) (*Analytics, error)
+		BulkUpdateDisplayOrder(ctx context.Context, updates []DisplayOrderUpdate) error
+	}
 }
 
 func NewStorage(db *pgxpool.Pool) Storage {
@@ -158,6 +171,7 @@ func NewStorage(db *pgxpool.Pool) Storage {
 		GameQA:           &QuestionStore{db},
 		AppReviews:       &AppReviewStore{db},
 		PushTokens:       &PushTokensStore{db},
+		Ads:              &AdsStore{db},
 	}
 }
 

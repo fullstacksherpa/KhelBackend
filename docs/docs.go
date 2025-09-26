@@ -421,9 +421,9 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "boolean",
-                        "description": "Filter games based on booking status",
-                        "name": "is_booked",
+                        "type": "string",
+                        "description": "Filter games based on booking status (e.g., available, booked, pending)",
+                        "name": "booking_status",
                         "in": "query"
                     },
                     {
@@ -4576,12 +4576,32 @@ const docTemplate = `{
                 }
             }
         },
+        "store.BookingStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "requested",
+                "booked",
+                "rejected",
+                "cancelled"
+            ],
+            "x-enum-varnames": [
+                "BookingPending",
+                "BookingRequested",
+                "BookingBooked",
+                "BookingRejected",
+                "BookingCancelled"
+            ]
+        },
         "store.Game": {
             "type": "object",
             "properties": {
                 "admin_id": {
                     "description": "Foreign key to users table (game admin)",
                     "type": "integer"
+                },
+                "booking_status": {
+                    "$ref": "#/definitions/store.BookingStatus"
                 },
                 "created_at": {
                     "description": "Timestamp when the game was created",
@@ -4606,10 +4626,6 @@ const docTemplate = `{
                 "instruction": {
                     "description": "Game instructions (nullable)",
                     "type": "string"
-                },
-                "is_booked": {
-                    "description": "Whether the game is booked",
-                    "type": "boolean"
                 },
                 "match_full": {
                     "description": "Whether the game is full",
@@ -4655,6 +4671,9 @@ const docTemplate = `{
                 "admin_id": {
                     "type": "integer"
                 },
+                "booking_status": {
+                    "$ref": "#/definitions/store.BookingStatus"
+                },
                 "current_player": {
                     "type": "integer"
                 },
@@ -4672,9 +4691,6 @@ const docTemplate = `{
                 },
                 "game_level": {
                     "type": "string"
-                },
-                "is_booked": {
-                    "type": "boolean"
                 },
                 "match_full": {
                     "type": "boolean"
@@ -4779,6 +4795,9 @@ const docTemplate = `{
         "store.GameSummary": {
             "type": "object",
             "properties": {
+                "booking_status": {
+                    "$ref": "#/definitions/store.BookingStatus"
+                },
                 "current_player": {
                     "type": "integer"
                 },
@@ -4796,9 +4815,6 @@ const docTemplate = `{
                 },
                 "game_level": {
                     "type": "string"
-                },
-                "is_booked": {
-                    "type": "boolean"
                 },
                 "match_full": {
                     "type": "boolean"
@@ -5018,6 +5034,9 @@ const docTemplate = `{
                     "description": "Foreign key to users table (game admin)",
                     "type": "integer"
                 },
+                "booking_status": {
+                    "$ref": "#/definitions/store.BookingStatus"
+                },
                 "created_at": {
                     "description": "Timestamp when the game was created",
                     "type": "string"
@@ -5041,10 +5060,6 @@ const docTemplate = `{
                 "instruction": {
                     "description": "Game instructions (nullable)",
                     "type": "string"
-                },
-                "is_booked": {
-                    "description": "Whether the game is booked",
-                    "type": "boolean"
                 },
                 "match_full": {
                     "description": "Whether the game is full",

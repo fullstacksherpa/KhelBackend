@@ -342,6 +342,12 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 		app.badRequestResponse(w, r, err)
 	}
 
+	user := getUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	loc, err := time.LoadLocation("Asia/Kathmandu")
 	if err != nil {
 		app.internalServerError(w, r, err)
@@ -402,12 +408,6 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	// Calculate total price.
 	duration := payload.EndTime.Sub(payload.StartTime).Hours()
 	totalPrice := int(duration * float64(applicablePrice))
-
-	user := getUserFromContext(r)
-	if user == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
 
 	// Create the booking.
 	booking := &store.Booking{

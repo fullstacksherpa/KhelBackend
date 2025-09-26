@@ -530,11 +530,27 @@ definitions:
       user_id:
         type: integer
     type: object
+  store.BookingStatus:
+    enum:
+    - pending
+    - requested
+    - booked
+    - rejected
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - BookingPending
+    - BookingRequested
+    - BookingBooked
+    - BookingRejected
+    - BookingCancelled
   store.Game:
     properties:
       admin_id:
         description: Foreign key to users table (game admin)
         type: integer
+      booking_status:
+        $ref: '#/definitions/store.BookingStatus'
       created_at:
         description: Timestamp when the game was created
         type: string
@@ -553,9 +569,6 @@ definitions:
       instruction:
         description: Game instructions (nullable)
         type: string
-      is_booked:
-        description: Whether the game is booked
-        type: boolean
       match_full:
         description: Whether the game is full
         type: boolean
@@ -588,6 +601,8 @@ definitions:
     properties:
       admin_id:
         type: integer
+      booking_status:
+        $ref: '#/definitions/store.BookingStatus'
       current_player:
         type: integer
       end_time:
@@ -600,8 +615,6 @@ definitions:
         type: integer
       game_level:
         type: string
-      is_booked:
-        type: boolean
       match_full:
         type: boolean
       max_players:
@@ -672,6 +685,8 @@ definitions:
     type: object
   store.GameSummary:
     properties:
+      booking_status:
+        $ref: '#/definitions/store.BookingStatus'
       current_player:
         type: integer
       end_time:
@@ -684,8 +699,6 @@ definitions:
         type: integer
       game_level:
         type: string
-      is_booked:
-        type: boolean
       match_full:
         type: boolean
       max_players:
@@ -834,6 +847,8 @@ definitions:
       admin_id:
         description: Foreign key to users table (game admin)
         type: integer
+      booking_status:
+        $ref: '#/definitions/store.BookingStatus'
       created_at:
         description: Timestamp when the game was created
         type: string
@@ -852,9 +867,6 @@ definitions:
       instruction:
         description: Game instructions (nullable)
         type: string
-      is_booked:
-        description: Whether the game is booked
-        type: boolean
       match_full:
         description: Whether the game is full
         type: boolean
@@ -1879,10 +1891,11 @@ paths:
         in: query
         name: venue_id
         type: integer
-      - description: Filter games based on booking status
+      - description: Filter games based on booking status (e.g., available, booked,
+          pending)
         in: query
-        name: is_booked
-        type: boolean
+        name: booking_status
+        type: string
       - description: 'Game status: active, cancelled, completed'
         in: query
         name: status

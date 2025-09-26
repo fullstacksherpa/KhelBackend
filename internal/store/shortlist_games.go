@@ -61,7 +61,7 @@ func (s *ShortlistGamesStore) GetShortlistedGamesByUser(
     SELECT
       g.id, g.sport_type, g.price, g.format, g.venue_id, g.admin_id, g.max_players,
       g.game_level, g.start_time, g.end_time, g.visibility, g.instruction,
-      g.status, g.is_booked, g.match_full, g.created_at, g.updated_at,
+      g.status, g.booking_status, g.match_full, g.created_at, g.updated_at,
       v.name   AS venue_name,
       v.address AS venue_address
     FROM games g
@@ -94,7 +94,7 @@ func (s *ShortlistGamesStore) GetShortlistedGamesByUser(
 			&d.Visibility,
 			&d.Instruction,
 			&d.Status,
-			&d.IsBooked,
+			&d.BookingStatus,
 			&d.MatchFull,
 			&d.CreatedAt,
 			&d.UpdatedAt,

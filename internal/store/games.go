@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"database/sql"
 
 	"errors"
 	"fmt"
@@ -12,25 +11,35 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type BookingStatus string
+
+const (
+	BookingPending   BookingStatus = "pending"
+	BookingRequested BookingStatus = "requested"
+	BookingBooked    BookingStatus = "booked"
+	BookingRejected  BookingStatus = "rejected"
+	BookingCancelled BookingStatus = "cancelled"
+)
+
 // Game represents a game in the system
 type Game struct {
-	ID          int64     `json:"id"`                    // Primary key
-	SportType   string    `json:"sport_type"`            // Type of sport (e.g., futsal, basketball)
-	Price       *int      `json:"price,omitempty"`       // Price of the game (nullable)
-	Format      *string   `json:"format,omitempty"`      // Game format (nullable)
-	VenueID     int64     `json:"venue_id"`              // Foreign key to venues table
-	AdminID     int64     `json:"admin_id"`              // Foreign key to users table (game admin)
-	MaxPlayers  int       `json:"max_players"`           // Maximum number of players
-	GameLevel   *string   `json:"game_level,omitempty"`  // Skill level (beginner, intermediate, advanced)
-	StartTime   time.Time `json:"start_time"`            // Game start time
-	EndTime     time.Time `json:"end_time"`              // Game end time
-	Visibility  string    `json:"visibility"`            // Visibility (public or private)
-	Instruction *string   `json:"instruction,omitempty"` // Game instructions (nullable)
-	Status      string    `json:"status"`                // Game status (active, cancelled, completed)
-	IsBooked    bool      `json:"is_booked"`             // Whether the game is booked
-	MatchFull   bool      `json:"match_full"`            // Whether the game is full
-	CreatedAt   time.Time `json:"created_at"`            // Timestamp when the game was created
-	UpdatedAt   time.Time `json:"updated_at"`            // Timestamp when the game was last updated
+	ID            int64         `json:"id"`                    // Primary key
+	SportType     string        `json:"sport_type"`            // Type of sport (e.g., futsal, basketball)
+	Price         *int          `json:"price,omitempty"`       // Price of the game (nullable)
+	Format        *string       `json:"format,omitempty"`      // Game format (nullable)
+	VenueID       int64         `json:"venue_id"`              // Foreign key to venues table
+	AdminID       int64         `json:"admin_id"`              // Foreign key to users table (game admin)
+	MaxPlayers    int           `json:"max_players"`           // Maximum number of players
+	GameLevel     *string       `json:"game_level,omitempty"`  // Skill level (beginner, intermediate, advanced)
+	StartTime     time.Time     `json:"start_time"`            // Game start time
+	EndTime       time.Time     `json:"end_time"`              // Game end time
+	Visibility    string        `json:"visibility"`            // Visibility (public or private)
+	Instruction   *string       `json:"instruction,omitempty"` // Game instructions (nullable)
+	Status        string        `json:"status"`                // Game status (active, cancelled, completed)
+	BookingStatus BookingStatus `json:"booking_status"`
+	MatchFull     bool          `json:"match_full"` // Whether the game is full
+	CreatedAt     time.Time     `json:"created_at"` // Timestamp when the game was created
+	UpdatedAt     time.Time     `json:"updated_at"` // Timestamp when the game was last updated
 }
 
 // GameRequest represents a request to join a game in the system
@@ -60,44 +69,44 @@ type GamePlayer struct {
 	JoinedAt time.Time `json:"joined_at"`
 }
 type GameSummary struct {
-	GameID        int64     `json:"game_id"`
-	VenueID       int64     `json:"venue_id"`
-	VenueName     string    `json:"venue_name"`
-	SportType     string    `json:"sport_type"`
-	Price         *int      `json:"price,omitempty"`
-	Format        *string   `json:"format,omitempty"`
-	GameAdminName string    `json:"game_admin_name"`
-	GameLevel     *string   `json:"game_level,omitempty"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	MaxPlayers    int       `json:"max_players"`
-	CurrentPlayer int       `json:"current_player"`
-	PlayerImages  []string  `json:"player_images"`
-	IsBooked      bool      `json:"is_booked"`
-	MatchFull     bool      `json:"match_full"`
-	VenueLat      float64   `json:"venue_lat"` // Venue latitude
-	VenueLon      float64   `json:"venue_lon"` // Venue longitude
-	Shortlisted   bool      `json:"shortlisted"`
-	Status        string    `json:"status"`
+	GameID        int64         `json:"game_id"`
+	VenueID       int64         `json:"venue_id"`
+	VenueName     string        `json:"venue_name"`
+	SportType     string        `json:"sport_type"`
+	Price         *int          `json:"price,omitempty"`
+	Format        *string       `json:"format,omitempty"`
+	GameAdminName string        `json:"game_admin_name"`
+	GameLevel     *string       `json:"game_level,omitempty"`
+	StartTime     time.Time     `json:"start_time"`
+	EndTime       time.Time     `json:"end_time"`
+	MaxPlayers    int           `json:"max_players"`
+	CurrentPlayer int           `json:"current_player"`
+	PlayerImages  []string      `json:"player_images"`
+	BookingStatus BookingStatus `json:"booking_status"`
+	MatchFull     bool          `json:"match_full"`
+	VenueLat      float64       `json:"venue_lat"` // Venue latitude
+	VenueLon      float64       `json:"venue_lon"` // Venue longitude
+	Shortlisted   bool          `json:"shortlisted"`
+	Status        string        `json:"status"`
 }
 
 type GameWithVenue struct {
-	ID         int64
-	SportType  string
-	Price      int
-	Format     string
-	VenueID    int
-	AdminID    int
-	MaxPlayers int
-	GameLevel  string
-	StartTime  time.Time
-	EndTime    time.Time
-	Visibility string
-	Status     string
-	IsBooked   bool
-	MatchFull  bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID            int64
+	SportType     string
+	Price         int
+	Format        string
+	VenueID       int
+	AdminID       int
+	MaxPlayers    int
+	GameLevel     string
+	StartTime     time.Time
+	EndTime       time.Time
+	Visibility    string
+	Status        string
+	BookingStatus BookingStatus
+	MatchFull     bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 
 	// Venue details for Mapbox
 	VenueName string
@@ -110,27 +119,27 @@ type GameWithVenue struct {
 
 // GameDetails holds full info for a single game, including admin, booking and player lists.
 type GameDetails struct {
-	GameID             int64     `json:"game_id"`
-	VenueID            int64     `json:"venue_id"`
-	VenueName          string    `json:"venue_name"`
-	SportType          string    `json:"sport_type"`
-	Price              *int      `json:"price,omitempty"`
-	Format             *string   `json:"format,omitempty"`
-	GameLevel          *string   `json:"game_level,omitempty"`
-	AdminID            int64     `json:"admin_id"`
-	GameAdminName      string    `json:"game_admin_name"`
-	StartTime          time.Time `json:"start_time"`
-	EndTime            time.Time `json:"end_time"`
-	MaxPlayers         int       `json:"max_players"`
-	CurrentPlayer      int       `json:"current_player"`
-	PlayerImages       []string  `json:"player_images"`
-	PlayerIDs          []int64   `json:"player_ids"`           // all joined player user IDs
-	RequestedPlayerIDs []int64   `json:"requested_player_ids"` // pending request user IDs
-	IsBooked           bool      `json:"is_booked"`
-	MatchFull          bool      `json:"match_full"`
-	Status             string    `json:"status"`
-	VenueLat           float64   `json:"venue_lat"`
-	VenueLon           float64   `json:"venue_lon"`
+	GameID             int64         `json:"game_id"`
+	VenueID            int64         `json:"venue_id"`
+	VenueName          string        `json:"venue_name"`
+	SportType          string        `json:"sport_type"`
+	Price              *int          `json:"price,omitempty"`
+	Format             *string       `json:"format,omitempty"`
+	GameLevel          *string       `json:"game_level,omitempty"`
+	AdminID            int64         `json:"admin_id"`
+	GameAdminName      string        `json:"game_admin_name"`
+	StartTime          time.Time     `json:"start_time"`
+	EndTime            time.Time     `json:"end_time"`
+	MaxPlayers         int           `json:"max_players"`
+	CurrentPlayer      int           `json:"current_player"`
+	PlayerImages       []string      `json:"player_images"`
+	PlayerIDs          []int64       `json:"player_ids"`           // all joined player user IDs
+	RequestedPlayerIDs []int64       `json:"requested_player_ids"` // pending request user IDs
+	BookingStatus      BookingStatus `json:"booking_status"`
+	MatchFull          bool          `json:"match_full"`
+	Status             string        `json:"status"`
+	VenueLat           float64       `json:"venue_lat"`
+	VenueLon           float64       `json:"venue_lon"`
 }
 
 type GameStore struct {
@@ -141,7 +150,7 @@ func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
 	query := `
 		INSERT INTO games (
 			sport_type, price, format, venue_id, admin_id, max_players, game_level,
-			start_time, end_time, visibility, instruction, status, is_booked, match_full
+			start_time, end_time, visibility, instruction, status, booking_status, match_full
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING id, created_at, updated_at
@@ -164,7 +173,7 @@ func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
 		game.Visibility,
 		game.Instruction,
 		game.Status,
-		game.IsBooked,
+		game.BookingStatus,
 		game.MatchFull,
 	).Scan(
 		&game.ID,
@@ -186,7 +195,7 @@ func (s *GameStore) GetAdminID(ctx context.Context, gameID int64) (int64, error)
 
 	err := s.db.QueryRow(ctx, query, gameID).Scan(&adminID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, fmt.Errorf("game not found or deleted: %w", ErrNotFound)
 		}
 		return 0, fmt.Errorf("failed to get admin ID: %w", err)
@@ -194,11 +203,13 @@ func (s *GameStore) GetAdminID(ctx context.Context, gameID int64) (int64, error)
 	return adminID, nil
 }
 
+// MarkAsBooked sets the is_booked field to true for the given game ID.
+
 func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error) {
 	query := `
 		SELECT id, sport_type, price, format, venue_id, admin_id, max_players, 
 			   game_level, start_time, end_time, visibility, instruction, status, 
-			   is_booked, match_full, created_at, updated_at
+			   booking_status, match_full, created_at, updated_at
 		FROM games 
 		WHERE id = $1
 	`
@@ -221,7 +232,7 @@ func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error
 		&game.Visibility,
 		&game.Instruction,
 		&game.Status,
-		&game.IsBooked,
+		&game.BookingStatus,
 		&game.MatchFull,
 		&game.CreatedAt,
 		&game.UpdatedAt,
@@ -597,7 +608,7 @@ SELECT
          LIMIT 4
       ) AS t
     ), '{}') AS player_images,
-    g.is_booked,
+    g.booking_status,
     g.match_full,
     g.status,
     ST_Y(v.location::geometry) AS venue_lat,
@@ -609,7 +620,7 @@ WHERE 1 = 1
   AND ($1::varchar IS NULL OR g.sport_type = $1)
   AND ($2::varchar IS NULL OR g.game_level = $2)
   AND ($3::int IS NULL OR g.venue_id = $3)
-  AND ($4::bool IS NULL OR g.is_booked = $4)
+  AND ($4::booking_status_enum IS NULL OR g.booking_status = $4::booking_status_enum)
   AND ($5::varchar IS NULL OR g.status = $5)
   AND ($6::timestamp IS NULL OR g.start_time >= $6)
   AND ($7::timestamp IS NULL OR g.end_time <= $7)
@@ -636,7 +647,7 @@ LIMIT $13 OFFSET $14
 		nullIfEmpty(q.SportType), // $1
 		nullIfEmpty(q.GameLevel), // $2
 		nullIfZero(q.VenueID),    // $3
-		q.IsBooked,               // $4
+		q.BookingStatus,          // $4
 		q.Status,                 // $5
 		nullTime(q.StartAfter),   // $6
 		nullTime(q.EndBefore),    // $7
@@ -670,7 +681,7 @@ LIMIT $13 OFFSET $14
 			&g.MaxPlayers,
 			&g.CurrentPlayer,
 			&g.PlayerImages,
-			&g.IsBooked,
+			&g.BookingStatus,
 			&g.MatchFull,
 			&g.Status,
 			&g.VenueLat,
@@ -830,7 +841,7 @@ SELECT
 		),
 		'{}'
 	)                   AS requested_player_ids,
-					    g.is_booked,
+					    g.booking_status,
     g.match_full,
 	g.status,
 	ST_Y(v.location::geometry) AS venue_lat,
@@ -863,7 +874,7 @@ WHERE g.id = $1
 		&gd.PlayerImages,
 		&gd.PlayerIDs,
 		&gd.RequestedPlayerIDs,
-		&gd.IsBooked,
+		&gd.BookingStatus,
 		&gd.MatchFull,
 		&gd.Status,
 		&gd.VenueLat,
@@ -908,7 +919,7 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
      LIMIT 4
   ) AS t
 ), ARRAY[]::text[]) AS player_images,
-		    g.is_booked,
+		    g.booking_status,
 		    g.match_full,
 		    g.status,
 		    ST_Y(v.location::geometry) AS venue_lat,
@@ -948,7 +959,7 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
 			&g.MaxPlayers,
 			&g.CurrentPlayer,
 			&g.PlayerImages,
-			&g.IsBooked,
+			&g.BookingStatus,
 			&g.MatchFull,
 			&g.Status,
 			&g.VenueLat,
@@ -996,7 +1007,7 @@ SELECT
          LIMIT 4
       ) AS t
     ), '{}')                   AS player_images,
-    g.is_booked,
+    g.booking_status,
     g.match_full,
     g.status,
     ST_Y(v.location::geometry) AS venue_lat,
@@ -1038,7 +1049,7 @@ ORDER BY g.start_time ASC
 			&g.MaxPlayers,
 			&g.CurrentPlayer,
 			&g.PlayerImages,
-			&g.IsBooked,
+			&g.BookingStatus,
 			&g.MatchFull,
 			&g.Status,
 			&g.VenueLat,

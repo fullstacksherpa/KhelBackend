@@ -185,22 +185,19 @@ func (app *application) mount() http.Handler {
 		})
 
 		r.With(app.optionalAuth).Get("/games/get-games", app.getGamesHandler)
+		r.With(app.optionalAuth).Get("/games/{gameID}", app.getGameDetailsHandler)
 
 		r.With(app.optionalAuth).Get("/games/{venueID}/upcoming", app.getUpcomingGamesByVenueHandler)
 
-		r.Route("/games", func(r chi.Router) {
-			// Routes requiring authentication
-			r.Group(func(r chi.Router) {
-				r.Use(app.AuthTokenMiddleware)
-				r.Get("/get-upcoming", app.getUpcomingGamesForUser)
-				r.Get("/shortlist", app.listShortlistedGamesHandler)
-				r.Post("/create", app.createGameHandler)
-			})
+		r.With(app.AuthTokenMiddleware).Get("/games/get-upcoming", app.getUpcomingGamesForUser)
+		r.With(app.AuthTokenMiddleware).Get("/games/shortlist", app.listShortlistedGamesHandler)
+		r.With(app.AuthTokenMiddleware).Post("/games/create", app.createGameHandler)
 
+		r.Route("/games", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
 				r.Use(app.optionalAuth)
-				r.Get("/games/{gameID}", app.getGameDetailsHandler)
-				r.Get("/games/{gameID}/qa", app.getGameQAHandler)
+
+				r.Get("/{gameID}/qa", app.getGameQAHandler)
 
 			})
 
