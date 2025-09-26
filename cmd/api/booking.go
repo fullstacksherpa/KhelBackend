@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"khel/internal/domain/bookings"
 	"khel/internal/notifications"
-	"khel/internal/store"
+
 	"log"
 	"net/http"
 	"strconv"
@@ -125,7 +126,7 @@ func (app *application) parseBookingParam(param string) (int64, error) {
 	return 0, fmt.Errorf("invalid booking id: %s", param)
 }
 
-func (app *application) bookingToResponse(b *store.Booking) BookingResponse {
+func (app *application) bookingToResponse(b *bookings.Booking) BookingResponse {
 	return BookingResponse{
 		ID:            app.EncodeBookingID(b.ID),
 		VenueID:       b.VenueID,
@@ -224,7 +225,7 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 	//!false → true
 	//So !unique[key] becomes true the first time you encounter that key.
 	unique := make(map[string]bool)
-	var filtered []store.PricingSlot
+	var filtered []bookings.PricingSlot
 
 	for _, ps := range pricingSlots {
 		key := fmt.Sprintf("%s-%s-%d", ps.StartTime.Format("15:04"), ps.EndTime.Format("15:04"), ps.Price)
@@ -392,13 +393,13 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check for overlapping bookings.
-	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
+	bookingsList, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
 	if err != nil {
 		http.Error(w, "Error checking bookings", http.StatusInternalServerError)
 		return
 	}
-	requestedInterval := store.Interval{Start: payload.StartTime, End: payload.EndTime}
-	for _, b := range bookings {
+	requestedInterval := bookings.Interval{Start: payload.StartTime, End: payload.EndTime}
+	for _, b := range bookingsList {
 		if intervalsOverlap(requestedInterval, b) {
 			http.Error(w, "Time slot is already booked", http.StatusConflict)
 			return
@@ -410,7 +411,7 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	totalPrice := int(duration * float64(applicablePrice))
 
 	// Create the booking.
-	booking := &store.Booking{
+	booking := &bookings.Booking{
 		VenueID:    venueID,
 		UserID:     user.ID,
 		StartTime:  payload.StartTime,
@@ -455,7 +456,7 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 }
 
 // intervalsOverlap checks whether two intervals overlap.
-func intervalsOverlap(a, b store.Interval) bool {
+func intervalsOverlap(a, b bookings.Interval) bool {
 	return a.Start.Before(b.End) && b.Start.Before(a.End)
 }
 
@@ -509,13 +510,13 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 	//serverlog end_time 🎯: 2025-07-02 09:00:00 +0545 +0545
 
 	// Check for overlapping bookings.
-	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
+	bookingList, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
 	if err != nil {
 		http.Error(w, "Error checking bookings", http.StatusInternalServerError)
 		return
 	}
-	requestedInterval := store.Interval{Start: payload.StartTime, End: payload.EndTime}
-	for _, b := range bookings {
+	requestedInterval := bookings.Interval{Start: payload.StartTime, End: payload.EndTime}
+	for _, b := range bookingList {
 		if intervalsOverlap(requestedInterval, b) {
 			http.Error(w, "Time slot is already booked", http.StatusConflict)
 			return
@@ -551,7 +552,7 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 		notePtr = &payload.Note
 	}
 
-	booking := &store.Booking{
+	booking := &bookings.Booking{
 		VenueID:       venueID,
 		UserID:        bookingUserID,
 		StartTime:     payload.StartTime,
@@ -663,7 +664,7 @@ func (app *application) updateVenuePricingHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	pricing := &store.PricingSlot{
+	pricing := &bookings.PricingSlot{
 		ID:        pricingID,
 		VenueID:   venueID,
 		DayOfWeek: strings.ToLower(payload.DayOfWeek),
@@ -772,7 +773,7 @@ func (app *application) createVenuePricingHandler(w http.ResponseWriter, r *http
 	}
 
 	// 3) Build slice of store.PricingSlot
-	slots := make([]*store.PricingSlot, 0, len(payload.Slots))
+	slots := make([]*bookings.PricingSlot, 0, len(payload.Slots))
 	for i, in := range payload.Slots {
 		// parse times from string to time.time which is type for our model
 		st, err := time.Parse("15:04:05", in.StartTime)
@@ -790,7 +791,7 @@ func (app *application) createVenuePricingHandler(w http.ResponseWriter, r *http
 			return
 		}
 
-		slots = append(slots, &store.PricingSlot{
+		slots = append(slots, &bookings.PricingSlot{
 			VenueID:   venueID,
 			DayOfWeek: strings.ToLower(strings.TrimSpace(in.DayOfWeek)),
 			StartTime: st,
@@ -1269,7 +1270,7 @@ func (app *application) getBookingsByUserHandler(w http.ResponseWriter, r *http.
 		status = &s
 	}
 
-	filter := store.BookingFilter{
+	filter := bookings.BookingFilter{
 		Status: status,
 		Page:   page,
 		Limit:  limit,

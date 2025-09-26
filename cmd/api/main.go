@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"khel/internal/auth"
 	"khel/internal/db"
+	"khel/internal/domain/storage"
 	"khel/internal/mailer"
 	"khel/internal/notifications"
 	"khel/internal/ratelimiter"
-	"khel/internal/store"
 	"log"
 	"net/http"
 	"os"
@@ -180,7 +180,8 @@ func main() {
 	logger.Info("database connection pool established")
 
 	//storage
-	store := store.NewStorage(dbpool)
+
+	storeContainer := storage.NewContainer(dbpool)
 
 	//cloudinary
 	cloudinaryUrl := os.Getenv("CLOUDINARY_URL")
@@ -228,7 +229,7 @@ func main() {
 	app := &application{
 		config:        cfg,
 		logger:        logger,
-		store:         store,
+		store:         storeContainer,
 		cld:           cld,
 		mailer:        mailtrap,
 		authenticator: jwtAuthenticator,

@@ -1,48 +1,46 @@
-package store
+package appreviews
 
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Review represents an app review submitted by a user.
-type AppReview struct {
-	ID        int64     `json:"id"`
-	UserID    int64     `json:"user_id"`
-	Rating    int       `json:"rating"`
-	Feedback  string    `json:"feedback"`
-	CreatedAt time.Time `json:"created_at"`
+type Store interface {
+	AddReview(ctx context.Context, userID int64, rating int, feedback string) error
+	GetAllReviews(ctx context.Context) ([]AppReview, error)
 }
 
-// ReviewsStore handles database operations for app reviews.
-type AppReviewStore struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
 // AddReview inserts a new review record into the app_reviews table.
-func (s *AppReviewStore) AddReview(ctx context.Context, userID int64, rating int, feedback string) error {
+func (r *Repository) AddReview(ctx context.Context, userID int64, rating int, feedback string) error {
 	query := `
         INSERT INTO app_reviews (user_id, rating, feedback)
         VALUES ($1, $2, $3)
     `
-	if _, err := s.db.Exec(ctx, query, userID, rating, feedback); err != nil {
+	if _, err := r.db.Exec(ctx, query, userID, rating, feedback); err != nil {
 		return fmt.Errorf("failed to insert review: %w", err)
 	}
 	return nil
 }
 
 // GetAllReviews retrieves all reviews ordered by created_at descending.
-func (s *AppReviewStore) GetAllReviews(ctx context.Context) ([]AppReview, error) {
+func (r *Repository) GetAllReviews(ctx context.Context) ([]AppReview, error) {
 	query := `
         SELECT id, user_id, rating, feedback, created_at
         FROM app_reviews
         ORDER BY created_at DESC
     `
 
-	rows, err := s.db.Query(ctx, query)
+	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query reviews: %w", err)
 	}

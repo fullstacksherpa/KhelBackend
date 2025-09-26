@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"khel/internal/domain/gameqa"
 	"khel/internal/notifications"
-	"khel/internal/store"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -56,7 +56,7 @@ func (app *application) createQuestionHandler(w http.ResponseWriter, r *http.Req
 	user := getUserFromContext(r)
 	fmt.Printf("login userID is %v", user.ID)
 
-	question := &store.Question{
+	question := &gameqa.Question{
 		GameID:   gameID,
 		UserID:   user.ID,
 		Question: payload.Question,
@@ -139,7 +139,7 @@ func (app *application) createReplyHandler(w http.ResponseWriter, r *http.Reques
 
 	user := getUserFromContext(r)
 
-	reply := &store.Reply{
+	reply := &gameqa.Reply{
 		QuestionID: questionID,
 		AdminID:    user.ID,
 		Reply:      payload.Reply,
@@ -180,7 +180,7 @@ func (app *application) deleteQuestionHandler(w http.ResponseWriter, r *http.Req
 	user := getUserFromContext(r)
 
 	if err := app.store.GameQA.DeleteQuestion(r.Context(), questionID, user.ID); err != nil {
-		if errors.Is(err, store.ErrQuestionNotFound) {
+		if errors.Is(err, gameqa.ErrQuestionNotFound) {
 			app.notFoundResponse(w, r, err)
 			return
 		}

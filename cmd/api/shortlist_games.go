@@ -35,7 +35,7 @@ func (app *application) addShortlistedGameHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	if err := app.store.ShortlistedGames.AddShortlist(r.Context(), user.ID, gameID); err != nil {
+	if err := app.store.Games.AddShortlist(r.Context(), user.ID, gameID); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
@@ -70,7 +70,7 @@ func (app *application) removeShortlistedGameHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	if err := app.store.ShortlistedGames.RemoveShortlist(r.Context(), user.ID, gameID); err != nil {
+	if err := app.store.Games.RemoveShortlist(r.Context(), user.ID, gameID); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
@@ -97,7 +97,7 @@ func (app *application) listShortlistedGamesHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	games, err := app.store.ShortlistedGames.GetShortlistedGamesByUser(r.Context(), user.ID)
+	games, err := app.store.Games.GetShortlistedGamesByUser(r.Context(), user.ID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return

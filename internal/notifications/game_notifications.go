@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"khel/internal/store"
+	"khel/internal/domain/storage"
 	"strconv"
 	"time"
 
@@ -12,7 +12,7 @@ import (
 )
 
 // SendJoinRequestToAdmin - notify game admin(s) that a user requested to join with requesterName
-func SendJoinRequestToAdmin(ctx context.Context, push PushSender, store store.Storage, AdminID int64, gameID int64, requesterName string) error {
+func SendJoinRequestToAdmin(ctx context.Context, push PushSender, store *storage.Container, AdminID int64, gameID int64, requesterName string) error {
 
 	tokensMap, err := store.PushTokens.GetTokensByUserIDs(ctx, []int64{AdminID})
 	if err != nil {
@@ -55,7 +55,7 @@ func SendJoinRequestToAdmin(ctx context.Context, push PushSender, store store.St
 }
 
 // SendDeleteJoinRequestToAdmin - notify game admin(s) that a user has deleted join request.
-func SendDeleteJoinRequestToAdmin(ctx context.Context, push PushSender, store store.Storage, gameID int64, requesterName string) error {
+func SendDeleteJoinRequestToAdmin(ctx context.Context, push PushSender, store *storage.Container, gameID int64, requesterName string) error {
 
 	ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -107,7 +107,7 @@ func SendDeleteJoinRequestToAdmin(ctx context.Context, push PushSender, store st
 }
 
 // SendRejectJoinRequestToUser - notify the requesting user that request was rejected by the game admin
-func SendRejectJoinRequestToUser(ctx context.Context, push PushSender, store store.Storage, userID int64, gameID int64) error {
+func SendRejectJoinRequestToUser(ctx context.Context, push PushSender, store *storage.Container, userID int64, gameID int64) error {
 
 	tokensMap, err := store.PushTokens.GetTokensByUserIDs(ctx, []int64{userID})
 	if err != nil {
@@ -151,7 +151,7 @@ func SendRejectJoinRequestToUser(ctx context.Context, push PushSender, store sto
 }
 
 // SendAcceptJoinRequestToUser - notify the requesting user that request was rejected by the game admin
-func SendAcceptJoinRequestToUser(ctx context.Context, push PushSender, store store.Storage, userID int64, gameID int64) error {
+func SendAcceptJoinRequestToUser(ctx context.Context, push PushSender, store *storage.Container, userID int64, gameID int64) error {
 
 	tokensMap, err := store.PushTokens.GetTokensByUserIDs(ctx, []int64{userID})
 	if err != nil {
@@ -195,7 +195,7 @@ func SendAcceptJoinRequestToUser(ctx context.Context, push PushSender, store sto
 }
 
 // SendCancelGameToPlayers - notify all players that a game has been canceled
-func SendCancelGameToPlayers(ctx context.Context, push PushSender, store store.Storage, gameID int64) error {
+func SendCancelGameToPlayers(ctx context.Context, push PushSender, store *storage.Container, gameID int64) error {
 
 	// Get all player IDs for the game
 	playerIDs, err := store.Games.GetAllGamePlayerIDs(ctx, gameID)
@@ -256,7 +256,7 @@ func SendCancelGameToPlayers(ctx context.Context, push PushSender, store store.S
 }
 
 // NotifySendGameQuestionToAdmin - notify game admin(s) that a user has send a question
-func NotifyGameQuestionToAdmin(ctx context.Context, push PushSender, store store.Storage, gameID int64, requesterName string) error {
+func NotifyGameQuestionToAdmin(ctx context.Context, push PushSender, store *storage.Container, gameID int64, requesterName string) error {
 
 	ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -308,7 +308,7 @@ func NotifyGameQuestionToAdmin(ctx context.Context, push PushSender, store store
 }
 
 // SendQuestionReply - notify question asker that admin has reply
-func SendQuestionReply(ctx context.Context, push PushSender, store store.Storage, questionID int64, gameID int64) error {
+func SendQuestionReply(ctx context.Context, push PushSender, store *storage.Container, questionID int64, gameID int64) error {
 	ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	userID, err := store.GameQA.GetUserIDByQuestionID(ctxTimeout, questionID)

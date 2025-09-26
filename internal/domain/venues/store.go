@@ -1,4 +1,4 @@
-package store
+package venues
 
 import (
 	"context"
@@ -7,65 +7,50 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	// For PostGIS GEOGRAPHY
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrVenueNotFound = errors.New("venue not found")
-
-// Venue represents a venue in the database
-type Venue struct {
-	ID          int64     `json:"id"`
-	OwnerID     int64     `json:"owner_id"`
-	Name        string    `json:"name"`
-	Address     string    `json:"address"`
-	Location    []float64 `json:"location"` // PostGIS point (longitude, latitude)
-	Description *string   `json:"description,omitempty"`
-	PhoneNumber string    `json:"phone_number"`
-	Amenities   []string  `json:"amenities,omitempty"` // Array of strings
-	OpenTime    *string   `json:"open_time,omitempty"`
-	Sport       string    `json:"sport"`
-	ImageURLs   []string  `json:"image_urls,omitempty"` // Array of image URLs
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+type Store interface {
+	Create(context.Context, *Venue) error
+	UpdateImageURLs(ctx context.Context, venueID int64, urls []string) error
+	Delete(ctx context.Context, venueID int64) error
+	Update(ctx context.Context, venueID int64, updateData map[string]interface{}) error
+	CheckIfVenueExists(context.Context, string, int64) (bool, error)
+	RemovePhotoURL(ctx context.Context, venueID int64, photoURL string) error
+	AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error
+	IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error)
+	GetVenueByID(ctx context.Context, venueID int64) (*Venue, error)
+	GetOwnedVenueIDs(ctx context.Context, userID int64) ([]int64, error)
+	List(ctx context.Context, filter VenueFilter) ([]VenueListing, error)
+	GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error)
+	GetImageURLs(ctx context.Context, venueID int64) ([]string, error)
+	GetVenueInfo(ctx context.Context, venueID int64) (*VenueInfo, error)
+	GetOwnerIDFromVenueID(ctx context.Context, venueID int64) (int64, error)
+	// ... favourite venues
+	AddFavorite(ctx context.Context, userID, venueID int64) error
+	RemoveFavorite(ctx context.Context, userID, venueID int64) error
+	GetFavoritesByUser(ctx context.Context, userID int64) ([]Venue, error)
+	GetFavoriteVenueIDsByUser(ctx context.Context, userID int64) (map[int64]struct{}, error)
 }
 
-type VenueInfo struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	Address     string    `json:"address"`
-	Location    []float64 `json:"location"` // PostGIS point (longitude, latitude)
-	Description *string   `json:"description,omitempty"`
-	PhoneNumber string    `json:"phone_number"`
-	Amenities   []string  `json:"amenities,omitempty"` // Array of strings
-	OpenTime    *string   `json:"open_time,omitempty"`
-	Status      string    `json:"status"`
-}
-
-// VenueDetail extends Venue with aggregation fields from reviews and games.
-type VenueDetail struct {
-	Venue
-	TotalReviews   int     `json:"total_reviews"`
-	AverageRating  float64 `json:"average_rating"`
-	UpcomingGames  int     `json:"upcoming_games"`
-	CompletedGames int     `json:"completed_games"`
-}
-
-type VenuesStore struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
 // CheckIfVenueExists checks if a venue with the same name and owner already exists
-func (s *VenuesStore) CheckIfVenueExists(ctx context.Context, name string, ownerID int64) (bool, error) {
+func (r *Repository) CheckIfVenueExists(ctx context.Context, name string, ownerID int64) (bool, error) {
 	query := `
 		SELECT id FROM venues WHERE name = $1 AND owner_id = $2
 	`
 
 	var existingVenueID int64
-	err := s.db.QueryRow(ctx, query, name, ownerID).Scan(&existingVenueID)
+	err := r.db.QueryRow(ctx, query, name, ownerID).Scan(&existingVenueID)
 
 	// If an error is not found, it means the venue exists
 	if err == nil {
@@ -82,7 +67,7 @@ func (s *VenuesStore) CheckIfVenueExists(ctx context.Context, name string, owner
 }
 
 // Create creates a new venue in the database
-func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
+func (r *Repository) Create(ctx context.Context, venue *Venue) error {
 
 	const query = `
     INSERT INTO venues (
@@ -111,7 +96,7 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 		venue.Sport,
 		venue.PhoneNumber,
 	}
-	row := s.db.QueryRow(ctx, query, args...)
+	row := r.db.QueryRow(ctx, query, args...)
 	if err := row.Scan(&venue.ID, &venue.CreatedAt, &venue.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// Insert succeeded, but didn’t RETURN any row
@@ -123,13 +108,13 @@ func (s *VenuesStore) Create(ctx context.Context, venue *Venue) error {
 }
 
 // RemovePhotoURL removes a specific photo URL from a venue's image_urls array
-func (s *VenuesStore) RemovePhotoURL(ctx context.Context, venueID int64, photoURL string) error {
+func (r *Repository) RemovePhotoURL(ctx context.Context, venueID int64, photoURL string) error {
 	query := `
 		UPDATE venues
 		SET image_urls = array_remove(image_urls, $1)
 		WHERE id = $2
 	`
-	_, err := s.db.Exec(ctx, query, photoURL, venueID)
+	_, err := r.db.Exec(ctx, query, photoURL, venueID)
 	if err != nil {
 		return fmt.Errorf("failed to remove photo URL: %w", err)
 	}
@@ -137,13 +122,13 @@ func (s *VenuesStore) RemovePhotoURL(ctx context.Context, venueID int64, photoUR
 }
 
 // AddPhotoURL adds a new photo URL to a venue's image_urls array
-func (s *VenuesStore) AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error {
+func (r *Repository) AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error {
 	query := `
 		UPDATE venues
 		SET image_urls = array_append(image_urls, $1)
 		WHERE id = $2
 	`
-	_, err := s.db.Exec(ctx, query, photoURL, venueID)
+	_, err := r.db.Exec(ctx, query, photoURL, venueID)
 	if err != nil {
 		return fmt.Errorf("failed to add photo URL: %w", err)
 	}
@@ -151,7 +136,7 @@ func (s *VenuesStore) AddPhotoURL(ctx context.Context, venueID int64, photoURL s
 }
 
 // Update updates a venue's data in the database
-func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[string]interface{}) error {
+func (r *Repository) Update(ctx context.Context, venueID int64, updateData map[string]interface{}) error {
 	query := "UPDATE venues SET "
 	args := []interface{}{}
 	argCounter := 1
@@ -211,17 +196,17 @@ func (s *VenuesStore) Update(ctx context.Context, venueID int64, updateData map[
 	query += fmt.Sprintf(" WHERE id = $%d", argCounter)
 	args = append(args, venueID)
 
-	if _, err := s.db.Exec(ctx, query, args...); err != nil {
+	if _, err := r.db.Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("failed to update venue: %w", err)
 	}
 	return nil
 }
 
 // IsOwner checks if the user is the owner of the given venue
-func (s *VenuesStore) IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error) {
+func (r *Repository) IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error) {
 	var ownerID int64
 
-	err := s.db.QueryRow(ctx, `SELECT owner_id FROM venues WHERE id = $1`, venueID).Scan(&ownerID)
+	err := r.db.QueryRow(ctx, `SELECT owner_id FROM venues WHERE id = $1`, venueID).Scan(&ownerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, fmt.Errorf("venue not found")
@@ -239,9 +224,9 @@ func (s *VenuesStore) IsOwner(ctx context.Context, venueID int64, userID int64) 
 	return false, nil
 }
 
-func (s *VenuesStore) GetOwnedVenueIDs(ctx context.Context, userID int64) ([]int64, error) {
+func (r *Repository) GetOwnedVenueIDs(ctx context.Context, userID int64) ([]int64, error) {
 	query := `SELECT id FROM venues WHERE owner_id = $1`
-	rows, err := s.db.Query(ctx, query, userID)
+	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -262,12 +247,12 @@ func (s *VenuesStore) GetOwnedVenueIDs(ctx context.Context, userID int64) ([]int
 }
 
 // GetVenueByID retrieves a venue by its ID.
-func (s *VenuesStore) GetVenueByID(ctx context.Context, venueID int64) (*Venue, error) {
+func (r *Repository) GetVenueByID(ctx context.Context, venueID int64) (*Venue, error) {
 	query := `
 	SELECT id, owner_id, name, address, description, amenities, open_time, image_urls, sport, phone_number, created_at, updated_at 
 	FROM venues 
 	WHERE id = $1`
-	row := s.db.QueryRow(ctx, query, venueID)
+	row := r.db.QueryRow(ctx, query, venueID)
 	var v Venue
 	var amenitiesJSON []byte
 	var imageURLsJSON []byte
@@ -284,33 +269,10 @@ func (s *VenuesStore) GetVenueByID(ctx context.Context, venueID int64) (*Venue, 
 	return &v, nil
 }
 
-type VenueFilter struct {
-	Sport     *string
-	Latitude  *float64
-	Longitude *float64
-	Distance  *float64 // meters
-	Page      int
-	Limit     int
-}
-
-type VenueListing struct {
-	ID            int64
-	Name          string
-	Address       string
-	Longitude     float64
-	Latitude      float64
-	ImageURLs     []string
-	OpenTime      *string
-	PhoneNumber   string
-	Sport         string
-	TotalReviews  int
-	AverageRating float64
-}
-
 // List returns a paginated slice of VenueListing, optionally filtered by sport
 // and/or by a geographic radius, and—when a location is provided—sorted
 // nearest-first.
-func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueListing, error) {
+func (r *Repository) List(ctx context.Context, filter VenueFilter) ([]VenueListing, error) {
 	var (
 		where      []string
 		args       []interface{}
@@ -387,7 +349,7 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
 	)
 
 	// 5) Execute query
-	rows, err := s.db.Query(ctx, query, args...)
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying venues: %w", err)
 	}
@@ -424,22 +386,22 @@ func (s *VenuesStore) List(ctx context.Context, filter VenueFilter) ([]VenueList
 }
 
 // UpdateImageURLs updates the venue record with the provided image URLs.
-func (s *VenuesStore) UpdateImageURLs(ctx context.Context, venueID int64, urls []string) error {
+func (r *Repository) UpdateImageURLs(ctx context.Context, venueID int64, urls []string) error {
 	query := `UPDATE venues SET image_urls = $1 WHERE id = $2`
-	_, err := s.db.Exec(ctx, query, urls, venueID)
+	_, err := r.db.Exec(ctx, query, urls, venueID)
 	return err
 }
 
 // Delete removes the venue with the given ID from the database.
-func (s *VenuesStore) Delete(ctx context.Context, venueID int64) error {
+func (r *Repository) Delete(ctx context.Context, venueID int64) error {
 	query := `DELETE FROM venues WHERE id = $1`
-	_, err := s.db.Exec(ctx, query, venueID)
+	_, err := r.db.Exec(ctx, query, venueID)
 	return err
 }
 
 // GetVenueDetail retrieves a venue by its ID while joining reviews and games
 // to aggregate total_reviews, average_rating, upcoming_games, and completed_games.
-func (s *VenuesStore) GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error) {
+func (r *Repository) GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error) {
 	query := `
 	SELECT 
 		v.id,
@@ -472,7 +434,7 @@ func (s *VenuesStore) GetVenueDetail(ctx context.Context, venueID int64) (*Venue
 	var vd VenueDetail
 	var longitude, latitude float64
 
-	err := s.db.QueryRow(ctx, query, venueID).Scan(
+	err := r.db.QueryRow(ctx, query, venueID).Scan(
 		&vd.ID,
 		&vd.OwnerID,
 		&vd.Name,
@@ -505,11 +467,11 @@ func (s *VenuesStore) GetVenueDetail(ctx context.Context, venueID int64) (*Venue
 	return &vd, nil
 }
 
-func (s *VenuesStore) GetImageURLs(ctx context.Context, venueID int64) ([]string, error) {
+func (r *Repository) GetImageURLs(ctx context.Context, venueID int64) ([]string, error) {
 	query := `SELECT image_urls FROM venues WHERE id = $1`
 
 	var urls []string
-	if err := s.db.QueryRow(ctx, query, venueID).Scan(&urls); err != nil {
+	if err := r.db.QueryRow(ctx, query, venueID).Scan(&urls); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("venue %d not found", venueID)
 		}
@@ -520,14 +482,14 @@ func (s *VenuesStore) GetImageURLs(ctx context.Context, venueID int64) ([]string
 
 // just get basic venueinfo without images and rating and rate count, much
 // lighter than get venue details method.
-func (s *VenuesStore) GetVenueInfo(ctx context.Context, venueID int64) (*VenueInfo, error) {
+func (r *Repository) GetVenueInfo(ctx context.Context, venueID int64) (*VenueInfo, error) {
 	query := `SELECT id, name, address, ST_X(location::geometry) as longitude,
 		ST_Y(location::geometry) as latitude, description, amenities, open_time, phone_number, status FROM venues WHERE venues.id = $1`
 
 	var VenueInfo VenueInfo
 	var longitude, latitude float64
 
-	err := s.db.QueryRow(ctx, query, venueID).Scan(
+	err := r.db.QueryRow(ctx, query, venueID).Scan(
 		&VenueInfo.ID,
 		&VenueInfo.Name,
 		&VenueInfo.Address,
@@ -552,9 +514,9 @@ func (s *VenuesStore) GetVenueInfo(ctx context.Context, venueID int64) (*VenueIn
 }
 
 // GetOwnerIDFromVenueID returns a OwnerID from the provided venueID
-func (s *VenuesStore) GetOwnerIDFromVenueID(ctx context.Context, venueID int64) (int64, error) {
+func (r *Repository) GetOwnerIDFromVenueID(ctx context.Context, venueID int64) (int64, error) {
 	var ownerID int64
-	err := s.db.QueryRow(ctx, `SELECT owner_id FROM venues WHERE id = $1`, venueID).Scan(&ownerID)
+	err := r.db.QueryRow(ctx, `SELECT owner_id FROM venues WHERE id = $1`, venueID).Scan(&ownerID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return 0, fmt.Errorf("venue not found")
@@ -562,4 +524,100 @@ func (s *VenuesStore) GetOwnerIDFromVenueID(ctx context.Context, venueID int64) 
 		return 0, err
 	}
 	return ownerID, nil
+}
+
+// AddFavorite inserts a record into the favorite_venues table.
+func (r *Repository) AddFavorite(ctx context.Context, userID, venueID int64) error {
+	query := `
+		INSERT INTO favorite_venues (user_id, venue_id)
+		VALUES ($1, $2)
+		ON CONFLICT DO NOTHING
+	`
+	_, err := r.db.Exec(ctx, query, userID, venueID)
+	if err != nil {
+		return fmt.Errorf("failed to add favorite: %w", err)
+	}
+	return nil
+}
+
+// RemoveFavorite deletes a record from the favorite_venues table.
+func (r *Repository) RemoveFavorite(ctx context.Context, userID, venueID int64) error {
+	query := `
+		DELETE FROM favorite_venues
+		WHERE user_id = $1 AND venue_id = $2
+	`
+	_, err := r.db.Exec(ctx, query, userID, venueID)
+	if err != nil {
+		return fmt.Errorf("failed to remove favorite: %w", err)
+	}
+	return nil
+}
+
+// TODO: add phone number here
+// GetFavoritesByUser returns all venues that a user has favorited.
+// It performs a join between favorite_venues and venues.
+func (r *Repository) GetFavoritesByUser(ctx context.Context, userID int64) ([]Venue, error) {
+	query := `
+		SELECT v.id, v.owner_id, v.name, v.address, v.description, v.amenities,
+		       v.open_time, v.image_urls, v.sport, v.created_at, v.updated_at
+		FROM venues v
+		JOIN favorite_venues f ON v.id = f.venue_id
+		WHERE f.user_id = $1
+		ORDER BY f.created_at DESC
+	`
+
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get favorites: %w", err)
+	}
+	defer rows.Close()
+
+	var favorites []Venue
+	for rows.Next() {
+		var v Venue
+
+		// Scan the venue fields – be sure to match the order and types.
+		if err := rows.Scan(
+			&v.ID, &v.OwnerID, &v.Name, &v.Address, &v.Description,
+			&v.Amenities, &v.OpenTime, &v.ImageURLs, &v.Sport,
+			&v.CreatedAt, &v.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan venue row: %w", err)
+		}
+
+		favorites = append(favorites, v)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return favorites, nil
+}
+
+// GetFavoriteVenueIDsByUser returns the venue IDs a user has favorited.
+func (r *Repository) GetFavoriteVenueIDsByUser(ctx context.Context, userID int64) (map[int64]struct{}, error) {
+	query := `
+        SELECT venue_id
+        FROM favorite_venues
+        WHERE user_id = $1
+    `
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get favorite ids: %w", err)
+	}
+	defer rows.Close()
+
+	favs := make(map[int64]struct{})
+	for rows.Next() {
+		var vid int64
+		if err := rows.Scan(&vid); err != nil {
+			return nil, fmt.Errorf("failed to scan favorite id: %w", err)
+		}
+		favs[vid] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return favs, nil
 }

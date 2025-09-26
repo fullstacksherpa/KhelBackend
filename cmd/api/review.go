@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"khel/internal/store"
+	venuereviews "khel/internal/domain/venuereview"
+
 	"math"
 	"net/http"
 	"strconv"
@@ -52,7 +53,7 @@ func (app *application) createVenueReviewHandler(w http.ResponseWriter, r *http.
 	user := getUserFromContext(r)
 	userID := user.ID
 
-	already, err := app.store.Reviews.HasReview(r.Context(), vID, userID)
+	already, err := app.store.VenuesReviews.HasReview(r.Context(), vID, userID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -63,14 +64,14 @@ func (app *application) createVenueReviewHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	review := &store.Review{
+	review := &venuereviews.Review{
 		VenueID: vID,
 		UserID:  userID,
 		Rating:  payload.Rating,
 		Comment: payload.Comment,
 	}
 
-	if err := app.store.Reviews.CreateReview(r.Context(), review); err != nil {
+	if err := app.store.VenuesReviews.CreateReview(r.Context(), review); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
@@ -98,14 +99,14 @@ func (app *application) getVenueReviewsHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	reviews, err := app.store.Reviews.GetReviews(r.Context(), vID)
+	reviews, err := app.store.VenuesReviews.GetReviews(r.Context(), vID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
 
 	// Get review stats
-	total, average, err := app.store.Reviews.GetReviewStats(r.Context(), vID)
+	total, average, err := app.store.VenuesReviews.GetReviewStats(r.Context(), vID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -146,7 +147,7 @@ func (app *application) deleteVenueReviewHandler(w http.ResponseWriter, r *http.
 	user := getUserFromContext(r)
 	userID := user.ID
 
-	if err := app.store.Reviews.DeleteReview(r.Context(), rID, userID); err != nil {
+	if err := app.store.VenuesReviews.DeleteReview(r.Context(), rID, userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			app.notFoundResponse(w, r, err)
 			return

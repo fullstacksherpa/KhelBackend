@@ -1,138 +1,61 @@
-package store
+package bookings
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"khel/internal/database"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type PricingSlot struct {
-	ID        int64
-	VenueID   int64
-	DayOfWeek string
-	// Note: start_time and end_time are stored as TIME in the DB.
-	// We use time.Time to hold the time part.
-	StartTime time.Time
-	EndTime   time.Time
-	Price     int
+type Store interface {
+	GetBookingOwner(ctx context.Context, venueID, bookingID int64) (int64, error)
+	GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error)
+	GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error)
+	CreateBooking(ctx context.Context, booking *Booking) (int64, error)
+	UpdatePricing(ctx context.Context, p *PricingSlot) error
+	DeletePricingSlot(ctx context.Context, venueID, pricingID int64) error
+	CreatePricingSlotsBatch(ctx context.Context, slots []*PricingSlot) error
+	GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error)
+	GetCanceledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]CanceledBooking, error)
+	UpdateBookingStatus(ctx context.Context, venueID, bookingID int64, status string) error
+	AcceptBooking(ctx context.Context, venueID, bookingID int64) error
+	RejectBooking(ctx context.Context, venueID, bookingID int64) error
+	CancelBooking(ctx context.Context, venueID, bookingID int64) error
+	GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error)
+	GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error)
+	GetBookingByID(ctx context.Context, bookingID int64) (*Booking, error)
+	GetVenueOwnerIDFromBookingID(ctx context.Context, bookingID int64) (int64, error)
 }
 
-// Booking represents a booking record.
-type Booking struct {
-	ID            int64     `json:"id"`
-	VenueID       int64     `json:"venue_id"`
-	UserID        int64     `json:"user_id"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	TotalPrice    int       `json:"total_price"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-	CustomerName  *string   `json:"customer_name,omitempty" swaggertype:"string"`  // optional
-	CustomerPhone *string   `json:"customer_phone,omitempty" swaggertype:"string"` // optional
-	Note          *string   `json:"note,omitempty" swaggertype:"string"`           // optional
-}
-
-// AvailableTimeSlot represents a free time interval for booking.
-type AvailableTimeSlot struct {
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
-	PricePerHour int       `json:"price_per_hour"`
-}
-
-// Interval is used for time arithmetic.
-type Interval struct {
-	Start time.Time
-	End   time.Time
-}
-
-// PendingBooking is the view model for a pending booking request.
-type PendingBooking struct {
-	BookingID    int64     `json:"booking_id"`
-	UserID       int64     `json:"user_id"`
-	UserName     string    `json:"user_name"`
-	UserImageURL *string   `json:"user_image"` // nullable
-	UserPhone    string    `json:"user_number"`
-	Price        int       `json:"price"`
-	RequestedAt  time.Time `json:"requested_at"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
-}
-
-type CanceledBooking struct {
-	BookingID    int64     `json:"booking_id"`
-	UserID       int64     `json:"user_id"`
-	UserName     string    `json:"user_name"`
-	UserImageURL *string   `json:"user_image"` // nullable
-	UserPhone    string    `json:"user_number"`
-	Price        int       `json:"price"`
-	RequestedAt  time.Time `json:"requested_at"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
-}
-
-type ScheduledBooking struct {
-	BookingID     int64     `json:"booking_id"`
-	UserID        int64     `json:"user_id"`
-	UserName      string    `json:"user_name"`
-	UserImageURL  *string   `json:"user_image"`
-	UserPhone     string    `json:"user_number"`
-	Price         int       `json:"price"`
-	AcceptedAt    time.Time `json:"accepted_at"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	CustomerName  *string   `json:"customer_name,omitempty" swaggertype:"string"`  // optional
-	CustomerPhone *string   `json:"customer_phone,omitempty" swaggertype:"string"` // optional
-	Note          *string   `json:"note,omitempty" swaggertype:"string"`           // optional
-}
-
-type UserBooking struct {
-	BookingID    int64     `json:"booking_id"`
-	VenueID      int64     `json:"venue_id"`
-	VenueName    string    `json:"venue_name"`
-	VenueAddress string    `json:"venue_address"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
-	TotalPrice   int       `json:"total_price"`
-	Status       string    `json:"status"`
-	CreatedAt    time.Time `json:"created_at"`
-}
-
-type BookingFilter struct {
-	Status *string // nil = no filtering
-	Page   int     // 1-based
-	Limit  int     // max items per page
-}
-
-func (f BookingFilter) offset() int {
-	return (f.Page - 1) * f.Limit
-}
-
-type BookingStore struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func (s *BookingStore) GetBookingOwner(ctx context.Context, venueID, bookingID int64) (int64, error) {
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
+func (r *Repository) GetBookingOwner(ctx context.Context, venueID, bookingID int64) (int64, error) {
 	const query = `SELECT user_id FROM bookings WHERE id = $1 AND venue_id = $2`
 	var userID int64
-	err := s.db.QueryRow(ctx, query, bookingID, venueID).Scan(&userID)
+	err := r.db.QueryRow(ctx, query, bookingID, venueID).Scan(&userID)
 	if err != nil {
 		return 0, err
 	}
 	return userID, nil
 }
 
-func (s *BookingStore) GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error) {
+func (r *Repository) GetPricingSlots(ctx context.Context, venueID int64, dayOfWeek string) ([]PricingSlot, error) {
 	query := `
         SELECT id, venue_id, day_of_week, start_time, end_time, price 
         FROM venue_pricing 
         WHERE venue_id = $1 AND day_of_week = $2
         ORDER BY start_time`
-	rows, err := s.db.Query(ctx, query, venueID, dayOfWeek)
+	rows, err := r.db.Query(ctx, query, venueID, dayOfWeek)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +76,7 @@ func (s *BookingStore) GetPricingSlots(ctx context.Context, venueID int64, dayOf
 	return slots, nil
 }
 
-func (s *BookingStore) GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error) {
+func (r *Repository) GetBookingsForDate(ctx context.Context, venueID int64, date time.Time) ([]Interval, error) {
 	// Load Kathmandu location
 	loc, err := time.LoadLocation("Asia/Kathmandu")
 	if err != nil {
@@ -179,7 +102,7 @@ func (s *BookingStore) GetBookingsForDate(ctx context.Context, venueID int64, da
           AND start_time < $2 AND end_time > $3
         ORDER BY start_time
     `
-	rows, err := s.db.Query(ctx, query, venueID, endOfDayUTC, startOfDayUTC)
+	rows, err := r.db.Query(ctx, query, venueID, endOfDayUTC, startOfDayUTC)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +120,7 @@ func (s *BookingStore) GetBookingsForDate(ctx context.Context, venueID int64, da
 }
 
 // CreateBooking inserts a booking record into the database.
-func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) (int64, error) {
+func (r *Repository) CreateBooking(ctx context.Context, booking *Booking) (int64, error) {
 	query := `
         INSERT INTO bookings (
             venue_id, user_id, start_time, end_time, total_price, status,
@@ -205,7 +128,7 @@ func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) (int
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id, created_at, updated_at
     `
-	err := s.db.QueryRow(ctx, query,
+	err := r.db.QueryRow(ctx, query,
 		booking.VenueID,
 		booking.UserID,
 		booking.StartTime,
@@ -223,12 +146,12 @@ func (s *BookingStore) CreateBooking(ctx context.Context, booking *Booking) (int
 }
 
 // UpdatePricing updates a pricing slot in the database.
-func (s *BookingStore) UpdatePricing(ctx context.Context, p *PricingSlot) error {
+func (r *Repository) UpdatePricing(ctx context.Context, p *PricingSlot) error {
 	query := `
 		UPDATE venue_pricing 
 		SET day_of_week = $1, start_time = $2, end_time = $3, price = $4
 		WHERE id = $5 AND venue_id = $6`
-	result, err := s.db.Exec(ctx, query, p.DayOfWeek, p.StartTime.Format("15:04:05"), p.EndTime.Format("15:04:05"), p.Price, p.ID, p.VenueID)
+	result, err := r.db.Exec(ctx, query, p.DayOfWeek, p.StartTime.Format("15:04:05"), p.EndTime.Format("15:04:05"), p.Price, p.ID, p.VenueID)
 	if err != nil {
 		return err
 	}
@@ -241,9 +164,9 @@ func (s *BookingStore) UpdatePricing(ctx context.Context, p *PricingSlot) error 
 }
 
 // CreatePricingSlotsBatch uses pgx.Batch to insert multiple pricing slots in one round-trip.
-func (s *BookingStore) CreatePricingSlotsBatch(ctx context.Context, slots []*PricingSlot) error {
+func (r *Repository) CreatePricingSlotsBatch(ctx context.Context, slots []*PricingSlot) error {
 	// Use your withTx helper for transaction
-	return withTx(s.db, ctx, func(tx pgx.Tx) error {
+	return database.WithTx(r.db, ctx, func(tx pgx.Tx) error {
 		// Prepare the SQL once
 		const sql = `
 		INSERT INTO venue_pricing
@@ -280,12 +203,12 @@ func (s *BookingStore) CreatePricingSlotsBatch(ctx context.Context, slots []*Pri
 	})
 }
 
-func (s *BookingStore) DeletePricingSlot(ctx context.Context, venueID, pricingID int64) error {
+func (r *Repository) DeletePricingSlot(ctx context.Context, venueID, pricingID int64) error {
 	const q = `
          DELETE FROM venue_pricing WHERE id = $1 AND venue_id = $2
 `
 
-	res, err := s.db.Exec(ctx, q, pricingID, venueID)
+	res, err := r.db.Exec(ctx, q, pricingID, venueID)
 	if err != nil {
 		return fmt.Errorf("failed to delete pricing slot: %w", err)
 	}
@@ -297,7 +220,7 @@ func (s *BookingStore) DeletePricingSlot(ctx context.Context, venueID, pricingID
 }
 
 // GetBookingByID retrieves a single booking by its ID
-func (s *BookingStore) GetBookingByID(ctx context.Context, bookingID int64) (*Booking, error) {
+func (r *Repository) GetBookingByID(ctx context.Context, bookingID int64) (*Booking, error) {
 	const query = `
         SELECT 
             id, venue_id, user_id, start_time, end_time, 
@@ -308,7 +231,7 @@ func (s *BookingStore) GetBookingByID(ctx context.Context, bookingID int64) (*Bo
     `
 
 	var booking Booking
-	err := s.db.QueryRow(ctx, query, bookingID).Scan(
+	err := r.db.QueryRow(ctx, query, bookingID).Scan(
 		&booking.ID,
 		&booking.VenueID,
 		&booking.UserID,
@@ -333,7 +256,7 @@ func (s *BookingStore) GetBookingByID(ctx context.Context, bookingID int64) (*Bo
 	return &booking, nil
 }
 
-func (s *BookingStore) GetVenueOwnerIDFromBookingID(ctx context.Context, bookingID int64) (int64, error) {
+func (r *Repository) GetVenueOwnerIDFromBookingID(ctx context.Context, bookingID int64) (int64, error) {
 	const query = `
         SELECT v.owner_id
         FROM bookings b
@@ -342,7 +265,7 @@ func (s *BookingStore) GetVenueOwnerIDFromBookingID(ctx context.Context, booking
     `
 
 	var ownerID int64
-	err := s.db.QueryRow(ctx, query, bookingID).Scan(&ownerID)
+	err := r.db.QueryRow(ctx, query, bookingID).Scan(&ownerID)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -356,7 +279,7 @@ func (s *BookingStore) GetVenueOwnerIDFromBookingID(ctx context.Context, booking
 
 // GetPendingBookingsForVenueDate loads all bookings with status='pending'
 // for the given venue on the given date.
-func (s *BookingStore) GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error) {
+func (r *Repository) GetPendingBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]PendingBooking, error) {
 	// normalize to date only
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
@@ -381,7 +304,7 @@ func (s *BookingStore) GetPendingBookingsForVenueDate(ctx context.Context, venue
         AND b.start_time <  $3
       ORDER BY b.created_at
     `
-	rows, err := s.db.Query(ctx, q, venueID, startOfDay, endOfDay)
+	rows, err := r.db.Query(ctx, q, venueID, startOfDay, endOfDay)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +331,7 @@ func (s *BookingStore) GetPendingBookingsForVenueDate(ctx context.Context, venue
 	return out, rows.Err()
 }
 
-func (s *BookingStore) GetCanceledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]CanceledBooking, error) {
+func (r *Repository) GetCanceledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]CanceledBooking, error) {
 	// normalize to date only
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
@@ -433,7 +356,7 @@ func (s *BookingStore) GetCanceledBookingsForVenueDate(ctx context.Context, venu
         AND b.start_time <  $3
       ORDER BY b.created_at
     `
-	rows, err := s.db.Query(ctx, q, venueID, startOfDay, endOfDay)
+	rows, err := r.db.Query(ctx, q, venueID, startOfDay, endOfDay)
 	if err != nil {
 		return nil, err
 	}
@@ -460,7 +383,7 @@ func (s *BookingStore) GetCanceledBookingsForVenueDate(ctx context.Context, venu
 	return out, rows.Err()
 }
 
-func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error) {
+func (r *Repository) GetScheduledBookingsForVenueDate(ctx context.Context, venueID int64, date time.Time) ([]ScheduledBooking, error) {
 	// normalize to date only
 	startOfDay := date.In(time.UTC)
 	endOfDay := date.Add(24 * time.Hour).In(time.UTC)
@@ -488,7 +411,7 @@ func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, ven
         AND b.start_time <  $3
       ORDER BY b.start_time
     `
-	rows, err := s.db.Query(ctx, q, venueID, startOfDay, endOfDay)
+	rows, err := r.db.Query(ctx, q, venueID, startOfDay, endOfDay)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +442,7 @@ func (s *BookingStore) GetScheduledBookingsForVenueDate(ctx context.Context, ven
 }
 
 // UpdateBookingStatus sets a new status ("confirmed", "rejected", etc.) on a booking.
-func (s *BookingStore) UpdateBookingStatus(ctx context.Context, venueID, bookingID int64, status string) error {
+func (r *Repository) UpdateBookingStatus(ctx context.Context, venueID, bookingID int64, status string) error {
 	const q = `
       UPDATE bookings
       SET status    = $1,
@@ -527,7 +450,7 @@ func (s *BookingStore) UpdateBookingStatus(ctx context.Context, venueID, booking
       WHERE id       = $2
         AND venue_id = $3
     `
-	res, err := s.db.Exec(ctx, q, status, bookingID, venueID)
+	res, err := r.db.Exec(ctx, q, status, bookingID, venueID)
 	if err != nil {
 		return err
 	}
@@ -540,21 +463,21 @@ func (s *BookingStore) UpdateBookingStatus(ctx context.Context, venueID, booking
 }
 
 // AcceptBooking marks a pending booking as confirmed.
-func (s *BookingStore) AcceptBooking(ctx context.Context, venueID, bookingID int64) error {
-	return s.UpdateBookingStatus(ctx, venueID, bookingID, "confirmed")
+func (r *Repository) AcceptBooking(ctx context.Context, venueID, bookingID int64) error {
+	return r.UpdateBookingStatus(ctx, venueID, bookingID, "confirmed")
 }
 
 // RejectBooking marks a pending booking as rejected.
-func (s *BookingStore) RejectBooking(ctx context.Context, venueID, bookingID int64) error {
-	return s.UpdateBookingStatus(ctx, venueID, bookingID, "rejected")
+func (r *Repository) RejectBooking(ctx context.Context, venueID, bookingID int64) error {
+	return r.UpdateBookingStatus(ctx, venueID, bookingID, "rejected")
 }
 
 // RejectBooking marks a pending booking as rejected.
-func (s *BookingStore) CancelBooking(ctx context.Context, venueID, bookingID int64) error {
-	return s.UpdateBookingStatus(ctx, venueID, bookingID, "canceled")
+func (r *Repository) CancelBooking(ctx context.Context, venueID, bookingID int64) error {
+	return r.UpdateBookingStatus(ctx, venueID, bookingID, "canceled")
 }
 
-func (s *BookingStore) GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error) {
+func (r *Repository) GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error) {
 	// build a dynamic WHERE clause
 	base := `
       SELECT
@@ -585,7 +508,7 @@ func (s *BookingStore) GetBookingsByUser(ctx context.Context, userID int64, filt
 	base += fmt.Sprintf(" ORDER BY b.created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
 	args = append(args, filter.Limit, filter.offset())
 
-	rows, err := s.db.Query(ctx, base, args...)
+	rows, err := r.db.Query(ctx, base, args...)
 	if err != nil {
 		return nil, err
 	}

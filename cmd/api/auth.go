@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"khel/internal/domain/users"
 	"khel/internal/mailer"
-	"khel/internal/store"
 	"net/http"
 	"strconv"
 	"time"
@@ -45,7 +45,7 @@ type RegisterUserPayload struct {
 
 // TODO: remove Token from response
 type UserWithToken struct {
-	*store.User `json:"user"`
+	*users.User `json:"user"`
 	Token       string `json:"token"`
 }
 
@@ -75,7 +75,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user := &store.User{
+	user := &users.User{
 		FirstName: payload.FirstName,
 		LastName:  payload.LastName,
 		Email:     payload.Email,
@@ -97,9 +97,9 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	err := app.store.Users.CreateAndInvite(ctx, user, hashToken, app.config.mail.exp)
 	if err != nil {
 		switch err {
-		case store.ErrDuplicateEmail:
+		case users.ErrDuplicateEmail:
 			app.badRequestResponse(w, r, err)
-		case store.ErrDuplicatePhoneNumber:
+		case users.ErrDuplicatePhoneNumber:
 			app.badRequestResponse(w, r, err)
 		default:
 			app.internalServerError(w, r, err)
@@ -188,7 +188,7 @@ func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Reques
 	user, err := app.store.Users.GetByEmail(r.Context(), payload.Email)
 	if err != nil {
 		switch err {
-		case store.ErrNotFound:
+		case users.ErrNotFound:
 			app.unauthorizedErrorResponse(w, r, err)
 		default:
 			app.internalServerError(w, r, err)
@@ -408,7 +408,7 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 	// Update user with reset token and expiration time
 	err = app.store.Users.UpdateResetToken(ctx, payload.Email, hashToken, resetTokenExpires)
 	if err != nil {
-		if err == store.ErrNotFound {
+		if err == users.ErrNotFound {
 			app.badRequestResponse(w, r, errors.New("email not found"))
 			return
 		}
@@ -483,7 +483,7 @@ func (app *application) resetPasswordHandler(w http.ResponseWriter, r *http.Requ
 	// Get user by reset token
 	user, err := app.store.Users.GetByResetToken(ctx, hashToken)
 	if err != nil {
-		if err == store.ErrNotFound {
+		if err == users.ErrNotFound {
 			app.badRequestResponse(w, r, errors.New("invalid or expired token"))
 			return
 		}

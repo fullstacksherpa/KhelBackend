@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"khel/internal/domain/games"
 	"khel/internal/notifications"
-	"khel/internal/store"
 	"log"
 	"net/http"
 	"strconv"
@@ -62,7 +62,7 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 	user := getUserFromContext(r)
 
 	// 4. Create the game
-	game := &store.Game{
+	game := &games.Game{
 		SportType:     payload.SportType,
 		Price:         payload.Price,
 		Format:        payload.Format,
@@ -134,7 +134,7 @@ func (app *application) CreateJoinRequest(w http.ResponseWriter, r *http.Request
 	// Check if game exists and is active
 	game, err := app.store.Games.GetGameByID(r.Context(), gameID)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, games.ErrNotFound) {
 			app.notFoundResponse(w, r, errors.New("game not found or is inactive"))
 		} else {
 			app.internalServerError(w, r, err)
@@ -212,20 +212,20 @@ func (app *application) AcceptJoinRequest(w http.ResponseWriter, r *http.Request
 	// Get the join request
 	req, err := app.store.Games.GetJoinRequest(r.Context(), gameID, payload.UserID)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, games.ErrNotFound) {
 			writeJSONError(w, http.StatusNotFound, "Invalid request")
 			return
 		}
 		writeJSONError(w, http.StatusInternalServerError, "Internal server error")
 		return
 	}
-	if req.Status != store.GameRequestStatusPending {
+	if req.Status != games.GameRequestStatusPending {
 		app.badRequestResponse(w, r, errors.New("request is not in pending state"))
 		return
 	}
 
 	// Update request status
-	err = app.store.Games.UpdateRequestStatus(r.Context(), gameID, payload.UserID, store.GameRequestStatusAccepted)
+	err = app.store.Games.UpdateRequestStatus(r.Context(), gameID, payload.UserID, games.GameRequestStatusAccepted)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Failed to update request")
 		return
@@ -325,8 +325,8 @@ func (app *application) getGamePlayersHandler(w http.ResponseWriter, r *http.Req
 	// Fetch players for the game
 	players, err := app.store.Games.GetGamePlayers(r.Context(), gameID)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			app.notFoundResponse(w, r, store.ErrNotFound)
+		if errors.Is(err, games.ErrNotFound) {
+			app.notFoundResponse(w, r, games.ErrNotFound)
 			return
 		}
 		app.internalServerError(w, r, err)
@@ -386,7 +386,7 @@ func (app *application) RejectJoinRequest(w http.ResponseWriter, r *http.Request
 	// Get the join request
 	req, err := app.store.Games.GetJoinRequest(r.Context(), gameID, payload.UserID)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, games.ErrNotFound) {
 			writeJSONError(w, http.StatusNotFound, "Invalid request")
 			return
 		}
@@ -395,13 +395,13 @@ func (app *application) RejectJoinRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Check if the request is still pending
-	if req.Status != store.GameRequestStatusPending {
+	if req.Status != games.GameRequestStatusPending {
 		app.badRequestResponse(w, r, errors.New("request is not in pending state"))
 		return
 	}
 
 	// Update request status to rejected
-	err = app.store.Games.UpdateRequestStatus(r.Context(), gameID, payload.UserID, store.GameRequestStatusRejected)
+	err = app.store.Games.UpdateRequestStatus(r.Context(), gameID, payload.UserID, games.GameRequestStatusRejected)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Failed to update request status")
 		return
@@ -499,7 +499,7 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 //	@Failure		500				{object}	error				"Internal server error"
 //	@Router			/games/get-games [get]
 func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) {
-	fq := store.GameFilterQuery{
+	fq := games.GameFilterQuery{
 		Limit:      10,
 		Offset:     0,
 		Sort:       "asc",
@@ -520,7 +520,7 @@ func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) 
 
 	user := getUserFromContext(r) // Can be nil
 
-	games, err := app.store.Games.GetGames(r.Context(), fq)
+	gameList, err := app.store.Games.GetGames(r.Context(), fq)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -530,7 +530,7 @@ func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) 
 	shortlistedIDs := make(map[int64]struct{})
 
 	if user != nil { // Only fetch if authenticated
-		shortlistedGames, err := app.store.ShortlistedGames.GetShortlistedGamesByUser(r.Context(), user.ID)
+		shortlistedGames, err := app.store.Games.GetShortlistedGamesByUser(r.Context(), user.ID)
 		if err != nil {
 			app.internalServerError(w, r, err)
 			return
@@ -542,14 +542,14 @@ func (app *application) getGamesHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Mark shortlisted
-	for i, game := range games {
+	for i, game := range gameList {
 		if _, found := shortlistedIDs[game.GameID]; found {
-			games[i].Shortlisted = true
+			gameList[i].Shortlisted = true
 		}
 	}
 
-	response := make([]store.GameSummary, len(games))
-	copy(response, games)
+	response := make([]games.GameSummary, len(gameList))
+	copy(response, gameList)
 
 	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
 		app.internalServerError(w, r, err)
@@ -693,7 +693,7 @@ func (app *application) getGameDetailsHandler(w http.ResponseWriter, r *http.Req
 	game, err := app.store.Games.GetGameDetailsWithID(r.Context(), gameID)
 
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, games.ErrNotFound) {
 			app.notFoundResponse(w, r, errors.New("game not found"))
 			return
 		}

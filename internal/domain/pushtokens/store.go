@@ -1,24 +1,32 @@
-// internal/store/push_tokens.go
-package store
+package pushtokens
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrNoTokens = errors.New("no push tokens")
+type Store interface {
+	AddOrUpdatePushToken(ctx context.Context, userID int64, token string, deviceInfo json.RawMessage) error
+	RemovePushToken(ctx context.Context, userID int64, token string) error
+	RemoveTokensByTokenList(ctx context.Context, tokens []string) error
+	GetTokensByUserIDs(ctx context.Context, userIDs []int64) (map[int64][]string, error)
+	PruneStaleTokens(ctx context.Context, olderThan time.Duration) error
+}
 
-type PushTokensStore struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
 // AddOrUpdatePushToken upserts token + device info, updates last_updated
-func (s *PushTokensStore) AddOrUpdatePushToken(ctx context.Context, userID int64, token string, deviceInfo json.RawMessage) error {
+func (r *Repository) AddOrUpdatePushToken(ctx context.Context, userID int64, token string, deviceInfo json.RawMessage) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
@@ -29,22 +37,22 @@ func (s *PushTokensStore) AddOrUpdatePushToken(ctx context.Context, userID int64
 	DO UPDATE SET device_info = EXCLUDED.device_info, last_updated = NOW();
 	`
 
-	_, err := s.db.Exec(ctx, q, userID, token, deviceInfo)
+	_, err := r.db.Exec(ctx, q, userID, token, deviceInfo)
 	return err
 }
 
 // RemovePushToken deletes a token for a user
-func (s *PushTokensStore) RemovePushToken(ctx context.Context, userID int64, token string) error {
+func (r *Repository) RemovePushToken(ctx context.Context, userID int64, token string) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
 	q := `DELETE FROM user_push_tokens WHERE user_id = $1 AND expo_push_token = $2`
-	_, err := s.db.Exec(ctx, q, userID, token)
+	_, err := r.db.Exec(ctx, q, userID, token)
 	return err
 }
 
 // RemoveTokensByTokenList deletes tokens matching any token in the slice
-func (s *PushTokensStore) RemoveTokensByTokenList(ctx context.Context, tokens []string) error {
+func (r *Repository) RemoveTokensByTokenList(ctx context.Context, tokens []string) error {
 	if len(tokens) == 0 {
 		return nil
 	}
@@ -53,12 +61,12 @@ func (s *PushTokensStore) RemoveTokensByTokenList(ctx context.Context, tokens []
 
 	// expo tokens are text[] accepted by pg
 	q := `DELETE FROM user_push_tokens WHERE expo_push_token = ANY($1)`
-	_, err := s.db.Exec(ctx, q, tokens)
+	_, err := r.db.Exec(ctx, q, tokens)
 	return err
 }
 
 // The function retrieves push notification tokens for multiple users at once, returning them as a map where each key is a UserID and the value is a slice of push token associated with that user.
-func (s *PushTokensStore) GetTokensByUserIDs(ctx context.Context, userIDs []int64) (map[int64][]string, error) {
+func (r *Repository) GetTokensByUserIDs(ctx context.Context, userIDs []int64) (map[int64][]string, error) {
 	result := make(map[int64][]string)
 	if len(userIDs) == 0 {
 		return result, nil
@@ -68,7 +76,7 @@ func (s *PushTokensStore) GetTokensByUserIDs(ctx context.Context, userIDs []int6
 	defer cancel()
 
 	q := `SELECT user_id, expo_push_token FROM user_push_tokens WHERE user_id = ANY($1)`
-	rows, err := s.db.Query(ctx, q, userIDs)
+	rows, err := r.db.Query(ctx, q, userIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -86,13 +94,13 @@ func (s *PushTokensStore) GetTokensByUserIDs(ctx context.Context, userIDs []int6
 }
 
 // PruneStaleTokens deletes tokens not updated in olderThan duration
-func (s *PushTokensStore) PruneStaleTokens(ctx context.Context, olderThan time.Duration) error {
+func (r *Repository) PruneStaleTokens(ctx context.Context, olderThan time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
 	// pass interval string e.g. "90 days" or "3600 seconds"
 	interval := fmt.Sprintf("%d seconds", int64(olderThan.Seconds()))
 	q := `DELETE FROM user_push_tokens WHERE last_updated < NOW() - $1::interval`
-	_, err := s.db.Exec(ctx, q, interval)
+	_, err := r.db.Exec(ctx, q, interval)
 	return err
 }

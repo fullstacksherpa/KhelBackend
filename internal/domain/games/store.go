@@ -1,152 +1,61 @@
-package store
+package games
 
 import (
 	"context"
-
 	"errors"
 	"fmt"
+	"khel/internal/domain/users"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type BookingStatus string
+type Store interface {
+	GetGames(ctx context.Context, q GameFilterQuery) ([]GameSummary, error)
+	Create(ctx context.Context, game *Game) (int64, error)
+	GetAdminID(ctx context.Context, gameID int64) (int64, error)
+	GetGameByID(ctx context.Context, gameID int64) (*Game, error)
+	CheckRequestExist(ctx context.Context, gameID int64, userID int64) (bool, error)
+	AddToGameRequest(ctx context.Context, gameID int64, UserID int64) error
+	IsAdminAssistant(ctx context.Context, gameID int64, userID int64) (bool, error)
+	IsAdmin(ctx context.Context, gameID, userID int64) (bool, error)
+	ToggleMatchFull(ctx context.Context, gameID int64) error
+	InsertNewPlayer(ctx context.Context, gameID int64, userID int64) error
+	InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error
+	UpdateRequestStatus(ctx context.Context, gameID, userID int64, status GameRequestStatus) error
+	GetJoinRequest(ctx context.Context, gameID, userID int64) (*GameRequest, error)
+	DeleteJoinRequest(ctx context.Context, gameID, userID int64) error
+	GetAllJoinRequests(ctx context.Context, gameID int64) ([]*GameRequestWithUser, error)
+	GetPlayerCount(ctx context.Context, gameID int) (int, error)
+	GetGamePlayers(ctx context.Context, gameID int64) ([]*users.User, error)
+	AssignAssistant(ctx context.Context, gameID, playerID int64) error
+	CancelGame(ctx context.Context, gameID int64) error
+	GetGameDetailsWithID(ctx context.Context, gameID int64) (*GameDetails, error)
+	GetUpcomingGamesByVenue(ctx context.Context, venueID int64) ([]GameSummary, error)
+	GetUpcomingGamesByUser(ctx context.Context, userID int64) ([]GameSummary, error)
+	MarkCompletedGames() error
+	GetAllGamePlayerIDs(ctx context.Context, gameID int64) ([]int64, error)
 
-const (
-	BookingPending   BookingStatus = "pending"
-	BookingRequested BookingStatus = "requested"
-	BookingBooked    BookingStatus = "booked"
-	BookingRejected  BookingStatus = "rejected"
-	BookingCancelled BookingStatus = "cancelled"
-)
+	//... Shortlisted games
 
-// Game represents a game in the system
-type Game struct {
-	ID            int64         `json:"id"`                    // Primary key
-	SportType     string        `json:"sport_type"`            // Type of sport (e.g., futsal, basketball)
-	Price         *int          `json:"price,omitempty"`       // Price of the game (nullable)
-	Format        *string       `json:"format,omitempty"`      // Game format (nullable)
-	VenueID       int64         `json:"venue_id"`              // Foreign key to venues table
-	AdminID       int64         `json:"admin_id"`              // Foreign key to users table (game admin)
-	MaxPlayers    int           `json:"max_players"`           // Maximum number of players
-	GameLevel     *string       `json:"game_level,omitempty"`  // Skill level (beginner, intermediate, advanced)
-	StartTime     time.Time     `json:"start_time"`            // Game start time
-	EndTime       time.Time     `json:"end_time"`              // Game end time
-	Visibility    string        `json:"visibility"`            // Visibility (public or private)
-	Instruction   *string       `json:"instruction,omitempty"` // Game instructions (nullable)
-	Status        string        `json:"status"`                // Game status (active, cancelled, completed)
-	BookingStatus BookingStatus `json:"booking_status"`
-	MatchFull     bool          `json:"match_full"` // Whether the game is full
-	CreatedAt     time.Time     `json:"created_at"` // Timestamp when the game was created
-	UpdatedAt     time.Time     `json:"updated_at"` // Timestamp when the game was last updated
+	AddShortlist(ctx context.Context, userID, gameID int64) error
+	RemoveShortlist(ctx context.Context, userID, gameID int64) error
+	GetShortlistedGamesByUser(
+		ctx context.Context,
+		userID int64,
+	) ([]ShortlistedGameDetail, error)
 }
 
-// GameRequest represents a request to join a game in the system
-type GameRequest struct {
-	ID          int64             `json:"id"`
-	GameID      int64             `json:"game_id"`
-	UserID      int64             `json:"user_id"`
-	Status      GameRequestStatus `json:"status"`
-	RequestTime time.Time         `json:"request_time"`
-	UpdatedAt   time.Time         `json:"updated_at"`
-}
-
-type GameRequestStatus string
-
-// Enum values for GameRequestStatus
-const (
-	GameRequestStatusPending  GameRequestStatus = "pending"
-	GameRequestStatusAccepted GameRequestStatus = "accepted"
-	GameRequestStatusRejected GameRequestStatus = "rejected"
-)
-
-type GamePlayer struct {
-	ID       int64     `json:"id"`
-	GameID   int64     `json:"game_id"`
-	UserID   int64     `json:"user_id"`
-	Role     string    `json:"role"`
-	JoinedAt time.Time `json:"joined_at"`
-}
-type GameSummary struct {
-	GameID        int64         `json:"game_id"`
-	VenueID       int64         `json:"venue_id"`
-	VenueName     string        `json:"venue_name"`
-	SportType     string        `json:"sport_type"`
-	Price         *int          `json:"price,omitempty"`
-	Format        *string       `json:"format,omitempty"`
-	GameAdminName string        `json:"game_admin_name"`
-	GameLevel     *string       `json:"game_level,omitempty"`
-	StartTime     time.Time     `json:"start_time"`
-	EndTime       time.Time     `json:"end_time"`
-	MaxPlayers    int           `json:"max_players"`
-	CurrentPlayer int           `json:"current_player"`
-	PlayerImages  []string      `json:"player_images"`
-	BookingStatus BookingStatus `json:"booking_status"`
-	MatchFull     bool          `json:"match_full"`
-	VenueLat      float64       `json:"venue_lat"` // Venue latitude
-	VenueLon      float64       `json:"venue_lon"` // Venue longitude
-	Shortlisted   bool          `json:"shortlisted"`
-	Status        string        `json:"status"`
-}
-
-type GameWithVenue struct {
-	ID            int64
-	SportType     string
-	Price         int
-	Format        string
-	VenueID       int
-	AdminID       int
-	MaxPlayers    int
-	GameLevel     string
-	StartTime     time.Time
-	EndTime       time.Time
-	Visibility    string
-	Status        string
-	BookingStatus BookingStatus
-	MatchFull     bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-
-	// Venue details for Mapbox
-	VenueName string
-	Address   string
-	Latitude  float64
-	Longitude float64
-	Amenities []string
-	ImageURLs []string
-}
-
-// GameDetails holds full info for a single game, including admin, booking and player lists.
-type GameDetails struct {
-	GameID             int64         `json:"game_id"`
-	VenueID            int64         `json:"venue_id"`
-	VenueName          string        `json:"venue_name"`
-	SportType          string        `json:"sport_type"`
-	Price              *int          `json:"price,omitempty"`
-	Format             *string       `json:"format,omitempty"`
-	GameLevel          *string       `json:"game_level,omitempty"`
-	AdminID            int64         `json:"admin_id"`
-	GameAdminName      string        `json:"game_admin_name"`
-	StartTime          time.Time     `json:"start_time"`
-	EndTime            time.Time     `json:"end_time"`
-	MaxPlayers         int           `json:"max_players"`
-	CurrentPlayer      int           `json:"current_player"`
-	PlayerImages       []string      `json:"player_images"`
-	PlayerIDs          []int64       `json:"player_ids"`           // all joined player user IDs
-	RequestedPlayerIDs []int64       `json:"requested_player_ids"` // pending request user IDs
-	BookingStatus      BookingStatus `json:"booking_status"`
-	MatchFull          bool          `json:"match_full"`
-	Status             string        `json:"status"`
-	VenueLat           float64       `json:"venue_lat"`
-	VenueLon           float64       `json:"venue_lon"`
-}
-
-type GameStore struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
+func (r *Repository) Create(ctx context.Context, game *Game) (int64, error) {
 	query := `
 		INSERT INTO games (
 			sport_type, price, format, venue_id, admin_id, max_players, game_level,
@@ -159,7 +68,7 @@ func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	err := s.db.QueryRow(
+	err := r.db.QueryRow(
 		ctx, query,
 		game.SportType,
 		game.Price,
@@ -188,12 +97,12 @@ func (s *GameStore) Create(ctx context.Context, game *Game) (int64, error) {
 	return game.ID, nil
 }
 
-func (s *GameStore) GetAdminID(ctx context.Context, gameID int64) (int64, error) {
+func (r *Repository) GetAdminID(ctx context.Context, gameID int64) (int64, error) {
 	query := `SELECT admin_id FROM games WHERE id = $1`
 
 	var adminID int64
 
-	err := s.db.QueryRow(ctx, query, gameID).Scan(&adminID)
+	err := r.db.QueryRow(ctx, query, gameID).Scan(&adminID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, fmt.Errorf("game not found or deleted: %w", ErrNotFound)
@@ -205,7 +114,7 @@ func (s *GameStore) GetAdminID(ctx context.Context, gameID int64) (int64, error)
 
 // MarkAsBooked sets the is_booked field to true for the given game ID.
 
-func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error) {
+func (r *Repository) GetGameByID(ctx context.Context, gameID int64) (*Game, error) {
 	query := `
 		SELECT id, sport_type, price, format, venue_id, admin_id, max_players, 
 			   game_level, start_time, end_time, visibility, instruction, status, 
@@ -218,7 +127,7 @@ func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error
 	defer cancel()
 
 	game := &Game{}
-	err := s.db.QueryRow(ctx, query, gameID).Scan(
+	err := r.db.QueryRow(ctx, query, gameID).Scan(
 		&game.ID,
 		&game.SportType,
 		&game.Price,
@@ -248,13 +157,13 @@ func (s *GameStore) GetGameByID(ctx context.Context, gameID int64) (*Game, error
 	return game, nil
 }
 
-func (s *GameStore) CheckRequestExist(ctx context.Context, gameID int64, userID int64) (bool, error) {
+func (r *Repository) CheckRequestExist(ctx context.Context, gameID int64, userID int64) (bool, error) {
 	query := `
         SELECT 1 FROM game_join_requests 
         WHERE game_id = $1 AND user_id = $2 AND status = 'pending'`
 
 	var exists int
-	err := s.db.QueryRow(ctx, query, gameID, userID).Scan(&exists)
+	err := r.db.QueryRow(ctx, query, gameID, userID).Scan(&exists)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil // No existing request
@@ -265,11 +174,11 @@ func (s *GameStore) CheckRequestExist(ctx context.Context, gameID int64, userID 
 	return true, nil // Request exists
 }
 
-func (s *GameStore) AddToGameRequest(ctx context.Context, gameID int64, UserID int64) error {
+func (r *Repository) AddToGameRequest(ctx context.Context, gameID int64, UserID int64) error {
 	query := `
         INSERT INTO game_join_requests (game_id, user_id, status)
         VALUES ($1, $2, 'pending')`
-	_, err := s.db.Exec(ctx, query,
+	_, err := r.db.Exec(ctx, query,
 		gameID, UserID)
 	if err != nil {
 		return err
@@ -277,7 +186,7 @@ func (s *GameStore) AddToGameRequest(ctx context.Context, gameID int64, UserID i
 	return nil
 }
 
-func (s *GameStore) DeleteJoinRequest(ctx context.Context, gameID, userID int64) error {
+func (r *Repository) DeleteJoinRequest(ctx context.Context, gameID, userID int64) error {
 	query := `
 		DELETE FROM game_join_requests
 		WHERE game_id = $1 AND user_id = $2
@@ -286,7 +195,7 @@ func (s *GameStore) DeleteJoinRequest(ctx context.Context, gameID, userID int64)
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	result, err := s.db.Exec(ctx, query, gameID, userID)
+	result, err := r.db.Exec(ctx, query, gameID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete join request: %w", err)
 	}
@@ -298,7 +207,7 @@ func (s *GameStore) DeleteJoinRequest(ctx context.Context, gameID, userID int64)
 	return nil
 }
 
-func (s *GameStore) IsAdminAssistant(ctx context.Context, gameID int64, userID int64) (bool, error) {
+func (r *Repository) IsAdminAssistant(ctx context.Context, gameID int64, userID int64) (bool, error) {
 	query := `
 		SELECT EXISTS (
 			SELECT 1 FROM game_players 
@@ -306,31 +215,31 @@ func (s *GameStore) IsAdminAssistant(ctx context.Context, gameID int64, userID i
 		)`
 
 	var isAdmin bool
-	err := s.db.QueryRow(ctx, query, gameID, userID).Scan(&isAdmin)
+	err := r.db.QueryRow(ctx, query, gameID, userID).Scan(&isAdmin)
 	if err != nil {
 		return false, err
 	}
 
 	return isAdmin, nil
 }
-func (s *GameStore) IsAdmin(ctx context.Context, gameID, userID int64) (bool, error) {
+func (r *Repository) IsAdmin(ctx context.Context, gameID, userID int64) (bool, error) {
 	query := `
 		SELECT EXISTS (
 			SELECT 1 FROM game_players 
 			WHERE game_id = $1 AND user_id = $2 AND role = 'admin'
 		)`
 	var isAdmin bool
-	err := s.db.QueryRow(ctx, query, gameID, userID).Scan(&isAdmin)
+	err := r.db.QueryRow(ctx, query, gameID, userID).Scan(&isAdmin)
 	if err != nil {
 		return false, err
 	}
 	return isAdmin, nil
 }
 
-func (s *GameStore) ToggleMatchFull(ctx context.Context, gameID int64) error {
+func (r *Repository) ToggleMatchFull(ctx context.Context, gameID int64) error {
 	var currentValue bool
 	query := `SELECT match_full FROM games WHERE id = $1`
-	err := s.db.QueryRow(ctx, query, gameID).Scan(&currentValue)
+	err := r.db.QueryRow(ctx, query, gameID).Scan(&currentValue)
 	if err != nil {
 		return fmt.Errorf("error checking match_full: %w", err)
 	}
@@ -343,7 +252,7 @@ func (s *GameStore) ToggleMatchFull(ctx context.Context, gameID int64) error {
 		UPDATE games 
 		SET match_full = $1 
 		WHERE id = $2`
-	_, err = s.db.Exec(ctx, updateQuery, toggledValue, gameID)
+	_, err = r.db.Exec(ctx, updateQuery, toggledValue, gameID)
 	if err != nil {
 		return fmt.Errorf("error updating match_full: %w", err)
 	}
@@ -351,10 +260,10 @@ func (s *GameStore) ToggleMatchFull(ctx context.Context, gameID int64) error {
 	return nil
 }
 
-func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) error {
+func (r *Repository) InsertNewPlayer(ctx context.Context, gameID, userID int64) error {
 	var maxPlayers int
 	query := `SELECT max_players FROM games WHERE id = $1`
-	err := s.db.QueryRow(ctx, query, gameID).Scan(&maxPlayers)
+	err := r.db.QueryRow(ctx, query, gameID).Scan(&maxPlayers)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return fmt.Errorf("game not found")
@@ -365,7 +274,7 @@ func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) e
 	// Step 2: Count current players in the game
 	var currentPlayers int
 	query = `SELECT COUNT(*) FROM game_players WHERE game_id = $1`
-	err = s.db.QueryRow(ctx, query, gameID).Scan(&currentPlayers)
+	err = r.db.QueryRow(ctx, query, gameID).Scan(&currentPlayers)
 	if err != nil {
 		return fmt.Errorf("error counting current players: %w", err)
 	}
@@ -377,7 +286,7 @@ func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) e
 
 	// Step 4: Insert player if limit is not reached
 	insertQuery := `INSERT INTO game_players (game_id, user_id, role, joined_at) VALUES ($1, $2, 'player', NOW())`
-	_, err = s.db.Exec(ctx, insertQuery, gameID, userID)
+	_, err = r.db.Exec(ctx, insertQuery, gameID, userID)
 	if err != nil {
 		return fmt.Errorf("error inserting player into game: %w", err)
 	}
@@ -385,18 +294,18 @@ func (s *GameStore) InsertNewPlayer(ctx context.Context, gameID, userID int64) e
 	return nil
 }
 
-func (s *GameStore) InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error {
+func (r *Repository) InsertAdminInPlayer(ctx context.Context, gameID int64, userID int64) error {
 	query := `
 		INSERT INTO game_players (game_id, user_id, role)
 		VALUES ($1, $2, 'admin')`
-	_, err := s.db.Exec(ctx, query, gameID, userID)
+	_, err := r.db.Exec(ctx, query, gameID, userID)
 	if err != nil {
 		return fmt.Errorf("InsertAdminInPlayer error (gameID=%d, userID=%d): %w", gameID, userID, err)
 	}
 	return nil
 }
 
-func (s *GameStore) UpdateRequestStatus(ctx context.Context, gameID, userID int64, status GameRequestStatus) error {
+func (r *Repository) UpdateRequestStatus(ctx context.Context, gameID, userID int64, status GameRequestStatus) error {
 	query := `
 		UPDATE game_join_requests
 		SET status = $1
@@ -408,7 +317,7 @@ func (s *GameStore) UpdateRequestStatus(ctx context.Context, gameID, userID int6
 
 	// Execute the update query
 	var requestID int64
-	err := s.db.QueryRow(ctx, query, status, gameID, userID).Scan(&requestID)
+	err := r.db.QueryRow(ctx, query, status, gameID, userID).Scan(&requestID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return fmt.Errorf("no pending request found for the game and user")
@@ -418,7 +327,7 @@ func (s *GameStore) UpdateRequestStatus(ctx context.Context, gameID, userID int6
 	return nil
 }
 
-func (s *GameStore) GetJoinRequest(ctx context.Context, gameID, userID int64) (*GameRequest, error) {
+func (r *Repository) GetJoinRequest(ctx context.Context, gameID, userID int64) (*GameRequest, error) {
 	query := `
 	  SELECT id, game_id, user_id, status, request_time, updated_at
 		FROM game_join_requests
@@ -429,7 +338,7 @@ func (s *GameStore) GetJoinRequest(ctx context.Context, gameID, userID int64) (*
 	defer cancel()
 
 	var req GameRequest
-	err := s.db.QueryRow(ctx, query, gameID, userID).Scan(
+	err := r.db.QueryRow(ctx, query, gameID, userID).Scan(
 		&req.ID,
 		&req.GameID,
 		&req.UserID,
@@ -447,7 +356,7 @@ func (s *GameStore) GetJoinRequest(ctx context.Context, gameID, userID int64) (*
 	return &req, nil
 }
 
-func (s *GameStore) GetPlayerCount(ctx context.Context, gameID int) (int, error) {
+func (r *Repository) GetPlayerCount(ctx context.Context, gameID int) (int, error) {
 	query := `
 	 SELECT COUNT(*) 
 		FROM game_players 
@@ -457,7 +366,7 @@ func (s *GameStore) GetPlayerCount(ctx context.Context, gameID int) (int, error)
 	defer cancel()
 	var count int
 
-	err := s.db.QueryRow(ctx, query, gameID).Scan(&count)
+	err := r.db.QueryRow(ctx, query, gameID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("error getting player count: %w", err)
 	}
@@ -465,7 +374,7 @@ func (s *GameStore) GetPlayerCount(ctx context.Context, gameID int) (int, error)
 }
 
 // GetAllGamePlayerIDs retrieves all player IDs for a specific game
-func (s *GameStore) GetAllGamePlayerIDs(ctx context.Context, gameID int64) ([]int64, error) {
+func (r *Repository) GetAllGamePlayerIDs(ctx context.Context, gameID int64) ([]int64, error) {
 	query := `
 		SELECT 
 			user_id
@@ -478,7 +387,7 @@ func (s *GameStore) GetAllGamePlayerIDs(ctx context.Context, gameID int64) ([]in
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.Query(ctx, query, gameID)
+	rows, err := r.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying game player IDs: %w", err)
 	}
@@ -505,7 +414,7 @@ func (s *GameStore) GetAllGamePlayerIDs(ctx context.Context, gameID int64) ([]in
 	return playerIDs, nil
 }
 
-func (s *GameStore) GetGamePlayers(ctx context.Context, gameID int64) ([]*User, error) {
+func (r *Repository) GetGamePlayers(ctx context.Context, gameID int64) ([]*users.User, error) {
 	query := `
 		SELECT 
 			u.id, 
@@ -524,15 +433,15 @@ func (s *GameStore) GetGamePlayers(ctx context.Context, gameID int64) ([]*User, 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.Query(ctx, query, gameID)
+	rows, err := r.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying game players: %w", err)
 	}
 	defer rows.Close()
 
-	players := make([]*User, 0)
+	players := make([]*users.User, 0)
 	for rows.Next() {
-		var player User
+		var player users.User
 		err := rows.Scan(
 			&player.ID,
 			&player.FirstName,
@@ -557,7 +466,7 @@ func (s *GameStore) GetGamePlayers(ctx context.Context, gameID int64) ([]*User, 
 	return players, nil
 }
 
-func (s *GameStore) AssignAssistant(ctx context.Context, gameID, playerID int64) error {
+func (r *Repository) AssignAssistant(ctx context.Context, gameID, playerID int64) error {
 
 	// Update player's role to 'assistant'
 	query := `
@@ -565,7 +474,7 @@ func (s *GameStore) AssignAssistant(ctx context.Context, gameID, playerID int64)
 		SET role = 'assistant' 
 		WHERE game_id = $1 AND user_id = $2 AND role = 'player'
 	`
-	res, err := s.db.Exec(ctx, query, gameID, playerID)
+	res, err := r.db.Exec(ctx, query, gameID, playerID)
 	if err != nil {
 		return err
 	}
@@ -580,7 +489,7 @@ func (s *GameStore) AssignAssistant(ctx context.Context, gameID, playerID int64)
 }
 
 // GetGames queries the database for games that match the provided filters.
-func (s *GameStore) GetGames(ctx context.Context, q GameFilterQuery) ([]GameSummary, error) {
+func (r *Repository) GetGames(ctx context.Context, q GameFilterQuery) ([]GameSummary, error) {
 	// build the base of your SQL once
 	baseQuery := `
 SELECT 
@@ -643,7 +552,7 @@ LIMIT $13 OFFSET $14
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.Query(ctx, query,
+	rows, err := r.db.Query(ctx, query,
 		nullIfEmpty(q.SportType), // $1
 		nullIfEmpty(q.GameLevel), // $2
 		nullIfZero(q.VenueID),    // $3
@@ -717,9 +626,9 @@ func nullTime(t time.Time) interface{} {
 	return t
 }
 
-func (s *GameStore) CancelGame(ctx context.Context, gameID int64) error {
+func (r *Repository) CancelGame(ctx context.Context, gameID int64) error {
 	query := `UPDATE games SET status = 'cancelled' WHERE id = $1`
-	result, err := s.db.Exec(ctx, query, gameID)
+	result, err := r.db.Exec(ctx, query, gameID)
 	if err != nil {
 		return err
 	}
@@ -730,20 +639,7 @@ func (s *GameStore) CancelGame(ctx context.Context, gameID int64) error {
 	return nil
 }
 
-type GameRequestWithUser struct {
-	ID                int64             `json:"id"`
-	GameID            int64             `json:"game_id"`
-	UserID            int64             `json:"user_id"`
-	Status            GameRequestStatus `json:"status"`
-	RequestTime       time.Time         `json:"request_time"`
-	UpdatedAt         time.Time         `json:"updated_at"`
-	FirstName         string            `json:"first_name"`
-	Phone             string            `json:"phone"`
-	ProfilePictureURL *string           `json:"profile_picture_url" swaggertype:"string"`
-	SkillLevel        *string           `json:"skill_level" swaggertype:"string"`
-}
-
-func (s *GameStore) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*GameRequestWithUser, error) {
+func (r *Repository) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*GameRequestWithUser, error) {
 	query := `
         SELECT 
 			gr.id, gr.game_id, gr.user_id, gr.status, gr.request_time, gr.updated_at,
@@ -755,7 +651,7 @@ func (s *GameStore) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*Ga
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
-	rows, err := s.db.Query(ctx, query, gameID)
+	rows, err := r.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving join requests: %w", err)
 	}
@@ -789,7 +685,7 @@ func (s *GameStore) GetAllJoinRequests(ctx context.Context, gameID int64) ([]*Ga
 
 // GetGameDetailsWithID returns detailed info for a single game, including booking status,
 // the admin ID, all joined players' IDs, and pending join-request IDs.
-func (s *GameStore) GetGameDetailsWithID(ctx context.Context, gameID int64) (*GameDetails, error) {
+func (r *Repository) GetGameDetailsWithID(ctx context.Context, gameID int64) (*GameDetails, error) {
 	query := `
 SELECT
 	g.id               AS game_id,
@@ -857,7 +753,7 @@ WHERE g.id = $1
 	defer cancel()
 
 	var gd GameDetails
-	err := s.db.QueryRow(ctx, query, gameID).Scan(
+	err := r.db.QueryRow(ctx, query, gameID).Scan(
 		&gd.GameID,
 		&gd.VenueID,
 		&gd.VenueName,
@@ -891,7 +787,7 @@ WHERE g.id = $1
 }
 
 // GetUpcomingGamesByVenue queries the database for upcoming active games at a specific venue.
-func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) ([]GameSummary, error) {
+func (r *Repository) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) ([]GameSummary, error) {
 	// Build the base query with filtering for upcoming games and active status.
 	query := `
 		SELECT 
@@ -936,7 +832,7 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.Query(ctx, query, venueID)
+	rows, err := r.db.Query(ctx, query, venueID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get upcoming games for venue: %w", err)
 	}
@@ -979,7 +875,7 @@ func (s *GameStore) GetUpcomingGamesByVenue(ctx context.Context, venueID int64) 
 
 // GetUpcomingGamesByUser returns all active games the user has joined
 // whose start_time is in the future, ordered soonest-first.
-func (s *GameStore) GetUpcomingGamesByUser(ctx context.Context, userID int64) ([]GameSummary, error) {
+func (r *Repository) GetUpcomingGamesByUser(ctx context.Context, userID int64) ([]GameSummary, error) {
 
 	const query = `
 SELECT 
@@ -1026,7 +922,7 @@ ORDER BY g.start_time ASC
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.Query(ctx, query, userID)
+	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("GetUpcomingGamesByUser query error: %w", err)
 	}
@@ -1065,7 +961,7 @@ ORDER BY g.start_time ASC
 	return games, nil
 }
 
-func (s *GameStore) MarkCompletedGames() error {
+func (r *Repository) MarkCompletedGames() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -1076,10 +972,96 @@ func (s *GameStore) MarkCompletedGames() error {
 		  AND status = 'active'
 	`
 
-	ct, err := s.db.Exec(ctx, query)
+	ct, err := r.db.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to update games: %w", err)
 	}
 	fmt.Printf("Marked %d games as completed at %s\n", ct.RowsAffected(), time.Now().Format(time.RFC1123))
 	return nil
+}
+
+// AddShortlist adds a game to the user's shortlist.
+func (r *Repository) AddShortlist(ctx context.Context, userID, gameID int64) error {
+	query := `
+		INSERT INTO shortlisted_games (user_id, game_id)
+		VALUES ($1, $2)
+		ON CONFLICT DO NOTHING
+	`
+	_, err := r.db.Exec(ctx, query, userID, gameID)
+	if err != nil {
+		return fmt.Errorf("failed to add shortlisted game: %w", err)
+	}
+	return nil
+}
+
+// RemoveShortlist removes a game from the user's shortlist.
+func (r *Repository) RemoveShortlist(ctx context.Context, userID, gameID int64) error {
+	query := `
+		DELETE FROM shortlisted_games
+		WHERE user_id = $1 AND game_id = $2
+	`
+	_, err := r.db.Exec(ctx, query, userID, gameID)
+	if err != nil {
+		return fmt.Errorf("failed to remove shortlisted game: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetShortlistedGamesByUser(
+	ctx context.Context,
+	userID int64,
+) ([]ShortlistedGameDetail, error) {
+	const query = `
+    SELECT
+      g.id, g.sport_type, g.price, g.format, g.venue_id, g.admin_id, g.max_players,
+      g.game_level, g.start_time, g.end_time, g.visibility, g.instruction,
+      g.status, g.booking_status, g.match_full, g.created_at, g.updated_at,
+      v.name   AS venue_name,
+      v.address AS venue_address
+    FROM games g
+    JOIN shortlisted_games sg ON g.id = sg.game_id
+    JOIN venues v           ON g.venue_id = v.id
+    WHERE sg.user_id = $1
+    ORDER BY sg.created_at DESC
+    `
+
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shortlisted games: %w", err)
+	}
+	defer rows.Close()
+
+	var list []ShortlistedGameDetail
+	for rows.Next() {
+		var d ShortlistedGameDetail
+		if err := rows.Scan(
+			&d.ID,
+			&d.SportType,
+			&d.Price,
+			&d.Format,
+			&d.VenueID,
+			&d.AdminID,
+			&d.MaxPlayers,
+			&d.GameLevel,
+			&d.StartTime,
+			&d.EndTime,
+			&d.Visibility,
+			&d.Instruction,
+			&d.Status,
+			&d.BookingStatus,
+			&d.MatchFull,
+			&d.CreatedAt,
+			&d.UpdatedAt,
+			&d.VenueName,
+			&d.VenueAddress,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan shortlisted game row: %w", err)
+		}
+		list = append(list, d)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return list, nil
 }

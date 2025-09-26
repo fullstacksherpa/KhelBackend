@@ -1,4 +1,4 @@
-package store
+package followers
 
 import (
 	"context"
@@ -8,17 +8,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Follower struct {
-	UserID     int64  `json:"user_id"`
-	FollowerID int64  `json:"follower_id"`
-	CreatedAt  string `json:"created_at"`
+type Store interface {
+	Follow(ctx context.Context, followerID, userID int64) error
+	Unfollow(ctx context.Context, followerID, userID int64) error
 }
 
-type FollowerStore struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func (s *FollowerStore) Follow(ctx context.Context, followerID, userID int64) error {
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
+func (r *Repository) Follow(ctx context.Context, followerID, userID int64) error {
 	query := `
            INSERT INTO followers (user_id, follower_id) VALUES ($1, $2)
    `
@@ -26,7 +29,7 @@ func (s *FollowerStore) Follow(ctx context.Context, followerID, userID int64) er
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	_, err := s.db.Exec(ctx, query, userID, followerID)
+	_, err := r.db.Exec(ctx, query, userID, followerID)
 	if err != nil {
 		log.Printf("Follow query failed for userID=%d, followerID=%d: %v", userID, followerID, err)
 
@@ -35,7 +38,7 @@ func (s *FollowerStore) Follow(ctx context.Context, followerID, userID int64) er
 	return nil
 }
 
-func (s *FollowerStore) Unfollow(ctx context.Context, followerID, userID int64) error {
+func (r *Repository) Unfollow(ctx context.Context, followerID, userID int64) error {
 	query := `
 	   DELETE FROM followers
 	   WHERE user_id = $1 AND follower_id = $2
@@ -44,6 +47,6 @@ func (s *FollowerStore) Unfollow(ctx context.Context, followerID, userID int64) 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	_, err := s.db.Exec(ctx, query, userID, followerID)
+	_, err := r.db.Exec(ctx, query, userID, followerID)
 	return err
 }

@@ -254,7 +254,7 @@ func (app *application) IsReviewOwnerMiddleware(next http.Handler) http.Handler 
 		userID := user.ID
 
 		// Check if the user is the owner of the review
-		isOwner, err := app.store.Reviews.IsReviewOwner(r.Context(), reviewID, userID)
+		isOwner, err := app.store.VenuesReviews.IsReviewOwner(r.Context(), reviewID, userID)
 		if err != nil {
 			app.internalServerError(w, r, fmt.Errorf("error checking review ownership: %v", err))
 			return

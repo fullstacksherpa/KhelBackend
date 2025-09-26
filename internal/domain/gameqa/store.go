@@ -1,4 +1,4 @@
-package store
+package gameqa
 
 import (
 	"context"
@@ -11,49 +11,33 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var (
-	ErrQuestionNotFound = errors.New("question not found")
-	ErrReplyNotFound    = errors.New("reply not found")
-)
-
-type Question struct {
-	ID        int64     `json:"id"`
-	GameID    int64     `json:"game_id"`
-	UserID    int64     `json:"user_id"`
-	Question  string    `json:"question"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+type Store interface {
+	CreateQuestion(ctx context.Context, question *Question) error
+	GetUserIDByQuestionID(ctx context.Context, questionID int64) (int64, error)
+	GetQuestionsByGame(ctx context.Context, gameID int64) ([]Question, error)
+	CreateReply(ctx context.Context, reply *Reply) error
+	GetRepliesByQuestion(ctx context.Context, questionID int64) ([]Reply, error)
+	DeleteQuestion(ctx context.Context, questionID, userID int64) error
+	GetQuestionsWithReplies(ctx context.Context, gameID int64) ([]QuestionWithReplies, error)
 }
 
-type Reply struct {
-	ID         int64     `json:"id"`
-	QuestionID int64     `json:"question_id"`
-	AdminID    int64     `json:"admin_id"`
-	Reply      string    `json:"reply"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-}
-
-type QuestionWithReplies struct {
-	ID        int64     `json:"id"`
-	Question  string    `json:"question"`
-	CreatedAt time.Time `json:"created_at"`
-	Replies   []Reply   `json:"replies,omitempty"`
-}
-
-type QuestionStore struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
 // CreateQuestion creates a new game question
-func (s *QuestionStore) CreateQuestion(ctx context.Context, question *Question) error {
+func (r *Repository) CreateQuestion(ctx context.Context, question *Question) error {
 	query := `
 		INSERT INTO game_questions (game_id, user_id, question)
 		VALUES ($1, $2, $3)
 		RETURNING id, created_at, updated_at
 	`
 
-	err := s.db.QueryRow(ctx, query,
+	err := r.db.QueryRow(ctx, query,
 		question.GameID,
 		question.UserID,
 		question.Question,
@@ -71,7 +55,7 @@ func (s *QuestionStore) CreateQuestion(ctx context.Context, question *Question) 
 }
 
 // GetQuestionsByGame returns all questions for a game
-func (s *QuestionStore) GetQuestionsByGame(ctx context.Context, gameID int64) ([]Question, error) {
+func (r *Repository) GetQuestionsByGame(ctx context.Context, gameID int64) ([]Question, error) {
 	query := `
 		SELECT id, game_id, user_id, question, created_at, updated_at
 		FROM game_questions
@@ -79,7 +63,7 @@ func (s *QuestionStore) GetQuestionsByGame(ctx context.Context, gameID int64) ([
 		ORDER BY created_at DESC
 	`
 
-	rows, err := s.db.Query(ctx, query, gameID)
+	rows, err := r.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching questions: %w", err)
 	}
@@ -105,14 +89,14 @@ func (s *QuestionStore) GetQuestionsByGame(ctx context.Context, gameID int64) ([
 }
 
 // CreateReply creates a reply to a question
-func (s *QuestionStore) CreateReply(ctx context.Context, reply *Reply) error {
+func (r *Repository) CreateReply(ctx context.Context, reply *Reply) error {
 	query := `
 		INSERT INTO game_question_replies (question_id, admin_id, reply)
 		VALUES ($1, $2, $3)
 		RETURNING id, created_at, updated_at
 	`
 
-	err := s.db.QueryRow(ctx, query,
+	err := r.db.QueryRow(ctx, query,
 		reply.QuestionID,
 		reply.AdminID,
 		reply.Reply,
@@ -129,11 +113,11 @@ func (s *QuestionStore) CreateReply(ctx context.Context, reply *Reply) error {
 	return nil
 }
 
-func (s *QuestionStore) GetUserIDByQuestionID(ctx context.Context, questionID int64) (int64, error) {
+func (r *Repository) GetUserIDByQuestionID(ctx context.Context, questionID int64) (int64, error) {
 	query := `SELECT user_id FROM game_questions WHERE id = $1`
 	var userID int64
 
-	err := s.db.QueryRow(ctx, query, questionID).Scan(&userID)
+	err := r.db.QueryRow(ctx, query, questionID).Scan(&userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, fmt.Errorf("question not found: %w", ErrNotFound)
@@ -145,7 +129,7 @@ func (s *QuestionStore) GetUserIDByQuestionID(ctx context.Context, questionID in
 }
 
 // GetRepliesByQuestion returns all replies for a question
-func (s *QuestionStore) GetRepliesByQuestion(ctx context.Context, questionID int64) ([]Reply, error) {
+func (r *Repository) GetRepliesByQuestion(ctx context.Context, questionID int64) ([]Reply, error) {
 	query := `
 		SELECT id, question_id, admin_id, reply, created_at, updated_at
 		FROM game_question_replies
@@ -153,7 +137,7 @@ func (s *QuestionStore) GetRepliesByQuestion(ctx context.Context, questionID int
 		ORDER BY created_at ASC
 	`
 
-	rows, err := s.db.Query(ctx, query, questionID)
+	rows, err := r.db.Query(ctx, query, questionID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching replies: %w", err)
 	}
@@ -179,13 +163,13 @@ func (s *QuestionStore) GetRepliesByQuestion(ctx context.Context, questionID int
 }
 
 // DeleteQuestion soft deletes a question
-func (s *QuestionStore) DeleteQuestion(ctx context.Context, questionID, userID int64) error {
+func (r *Repository) DeleteQuestion(ctx context.Context, questionID, userID int64) error {
 	query := `
 		DELETE FROM game_questions
 		WHERE id = $1 AND user_id = $2
 	`
 
-	result, err := s.db.Exec(ctx, query, questionID, userID)
+	result, err := r.db.Exec(ctx, query, questionID, userID)
 	if err != nil {
 		return fmt.Errorf("error deleting question: %w", err)
 	}
@@ -198,7 +182,7 @@ func (s *QuestionStore) DeleteQuestion(ctx context.Context, questionID, userID i
 	return nil
 }
 
-func (s *QuestionStore) GetQuestionsWithReplies(ctx context.Context, gameID int64) ([]QuestionWithReplies, error) {
+func (r *Repository) GetQuestionsWithReplies(ctx context.Context, gameID int64) ([]QuestionWithReplies, error) {
 	query := `
 		SELECT 
 			q.id AS question_id,
@@ -214,7 +198,7 @@ func (s *QuestionStore) GetQuestionsWithReplies(ctx context.Context, gameID int6
 		ORDER BY q.created_at DESC, r.created_at ASC
 	`
 
-	rows, err := s.db.Query(ctx, query, gameID)
+	rows, err := r.db.Query(ctx, query, gameID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching questions with replies: %w", err)
 	}

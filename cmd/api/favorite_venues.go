@@ -38,7 +38,7 @@ func (app *application) addFavoriteHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Insert the favorite.
-	if err := app.store.FavoriteVenues.AddFavorite(r.Context(), user.ID, venueID); err != nil {
+	if err := app.store.Venues.AddFavorite(r.Context(), user.ID, venueID); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
@@ -77,7 +77,7 @@ func (app *application) removeFavoriteHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	// Delete the favorite record.
-	if err := app.store.FavoriteVenues.RemoveFavorite(r.Context(), user.ID, venueID); err != nil {
+	if err := app.store.Venues.RemoveFavorite(r.Context(), user.ID, venueID); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
@@ -107,7 +107,7 @@ func (app *application) listFavoritesHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Get the list of favorite venues.
-	favorites, err := app.store.FavoriteVenues.GetFavoritesByUser(r.Context(), user.ID)
+	favorites, err := app.store.Venues.GetFavoritesByUser(r.Context(), user.ID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return

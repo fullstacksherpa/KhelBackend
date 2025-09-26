@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"khel/internal/store"
+	"khel/internal/domain/storage"
 
 	"github.com/9ssi7/exponent"
 )
@@ -18,7 +18,7 @@ const (
 	BookingCanceled BookingEvent = "CANCELED"
 )
 
-func SendBookingNotification(ctx context.Context, push PushSender, store store.Storage, userID int64, event BookingEvent, bookingID string) error {
+func SendBookingNotification(ctx context.Context, push PushSender, store *storage.Container, userID int64, event BookingEvent, bookingID string) error {
 	// Fetch tokens for the user
 	tokensMap, err := store.PushTokens.GetTokensByUserIDs(ctx, []int64{userID})
 	if err != nil {

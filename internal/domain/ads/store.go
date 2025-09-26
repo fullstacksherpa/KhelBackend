@@ -1,4 +1,4 @@
-package store
+package ads
 
 import (
 	"context"
@@ -10,49 +10,30 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Ad represents the ads table structure
-type Ad struct {
-	ID           int64     `json:"id"`
-	Title        string    `json:"title"`
-	Description  *string   `json:"description"`
-	ImageURL     string    `json:"image_url"`
-	ImageAlt     *string   `json:"image_alt"`
-	Link         *string   `json:"link"`
-	Active       bool      `json:"active"`
-	DisplayOrder int       `json:"display_order"`
-	Impressions  int       `json:"impressions"`
-	Clicks       int       `json:"clicks"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+type Store interface {
+	GetActiveAds(ctx context.Context) ([]Ad, error)
+	GetAllAds(ctx context.Context, limit, offset int) ([]Ad, int, error)
+	GetAdByID(ctx context.Context, id int64) (*Ad, error)
+	CreateAd(ctx context.Context, req CreateAdRequest) (*Ad, error)
+	UpdateAd(ctx context.Context, id int64, req UpdateAdRequest) (*Ad, error)
+	DeleteAd(ctx context.Context, id int64) error
+	ToggleAdStatus(ctx context.Context, id int64) (*Ad, error)
+	IncrementImpressions(ctx context.Context, id int64) error
+	IncrementClicks(ctx context.Context, id int64) error
+	GetAdsAnalytics(ctx context.Context) (*Analytics, error)
+	BulkUpdateDisplayOrder(ctx context.Context, updates []DisplayOrderUpdate) error
 }
 
-// CreateAdRequest represents the request payload for creating an ad
-type CreateAdRequest struct {
-	Title        string  `json:"title"`
-	Description  *string `json:"description"`
-	ImageURL     string  `json:"image_url"`
-	ImageAlt     *string `json:"image_alt"`
-	Link         *string `json:"link"`
-	DisplayOrder int     `json:"display_order"`
-}
-
-// UpdateAdRequest represents the request payload for updating an ad
-type UpdateAdRequest struct {
-	Title        *string `json:"title"`
-	Description  *string `json:"description"`
-	ImageURL     *string `json:"image_url"`
-	ImageAlt     *string `json:"image_alt"`
-	Link         *string `json:"link"`
-	Active       *bool   `json:"active"`
-	DisplayOrder *int    `json:"display_order"`
-}
-
-type AdsStore struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
 // GetActiveAds returns all active ads ordered by display_order and created_at
-func (s *AdsStore) GetActiveAds(ctx context.Context) ([]Ad, error) {
+func (r *Repository) GetActiveAds(ctx context.Context) ([]Ad, error) {
 	query := `
 		SELECT id, title, description, image_url, image_alt, link, active, 
 		       display_order, impressions, clicks, created_at, updated_at
@@ -61,7 +42,7 @@ func (s *AdsStore) GetActiveAds(ctx context.Context) ([]Ad, error) {
 		ORDER BY display_order ASC, created_at DESC
 	`
 
-	rows, err := s.db.Query(ctx, query)
+	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query active ads: %w", err)
 	}
@@ -89,11 +70,11 @@ func (s *AdsStore) GetActiveAds(ctx context.Context) ([]Ad, error) {
 }
 
 // GetAllAds returns all ads with pagination for admin dashboard
-func (s *AdsStore) GetAllAds(ctx context.Context, limit, offset int) ([]Ad, int, error) {
+func (r *Repository) GetAllAds(ctx context.Context, limit, offset int) ([]Ad, int, error) {
 	//Get total count
 	var totalCount int
 	countQuery := `SELECT COUNT(*) FROM ads`
-	err := s.db.QueryRow(ctx, countQuery).Scan(&totalCount)
+	err := r.db.QueryRow(ctx, countQuery).Scan(&totalCount)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get total count: %w", err)
 	}
@@ -107,7 +88,7 @@ func (s *AdsStore) GetAllAds(ctx context.Context, limit, offset int) ([]Ad, int,
 	   LIMIT $1 OFFSET $2
 	`
 
-	rows, err := s.db.Query(ctx, query, limit, offset)
+	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query all ads: %w", err)
 	}
@@ -134,7 +115,7 @@ func (s *AdsStore) GetAllAds(ctx context.Context, limit, offset int) ([]Ad, int,
 }
 
 // GetAdByID retrieves a single ad by its ID
-func (s *AdsStore) GetAdByID(ctx context.Context, id int64) (*Ad, error) {
+func (r *Repository) GetAdByID(ctx context.Context, id int64) (*Ad, error) {
 	query := `
 		SELECT id, title, description, image_url, image_alt, link, active, 
 		       display_order, impressions, clicks, created_at, updated_at
@@ -143,7 +124,7 @@ func (s *AdsStore) GetAdByID(ctx context.Context, id int64) (*Ad, error) {
 	`
 
 	var ad Ad
-	err := s.db.QueryRow(ctx, query, id).Scan(
+	err := r.db.QueryRow(ctx, query, id).Scan(
 		&ad.ID, &ad.Title, &ad.Description, &ad.ImageURL, &ad.ImageAlt,
 		&ad.Link, &ad.Active, &ad.DisplayOrder, &ad.Impressions, &ad.Clicks,
 		&ad.CreatedAt, &ad.UpdatedAt,
@@ -160,7 +141,7 @@ func (s *AdsStore) GetAdByID(ctx context.Context, id int64) (*Ad, error) {
 }
 
 // CreateAd creates a new ad
-func (s *AdsStore) CreateAd(ctx context.Context, req CreateAdRequest) (*Ad, error) {
+func (r *Repository) CreateAd(ctx context.Context, req CreateAdRequest) (*Ad, error) {
 	query := `
 		INSERT INTO ads (title, description, image_url, image_alt, link, display_order)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -169,7 +150,7 @@ func (s *AdsStore) CreateAd(ctx context.Context, req CreateAdRequest) (*Ad, erro
 	`
 
 	var ad Ad
-	err := s.db.QueryRow(ctx, query,
+	err := r.db.QueryRow(ctx, query,
 		req.Title, req.Description, req.ImageURL, req.ImageAlt, req.Link, req.DisplayOrder,
 	).Scan(
 		&ad.ID, &ad.Title, &ad.Description, &ad.ImageURL, &ad.ImageAlt,
@@ -185,7 +166,7 @@ func (s *AdsStore) CreateAd(ctx context.Context, req CreateAdRequest) (*Ad, erro
 }
 
 // UpdateAd updates an existing ad with dynamic fields
-func (s *AdsStore) UpdateAd(ctx context.Context, id int64, req UpdateAdRequest) (*Ad, error) {
+func (r *Repository) UpdateAd(ctx context.Context, id int64, req UpdateAdRequest) (*Ad, error) {
 	setParts := []string{}
 	args := []interface{}{}
 	argIndex := 1
@@ -247,7 +228,7 @@ func (s *AdsStore) UpdateAd(ctx context.Context, id int64, req UpdateAdRequest) 
 	`, strings.Join(setParts, ", "), argIndex)
 
 	var ad Ad
-	err := s.db.QueryRow(ctx, query, args...).Scan(
+	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&ad.ID, &ad.Title, &ad.Description, &ad.ImageURL, &ad.ImageAlt,
 		&ad.Link, &ad.Active, &ad.DisplayOrder, &ad.Impressions, &ad.Clicks,
 		&ad.CreatedAt, &ad.UpdatedAt,
@@ -264,10 +245,10 @@ func (s *AdsStore) UpdateAd(ctx context.Context, id int64, req UpdateAdRequest) 
 }
 
 // DeleteAd deletes an ad by ID
-func (s *AdsStore) DeleteAd(ctx context.Context, id int64) error {
+func (r *Repository) DeleteAd(ctx context.Context, id int64) error {
 	query := "DELETE FROM ads WHERE id = $1"
 
-	cmdTag, err := s.db.Exec(ctx, query, id)
+	cmdTag, err := r.db.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete ad: %w", err)
 	}
@@ -280,7 +261,7 @@ func (s *AdsStore) DeleteAd(ctx context.Context, id int64) error {
 }
 
 // ToggleAdStatus toggles the active status of an ad
-func (s *AdsStore) ToggleAdStatus(ctx context.Context, id int64) (*Ad, error) {
+func (r *Repository) ToggleAdStatus(ctx context.Context, id int64) (*Ad, error) {
 	query := `
 		UPDATE ads 
 		SET active = NOT active, updated_at = NOW()
@@ -290,7 +271,7 @@ func (s *AdsStore) ToggleAdStatus(ctx context.Context, id int64) (*Ad, error) {
 	`
 
 	var ad Ad
-	err := s.db.QueryRow(ctx, query, id).Scan(
+	err := r.db.QueryRow(ctx, query, id).Scan(
 		&ad.ID, &ad.Title, &ad.Description, &ad.ImageURL, &ad.ImageAlt,
 		&ad.Link, &ad.Active, &ad.DisplayOrder, &ad.Impressions, &ad.Clicks,
 		&ad.CreatedAt, &ad.UpdatedAt,
@@ -307,10 +288,10 @@ func (s *AdsStore) ToggleAdStatus(ctx context.Context, id int64) (*Ad, error) {
 }
 
 // IncrementImpressions increments the impressions count for an ad
-func (s *AdsStore) IncrementImpressions(ctx context.Context, id int64) error {
+func (r *Repository) IncrementImpressions(ctx context.Context, id int64) error {
 	query := "UPDATE ads SET impressions = impressions + 1 WHERE id = $1"
 
-	cmdTag, err := s.db.Exec(ctx, query, id)
+	cmdTag, err := r.db.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to increment impressions: %w", err)
 	}
@@ -323,10 +304,10 @@ func (s *AdsStore) IncrementImpressions(ctx context.Context, id int64) error {
 }
 
 // IncrementClicks increments the clicks count for an ad
-func (s *AdsStore) IncrementClicks(ctx context.Context, id int64) error {
+func (r *Repository) IncrementClicks(ctx context.Context, id int64) error {
 	query := "UPDATE ads SET clicks = clicks + 1 WHERE id = $1"
 
-	cmdTag, err := s.db.Exec(ctx, query, id)
+	cmdTag, err := r.db.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to increment clicks: %w", err)
 	}
@@ -349,7 +330,7 @@ type Analytics struct {
 }
 
 // GetAdsAnalytics retrieves analytics data for ads
-func (s *AdsStore) GetAdsAnalytics(ctx context.Context) (*Analytics, error) {
+func (r *Repository) GetAdsAnalytics(ctx context.Context) (*Analytics, error) {
 	analytics := &Analytics{}
 
 	// Get total and active ads count, total impressions and clicks
@@ -362,7 +343,7 @@ func (s *AdsStore) GetAdsAnalytics(ctx context.Context) (*Analytics, error) {
 		FROM ads
 	`
 
-	err := s.db.QueryRow(ctx, statsQuery).Scan(
+	err := r.db.QueryRow(ctx, statsQuery).Scan(
 		&analytics.TotalAds,
 		&analytics.ActiveAds,
 		&analytics.TotalImpressions,
@@ -387,7 +368,7 @@ func (s *AdsStore) GetAdsAnalytics(ctx context.Context) (*Analytics, error) {
 		LIMIT 5
 	`
 
-	rows, err := s.db.Query(ctx, topAdsQuery)
+	rows, err := r.db.Query(ctx, topAdsQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get top performing ads: %w", err)
 	}
@@ -420,8 +401,8 @@ type DisplayOrderUpdate struct {
 }
 
 // BulkUpdateDisplayOrder updates display order for multiple ads in a transaction
-func (s *AdsStore) BulkUpdateDisplayOrder(ctx context.Context, updates []DisplayOrderUpdate) error {
-	tx, err := s.db.Begin(ctx)
+func (r *Repository) BulkUpdateDisplayOrder(ctx context.Context, updates []DisplayOrderUpdate) error {
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}

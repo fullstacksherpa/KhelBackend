@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"khel/internal/store"
+	"khel/internal/domain/users"
 	"net/http"
 	"strconv"
 	"time"
@@ -237,7 +237,7 @@ func (app *application) followUserHandler(w http.ResponseWriter, r *http.Request
 
 	if err := app.store.Followers.Follow(ctx, followedID, followerUser.ID); err != nil {
 		switch err {
-		case store.ErrConflict:
+		case users.ErrConflict:
 			app.conflictResponse(w, r, err)
 			return
 		default:
@@ -269,7 +269,7 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 	err := app.store.Users.Activate(r.Context(), token)
 	if err != nil {
 		switch err {
-		case store.ErrNotFound:
+		case users.ErrNotFound:
 			app.notFoundResponse(w, r, err)
 		default:
 			app.internalServerError(w, r, err)
@@ -310,8 +310,8 @@ func (app *application) unfollowUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func getUserFromContext(r *http.Request) *store.User {
-	if user, ok := r.Context().Value(userCtx).(*store.User); ok {
+func getUserFromContext(r *http.Request) *users.User {
+	if user, ok := r.Context().Value(userCtx).(*users.User); ok {
 		return user
 	}
 	return nil
@@ -418,7 +418,7 @@ func (app *application) getCurrentUserHandler(w http.ResponseWriter, r *http.Req
 	// 2. (Optional) re-fetch fresh data from DB to avoid stale info
 	user, err := app.store.Users.GetByID(r.Context(), userCtx.ID)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, users.ErrNotFound) {
 			http.Error(w, "User not found", http.StatusNotFound)
 		} else {
 			app.internalServerError(w, r, err)

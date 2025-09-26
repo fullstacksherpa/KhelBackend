@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"khel/internal/store"
+	"khel/internal/domain/venues"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -275,7 +275,7 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 		limit = 1000 // Or another value that makes sense for your data size.
 	}
 
-	filter := store.VenueFilter{
+	filter := venues.VenueFilter{
 		Sport: nullString(q.Get("sport")),
 		Page:  page,
 		Limit: limit,
@@ -307,7 +307,7 @@ func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request
 	user := getUserFromContext(r)
 
 	if user != nil {
-		favMap, err = app.store.FavoriteVenues.GetFavoriteVenueIDsByUser(r.Context(), user.ID)
+		favMap, err = app.store.Venues.GetFavoriteVenueIDsByUser(r.Context(), user.ID)
 		if err != nil {
 			app.internalServerError(w, r, err)
 			return
@@ -350,7 +350,7 @@ func nullString(s string) *string {
 // 2. Upload images externally to Cloudinary using custom public IDs.
 // 3. Update the venue record with the returned image URLs.
 // If an error occurs at any external step, the venue is deleted to ensure consistency.
-func (app *application) CreateAndUploadVenue(ctx context.Context, venue *store.Venue, files []*multipart.FileHeader, w http.ResponseWriter, r *http.Request) error {
+func (app *application) CreateAndUploadVenue(ctx context.Context, venue *venues.Venue, files []*multipart.FileHeader, w http.ResponseWriter, r *http.Request) error {
 	if err := app.store.Venues.Create(ctx, venue); err != nil {
 		return fmt.Errorf("error creating venue: %w", err)
 	}
@@ -419,7 +419,7 @@ func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Reques
 	user := getUserFromContext(r)
 
 	// Prepare the venue model without image URLs initially.
-	venue := &store.Venue{
+	venue := &venues.Venue{
 		OwnerID:     user.ID,
 		Name:        payload.Name,
 		Address:     payload.Address,
@@ -637,8 +637,8 @@ func (app *application) getVenueInfoHandler(w http.ResponseWriter, r *http.Reque
 
 	venueInfo, err := app.store.Venues.GetVenueInfo(r.Context(), venueID)
 	if err != nil {
-		if errors.Is(err, store.ErrVenueNotFound) {
-			app.notFoundResponse(w, r, store.ErrNotFound)
+		if errors.Is(err, venues.ErrVenueNotFound) {
+			app.notFoundResponse(w, r, venues.ErrVenueNotFound)
 			return
 		}
 		app.internalServerError(w, r, err)

@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"khel/docs" //this is required to generate swagger docs
 	"khel/internal/auth"
+	"khel/internal/domain/storage"
 	"khel/internal/mailer"
 	"khel/internal/notifications"
 	"khel/internal/ratelimiter"
-	"khel/internal/store"
 
 	"net/http"
 	"os"
@@ -29,7 +29,7 @@ import (
 
 type application struct {
 	config        config
-	store         store.Storage
+	store         *storage.Container
 	logger        *zap.SugaredLogger
 	cld           *cloudinary.Cloudinary
 	mailer        mailer.Client

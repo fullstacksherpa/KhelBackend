@@ -1,37 +1,36 @@
-package store
+package venuereviews
 
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Review struct {
-	ID        int64     `json:"id"`
-	VenueID   int64     `json:"venue_id"`
-	UserID    int64     `json:"user_id"`
-	Rating    int       `json:"rating"` // 1-5
-	Comment   string    `json:"comment"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-
-	// Joined fields
-	UserName  string  `json:"user_name,omitempty"`
-	AvatarURL *string `json:"avatar_url,omitempty"`
+type Store interface {
+	CreateReview(context.Context, *Review) error
+	GetReviews(context.Context, int64) ([]Review, error)
+	DeleteReview(context.Context, int64, int64) error
+	GetReviewStats(context.Context, int64) (int, float64, error)
+	IsReviewOwner(ctx context.Context, reviewID int64, userID int64) (bool, error)
+	HasReview(ctx context.Context, venueID, userID int64) (bool, error)
 }
-type ReviewStore struct {
+
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func (s *ReviewStore) CreateReview(ctx context.Context, review *Review) error {
+func NewRepository(db *pgxpool.Pool) Store {
+	return &Repository{db: db}
+}
+
+func (r *Repository) CreateReview(ctx context.Context, review *Review) error {
 	query := `
         INSERT INTO reviews (venue_id, user_id, rating, comment)
         VALUES ($1, $2, $3, $4)
         RETURNING id, created_at, updated_at
     `
-	return s.db.QueryRow(ctx, query,
+	return r.db.QueryRow(ctx, query,
 		review.VenueID,
 		review.UserID,
 		review.Rating,
@@ -39,7 +38,7 @@ func (s *ReviewStore) CreateReview(ctx context.Context, review *Review) error {
 	).Scan(&review.ID, &review.CreatedAt, &review.UpdatedAt)
 }
 
-func (s *ReviewStore) GetReviews(ctx context.Context, venueID int64) ([]Review, error) {
+func (r *Repository) GetReviews(ctx context.Context, venueID int64) ([]Review, error) {
 	query := `
         SELECT vr.id, vr.venue_id, vr.user_id, vr.rating, vr.comment, 
                vr.created_at, vr.updated_at, u.first_name, u.profile_picture_url
@@ -48,7 +47,7 @@ func (s *ReviewStore) GetReviews(ctx context.Context, venueID int64) ([]Review, 
         WHERE vr.venue_id = $1
         ORDER BY vr.created_at DESC
     `
-	rows, err := s.db.Query(ctx, query, venueID)
+	rows, err := r.db.Query(ctx, query, venueID)
 	if err != nil {
 		return nil, err
 	}
@@ -77,12 +76,12 @@ func (s *ReviewStore) GetReviews(ctx context.Context, venueID int64) ([]Review, 
 	return reviews, nil
 }
 
-func (s *ReviewStore) DeleteReview(ctx context.Context, reviewID, userID int64) error {
+func (r *Repository) DeleteReview(ctx context.Context, reviewID, userID int64) error {
 	query := `
         DELETE FROM reviews 
         WHERE id = $1 AND user_id = $2
     `
-	result, err := s.db.Exec(ctx, query, reviewID, userID)
+	result, err := r.db.Exec(ctx, query, reviewID, userID)
 	if err != nil {
 		return err
 	}
@@ -95,7 +94,7 @@ func (s *ReviewStore) DeleteReview(ctx context.Context, reviewID, userID int64) 
 	return nil
 }
 
-func (s *ReviewStore) GetReviewStats(ctx context.Context, venueID int64) (total int, average float64, err error) {
+func (r *Repository) GetReviewStats(ctx context.Context, venueID int64) (total int, average float64, err error) {
 	query := `
         SELECT 
             COUNT(id) as total_reviews,
@@ -103,13 +102,13 @@ func (s *ReviewStore) GetReviewStats(ctx context.Context, venueID int64) (total 
         FROM reviews
         WHERE venue_id = $1
     `
-	err = s.db.QueryRow(ctx, query, venueID).Scan(&total, &average)
+	err = r.db.QueryRow(ctx, query, venueID).Scan(&total, &average)
 	return total, average, err
 }
 
-func (s *ReviewStore) IsReviewOwner(ctx context.Context, reviewID int64, userID int64) (bool, error) {
+func (r *Repository) IsReviewOwner(ctx context.Context, reviewID int64, userID int64) (bool, error) {
 	var reviewUserID int64
-	err := s.db.QueryRow(ctx, `SELECT user_id FROM reviews WHERE id = $1`, reviewID).Scan(&reviewUserID)
+	err := r.db.QueryRow(ctx, `SELECT user_id FROM reviews WHERE id = $1`, reviewID).Scan(&reviewUserID)
 	if err != nil {
 		return false, err
 	}
@@ -118,7 +117,7 @@ func (s *ReviewStore) IsReviewOwner(ctx context.Context, reviewID int64, userID 
 }
 
 // HasReview returns true if a review by this user on this venue already exists.
-func (s *ReviewStore) HasReview(ctx context.Context, venueID, userID int64) (bool, error) {
+func (r *Repository) HasReview(ctx context.Context, venueID, userID int64) (bool, error) {
 	var exists bool
 	query := `
         SELECT EXISTS (
@@ -126,6 +125,6 @@ func (s *ReviewStore) HasReview(ctx context.Context, venueID, userID int64) (boo
           WHERE venue_id = $1 AND user_id = $2
         )
     `
-	err := s.db.QueryRow(ctx, query, venueID, userID).Scan(&exists)
+	err := r.db.QueryRow(ctx, query, venueID, userID).Scan(&exists)
 	return exists, err
 }
