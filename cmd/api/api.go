@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"khel/docs" //this is required to generate swagger docs
 	"khel/internal/auth"
+	"khel/internal/domain/accesscontrol"
 	"khel/internal/domain/storage"
 	"khel/internal/mailer"
 	"khel/internal/notifications"
@@ -118,6 +119,28 @@ func (app *application) mount() http.Handler {
 			r.Get("/", app.getAllAppReviewsHandler)
 		})
 
+		// Public ads routes
+		r.Route("/ads", func(r chi.Router) {
+			r.Get("/active", app.getActiveAdsHandler)
+			r.Post("/{adID}/impression", app.trackImpressionHandler)
+			r.Post("/{adID}/click", app.trackClickHandler)
+		})
+
+		// Admin ads routes
+		r.Route("/admin/ads", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
+
+			r.Get("/", app.getAllAdsHandler)
+			r.Post("/", app.createAdHandler)
+			r.Get("/{adID}", app.getAdByIDHandler)
+			r.Put("/{adID}", app.updateAdHandler)
+			r.Delete("/{adID}", app.deleteAdHandler)
+			r.Post("/{adID}/toggle", app.toggleAdStatusHandler)
+			r.Get("/analytics", app.getAdsAnalyticsHandler)
+			r.Post("/bulk-update-order", app.bulkUpdateDisplayOrderHandler)
+		})
+
 		r.With(app.optionalAuth).Get("/venues/list-venues", app.listVenuesHandler)
 
 		r.With(app.optionalAuth).Get("/venues/{venueID}/reviews", app.getVenueReviewsHandler)
@@ -205,7 +228,7 @@ func (app *application) mount() http.Handler {
 				r.Use(app.AuthTokenMiddleware)
 				r.Post("/shortlist", app.addShortlistedGameHandler)      // Add game to shortlist
 				r.Delete("/shortlist", app.removeShortlistedGameHandler) // Remove game from shortlist
-				r.With(app.CheckAdmin).Post("/assign-assistant/{playerID}", app.AssignAssistantHandler)
+				r.With(app.CheckGameAdmin).Post("/assign-assistant/{playerID}", app.AssignAssistantHandler)
 				r.Get("/players", app.getGamePlayersHandler)
 				r.Post("/request", app.CreateJoinRequest)
 				r.Delete("/request", app.DeleteJoinRequest)

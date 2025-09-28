@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"khel/internal/auth"
+	"khel/internal/domain/accesscontrol"
 	"log"
 	"net/http"
 	"strconv"
@@ -181,7 +182,7 @@ func (app *application) RequireGameAdminAssistant(next http.Handler) http.Handle
 	})
 }
 
-func (app *application) CheckAdmin(next http.Handler) http.Handler {
+func (app *application) CheckGameAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := getUserFromContext(r)
 
@@ -341,4 +342,30 @@ func (app *application) AuthTokenIgnoreExpiryMiddleware(next http.Handler) http.
 		ctx := context.WithValue(r.Context(), userCtx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// RequireRoleMiddleware checks if the authenticated user has a specific role
+func (app *application) RequireRoleMiddleware(role accesscontrol.RoleName) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user := getUserFromContext(r)
+			if user == nil {
+				app.unauthorizedErrorResponse(w, r, fmt.Errorf("user not authenticated"))
+				return
+			}
+
+			hasRole, err := app.store.AccessControl.UserHasRole(r.Context(), user.ID, string(role))
+			if err != nil {
+				app.internalServerError(w, r, fmt.Errorf("failed to check user role: %w", err))
+				return
+			}
+
+			if !hasRole {
+				app.forbiddenResponse(w, r)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }

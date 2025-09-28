@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -115,4 +116,75 @@ func (app *application) uploadImagesWithVenueID(
 	}
 
 	return urls, nil
+}
+
+func (app *application) uploadAdImageToCloudinary(file io.Reader, adTitle string) (string, error) {
+	env := os.Getenv("APP_ENV")
+
+	folder := "testAds"
+	if env == "prod" || env == "production" {
+		folder = "ads"
+	}
+	// Create safe public ID from title
+	publicID := app.createSafePublicID(adTitle)
+	publicID = fmt.Sprintf("%s_%d", publicID, time.Now().UnixNano())
+
+	resp, err := app.cld.Upload.Upload(
+		context.Background(),
+		file,
+		uploader.UploadParams{
+			Folder:         folder,
+			PublicID:       publicID,
+			Overwrite:      api.Bool(false),
+			Transformation: "w_800,h_450,c_fill,q_auto,f_auto",
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("cloudinary upload failed: %w", err)
+	}
+	return resp.SecureURL, nil
+}
+
+// Helper function to validate ad image file types
+func (app *application) isValidAdImageType(contentType string) bool {
+	validTypes := []string{
+		"image/jpeg",
+		"image/png",
+		"image/webp",
+		"image/jpg",
+	}
+
+	for _, validType := range validTypes {
+		if contentType == validType {
+			return true
+		}
+	}
+
+	return false
+}
+
+// createSafePublicID creates a safe public ID from ad title for Cloudinary
+func (app *application) createSafePublicID(title string) string {
+	// Convert to lowercase
+	safeID := strings.ToLower(title)
+
+	// Replace spaces and special characters with underscores
+	reg := regexp.MustCompile(`[^a-z0-9]+`)
+	safeID = reg.ReplaceAllString(safeID, "_")
+
+	// Remove leading/trailing underscores
+	safeID = strings.Trim(safeID, "_")
+
+	// Limit length to 50 characters
+	if len(safeID) > 50 {
+		safeID = safeID[:50]
+	}
+
+	// Ensure it's not empty
+	if safeID == "" {
+		safeID = "ad_image"
+	}
+
+	return safeID
 }

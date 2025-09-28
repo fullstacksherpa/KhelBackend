@@ -12,7 +12,7 @@ USING status::booking_status;
 
 -- 4. Set the default again (now using ENUM type)
 ALTER TABLE bookings
-ALTER COLUMN status SET DEFAULT 'confirmed';
+ALTER COLUMN status SET DEFAULT 'pending';
 
 -- 5. Create indexes on user_id and venue_id
 CREATE INDEX idx_bookings_user_id ON bookings(user_id);

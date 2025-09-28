@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"khel/internal/domain/accesscontrol"
 	"khel/internal/domain/ads"
 	"khel/internal/domain/appreviews"
 	"khel/internal/domain/bookings"
@@ -26,6 +27,7 @@ type Container struct {
 	AppReviews    appreviews.Store
 	PushTokens    pushtokens.Store
 	Ads           ads.Store
+	AccessControl accesscontrol.Store
 }
 
 func NewContainer(db *pgxpool.Pool) *Container {
@@ -40,5 +42,6 @@ func NewContainer(db *pgxpool.Pool) *Container {
 		AppReviews:    appreviews.NewRepository(db),
 		PushTokens:    pushtokens.NewRepository(db),
 		Ads:           ads.NewRepository(db),
+		AccessControl: accesscontrol.NewRepository(db),
 	}
 }

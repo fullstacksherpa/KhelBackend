@@ -1,5 +1,56 @@
 basePath: /v1
 definitions:
+  ads.Ad:
+    properties:
+      active:
+        type: boolean
+      clicks:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      display_order:
+        type: integer
+      id:
+        type: integer
+      image_alt:
+        type: string
+      image_url:
+        type: string
+      impressions:
+        type: integer
+      link:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  ads.Analytics:
+    properties:
+      active_ads:
+        type: integer
+      average_ctr:
+        type: number
+      top_performing_ads:
+        items:
+          $ref: '#/definitions/ads.Ad'
+        type: array
+      total_ads:
+        type: integer
+      total_clicks:
+        type: integer
+      total_impressions:
+        type: integer
+    type: object
+  ads.DisplayOrderUpdate:
+    properties:
+      displayOrder:
+        type: integer
+      id:
+        type: integer
+    type: object
   appreviews.AppReview:
     properties:
       created_at:
@@ -861,6 +912,16 @@ definitions:
       total_reviews:
         type: integer
     type: object
+  main.bulkUpdateDisplayOrderPayload:
+    properties:
+      updates:
+        items:
+          $ref: '#/definitions/ads.DisplayOrderUpdate'
+        minItems: 1
+        type: array
+    required:
+    - updates
+    type: object
   main.createReviewPayload:
     properties:
       comment:
@@ -1007,6 +1068,379 @@ info:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   title: Khel API
 paths:
+  /admin/ads:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all ads with pagination for admin dashboard
+      parameters:
+      - description: 'Limit results (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset results (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All ads with pagination
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: Invalid parameters'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get all ads (Admin)
+      tags:
+      - Admin
+    post:
+      consumes:
+      - multipart/form-data
+      description: Creates a new advertisement with file upload
+      parameters:
+      - description: Ad title
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Ad description
+        in: formData
+        name: description
+        type: string
+      - description: Image alt text
+        in: formData
+        name: image_alt
+        type: string
+      - description: Ad link URL
+        in: formData
+        name: link
+        type: string
+      - description: Display order
+        in: formData
+        name: display_order
+        type: integer
+      - description: 'Ad image file (max size: 5MB)'
+        in: formData
+        name: ad_image
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Ad created successfully
+          schema:
+            $ref: '#/definitions/ads.Ad'
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new ad (Admin)
+      tags:
+      - Admin
+  /admin/ads/{adID}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes an advertisement
+      parameters:
+      - description: Ad ID
+        in: path
+        name: adID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ad deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid ad ID'
+          schema: {}
+        "404":
+          description: 'Not Found: Ad not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an ad (Admin)
+      tags:
+      - Admin
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a single ad by its ID
+      parameters:
+      - description: Ad ID
+        in: path
+        name: adID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ad details
+          schema:
+            $ref: '#/definitions/ads.Ad'
+        "400":
+          description: 'Bad Request: Invalid ad ID'
+          schema: {}
+        "404":
+          description: 'Not Found: Ad not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get ad by ID (Admin)
+      tags:
+      - Admin
+    put:
+      consumes:
+      - multipart/form-data
+      description: Updates an existing advertisement with optional file upload
+      parameters:
+      - description: Ad ID
+        in: path
+        name: adID
+        required: true
+        type: integer
+      - description: Ad title
+        in: formData
+        name: title
+        type: string
+      - description: Ad description
+        in: formData
+        name: description
+        type: string
+      - description: Image alt text
+        in: formData
+        name: image_alt
+        type: string
+      - description: Ad link URL
+        in: formData
+        name: link
+        type: string
+      - description: Ad active status
+        in: formData
+        name: active
+        type: boolean
+      - description: Display order
+        in: formData
+        name: display_order
+        type: integer
+      - description: 'New ad image file (max size: 5MB)'
+        in: formData
+        name: ad_image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ad updated successfully
+          schema:
+            $ref: '#/definitions/ads.Ad'
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "404":
+          description: 'Not Found: Ad not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update an ad (Admin)
+      tags:
+      - Admin
+  /admin/ads/{adID}/toggle:
+    post:
+      consumes:
+      - application/json
+      description: Toggles the active status of an advertisement
+      parameters:
+      - description: Ad ID
+        in: path
+        name: adID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ad status toggled successfully
+          schema:
+            $ref: '#/definitions/ads.Ad'
+        "400":
+          description: 'Bad Request: Invalid ad ID'
+          schema: {}
+        "404":
+          description: 'Not Found: Ad not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Toggle ad status (Admin)
+      tags:
+      - Admin
+  /admin/ads/analytics:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves analytics data for all advertisements
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Analytics data
+          schema:
+            $ref: '#/definitions/ads.Analytics'
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get ads analytics (Admin)
+      tags:
+      - Admin
+  /admin/ads/bulk-update-order:
+    post:
+      consumes:
+      - application/json
+      description: Updates display order for multiple ads in a single transaction
+      parameters:
+      - description: Bulk update payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.bulkUpdateDisplayOrderPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Display orders updated successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid input'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Bulk update display order (Admin)
+      tags:
+      - Admin
+  /ads/{adID}/click:
+    post:
+      consumes:
+      - application/json
+      description: Increments the click count for an advertisement
+      parameters:
+      - description: Ad ID
+        in: path
+        name: adID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Click tracked successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid ad ID'
+          schema: {}
+        "404":
+          description: 'Not Found: Ad not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Track ad click
+      tags:
+      - Ads
+  /ads/{adID}/impression:
+    post:
+      consumes:
+      - application/json
+      description: Increments the impression count for an advertisement
+      parameters:
+      - description: Ad ID
+        in: path
+        name: adID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Impression tracked successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: Invalid ad ID'
+          schema: {}
+        "404":
+          description: 'Not Found: Ad not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Track ad impression
+      tags:
+      - Ads
+  /ads/active:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all active ads for the mobile app carousel
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Active ads
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get active ads
+      tags:
+      - Ads
   /app-reviews:
     get:
       consumes:
