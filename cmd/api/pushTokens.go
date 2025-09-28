@@ -10,7 +10,7 @@ import (
 // SavePushTokenRequest represents the payload for saving/updating a push token
 type SavePushTokenRequest struct {
 	Token      string          `json:"token" validate:"required"`
-	DeviceInfo json.RawMessage `json:"device_info"`
+	DeviceInfo json.RawMessage `json:"device_info" swaggertype:"object"`
 }
 
 // RemovePushTokenRequest represents the payload for removing a push token

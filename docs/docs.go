@@ -47,7 +47,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.AppReview"
+                                "$ref": "#/definitions/appreviews.AppReview"
                             }
                         }
                     },
@@ -366,7 +366,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Game created successfully",
                         "schema": {
-                            "$ref": "#/definitions/store.Game"
+                            "$ref": "#/definitions/games.Game"
                         }
                     },
                     "400": {
@@ -499,7 +499,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.GameSummary"
+                                "$ref": "#/definitions/games.GameSummary"
                             }
                         }
                     },
@@ -538,7 +538,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.GameSummary"
+                                "$ref": "#/definitions/games.GameSummary"
                             }
                         }
                     },
@@ -579,7 +579,7 @@ const docTemplate = `{
                             "items": {
                                 "type": "array",
                                 "items": {
-                                    "$ref": "#/definitions/store.ShortlistedGameDetail"
+                                    "$ref": "#/definitions/games.ShortlistedGameDetail"
                                 }
                             }
                         }
@@ -621,7 +621,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/store.GameDetails"
+                            "$ref": "#/definitions/games.GameDetails"
                         }
                     },
                     "400": {
@@ -898,7 +898,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.QuestionWithReplies"
+                                "$ref": "#/definitions/gameqa.QuestionWithReplies"
                             }
                         }
                     },
@@ -942,7 +942,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.Question"
+                                "$ref": "#/definitions/gameqa.Question"
                             }
                         }
                     },
@@ -991,7 +991,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/store.Question"
+                            "$ref": "#/definitions/gameqa.Question"
                         }
                     },
                     "400": {
@@ -1109,7 +1109,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/store.Reply"
+                            "$ref": "#/definitions/gameqa.Reply"
                         }
                     },
                     "400": {
@@ -1320,7 +1320,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.GameRequestWithUser"
+                                "$ref": "#/definitions/games.GameRequestWithUser"
                             }
                         }
                     },
@@ -1518,7 +1518,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.GameSummary"
+                                "$ref": "#/definitions/games.GameSummary"
                             }
                         }
                     },
@@ -1823,7 +1823,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Current user data",
                         "schema": {
-                            "$ref": "#/definitions/store.User"
+                            "$ref": "#/definitions/users.User"
                         }
                     },
                     "401": {
@@ -2353,7 +2353,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Venue created successfully",
                         "schema": {
-                            "$ref": "#/definitions/store.Venue"
+                            "$ref": "#/definitions/venues.Venue"
                         }
                     },
                     "400": {
@@ -2395,7 +2395,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.Venue"
+                                "$ref": "#/definitions/venues.Venue"
                             }
                         }
                     },
@@ -2891,7 +2891,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.ScheduledBooking"
+                                "$ref": "#/definitions/bookings.ScheduledBooking"
                             }
                         }
                     },
@@ -3362,7 +3362,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.PricingSlot"
+                                "$ref": "#/definitions/bookings.PricingSlot"
                             }
                         }
                     },
@@ -3417,7 +3417,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/store.PricingSlot"
+                                "$ref": "#/definitions/bookings.PricingSlot"
                             }
                         }
                     },
@@ -3479,7 +3479,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Pricing updated successfully",
                         "schema": {
-                            "$ref": "#/definitions/store.PricingSlot"
+                            "$ref": "#/definitions/bookings.PricingSlot"
                         }
                     },
                     "400": {
@@ -3623,7 +3623,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Review created successfully",
                         "schema": {
-                            "$ref": "#/definitions/store.Review"
+                            "$ref": "#/definitions/venuereviews.Review"
                         }
                     },
                     "400": {
@@ -3782,7 +3782,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Detailed venue information",
                         "schema": {
-                            "$ref": "#/definitions/store.VenueInfo"
+                            "$ref": "#/definitions/venues.VenueInfo"
                         }
                     },
                     "400": {
@@ -3806,6 +3806,521 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "appreviews.AppReview": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "feedback": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "bookings.PricingSlot": {
+            "type": "object",
+            "properties": {
+                "dayOfWeek": {
+                    "type": "string"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "startTime": {
+                    "description": "Note: start_time and end_time are stored as TIME in the DB.\nWe use time.Time to hold the time part.",
+                    "type": "string"
+                },
+                "venueID": {
+                    "type": "integer"
+                }
+            }
+        },
+        "bookings.ScheduledBooking": {
+            "type": "object",
+            "properties": {
+                "accepted_at": {
+                    "type": "string"
+                },
+                "booking_id": {
+                    "type": "integer"
+                },
+                "customer_name": {
+                    "description": "optional",
+                    "type": "string"
+                },
+                "customer_phone": {
+                    "description": "optional",
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "note": {
+                    "description": "optional",
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_image": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_number": {
+                    "type": "string"
+                }
+            }
+        },
+        "gameqa.Question": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "question": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "gameqa.QuestionWithReplies": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "question": {
+                    "type": "string"
+                },
+                "replies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/gameqa.Reply"
+                    }
+                }
+            }
+        },
+        "gameqa.Reply": {
+            "type": "object",
+            "properties": {
+                "admin_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "question_id": {
+                    "type": "integer"
+                },
+                "reply": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "games.BookingStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "requested",
+                "booked",
+                "rejected",
+                "cancelled"
+            ],
+            "x-enum-varnames": [
+                "BookingPending",
+                "BookingRequested",
+                "BookingBooked",
+                "BookingRejected",
+                "BookingCancelled"
+            ]
+        },
+        "games.Game": {
+            "type": "object",
+            "properties": {
+                "admin_id": {
+                    "description": "Foreign key to users table (game admin)",
+                    "type": "integer"
+                },
+                "booking_status": {
+                    "$ref": "#/definitions/games.BookingStatus"
+                },
+                "created_at": {
+                    "description": "Timestamp when the game was created",
+                    "type": "string"
+                },
+                "end_time": {
+                    "description": "Game end time",
+                    "type": "string"
+                },
+                "format": {
+                    "description": "Game format (nullable)",
+                    "type": "string"
+                },
+                "game_level": {
+                    "description": "Skill level (beginner, intermediate, advanced)",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Primary key",
+                    "type": "integer"
+                },
+                "instruction": {
+                    "description": "Game instructions (nullable)",
+                    "type": "string"
+                },
+                "match_full": {
+                    "description": "Whether the game is full",
+                    "type": "boolean"
+                },
+                "max_players": {
+                    "description": "Maximum number of players",
+                    "type": "integer"
+                },
+                "price": {
+                    "description": "Price of the game (nullable)",
+                    "type": "integer"
+                },
+                "sport_type": {
+                    "description": "Type of sport (e.g., futsal, basketball)",
+                    "type": "string"
+                },
+                "start_time": {
+                    "description": "Game start time",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Game status (active, cancelled, completed)",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "Timestamp when the game was last updated",
+                    "type": "string"
+                },
+                "venue_id": {
+                    "description": "Foreign key to venues table",
+                    "type": "integer"
+                },
+                "visibility": {
+                    "description": "Visibility (public or private)",
+                    "type": "string"
+                }
+            }
+        },
+        "games.GameDetails": {
+            "type": "object",
+            "properties": {
+                "admin_id": {
+                    "type": "integer"
+                },
+                "booking_status": {
+                    "$ref": "#/definitions/games.BookingStatus"
+                },
+                "current_player": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "format": {
+                    "type": "string"
+                },
+                "game_admin_name": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "game_level": {
+                    "type": "string"
+                },
+                "match_full": {
+                    "type": "boolean"
+                },
+                "max_players": {
+                    "type": "integer"
+                },
+                "player_ids": {
+                    "description": "all joined player user IDs",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "player_images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "requested_player_ids": {
+                    "description": "pending request user IDs",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "sport_type": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                },
+                "venue_lat": {
+                    "type": "number"
+                },
+                "venue_lon": {
+                    "type": "number"
+                },
+                "venue_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "games.GameRequestStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "accepted",
+                "rejected"
+            ],
+            "x-enum-varnames": [
+                "GameRequestStatusPending",
+                "GameRequestStatusAccepted",
+                "GameRequestStatusRejected"
+            ]
+        },
+        "games.GameRequestWithUser": {
+            "type": "object",
+            "properties": {
+                "first_name": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "profile_picture_url": {
+                    "type": "string"
+                },
+                "request_time": {
+                    "type": "string"
+                },
+                "skill_level": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/games.GameRequestStatus"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "games.GameSummary": {
+            "type": "object",
+            "properties": {
+                "booking_status": {
+                    "$ref": "#/definitions/games.BookingStatus"
+                },
+                "current_player": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "format": {
+                    "type": "string"
+                },
+                "game_admin_name": {
+                    "type": "string"
+                },
+                "game_id": {
+                    "type": "integer"
+                },
+                "game_level": {
+                    "type": "string"
+                },
+                "match_full": {
+                    "type": "boolean"
+                },
+                "max_players": {
+                    "type": "integer"
+                },
+                "player_images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "shortlisted": {
+                    "type": "boolean"
+                },
+                "sport_type": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                },
+                "venue_lat": {
+                    "description": "Venue latitude",
+                    "type": "number"
+                },
+                "venue_lon": {
+                    "description": "Venue longitude",
+                    "type": "number"
+                },
+                "venue_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "games.ShortlistedGameDetail": {
+            "type": "object",
+            "properties": {
+                "admin_id": {
+                    "description": "Foreign key to users table (game admin)",
+                    "type": "integer"
+                },
+                "booking_status": {
+                    "$ref": "#/definitions/games.BookingStatus"
+                },
+                "created_at": {
+                    "description": "Timestamp when the game was created",
+                    "type": "string"
+                },
+                "end_time": {
+                    "description": "Game end time",
+                    "type": "string"
+                },
+                "format": {
+                    "description": "Game format (nullable)",
+                    "type": "string"
+                },
+                "game_level": {
+                    "description": "Skill level (beginner, intermediate, advanced)",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Primary key",
+                    "type": "integer"
+                },
+                "instruction": {
+                    "description": "Game instructions (nullable)",
+                    "type": "string"
+                },
+                "match_full": {
+                    "description": "Whether the game is full",
+                    "type": "boolean"
+                },
+                "max_players": {
+                    "description": "Maximum number of players",
+                    "type": "integer"
+                },
+                "price": {
+                    "description": "Price of the game (nullable)",
+                    "type": "integer"
+                },
+                "sport_type": {
+                    "description": "Type of sport (e.g., futsal, basketball)",
+                    "type": "string"
+                },
+                "start_time": {
+                    "description": "Game start time",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Game status (active, cancelled, completed)",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "Timestamp when the game was last updated",
+                    "type": "string"
+                },
+                "venue_address": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "description": "Foreign key to venues table",
+                    "type": "integer"
+                },
+                "venue_name": {
+                    "type": "string"
+                },
+                "visibility": {
+                    "description": "Visibility (public or private)",
+                    "type": "string"
+                }
+            }
+        },
         "main.AppReviewPayload": {
             "type": "object",
             "properties": {
@@ -4287,7 +4802,18 @@ const docTemplate = `{
             }
         },
         "main.SavePushTokenRequest": {
-            "type": "object"
+            "type": "object",
+            "required": [
+                "token"
+            ],
+            "properties": {
+                "device_info": {
+                    "type": "object"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
         },
         "main.ScheduledBookingResponse": {
             "type": "object",
@@ -4409,7 +4935,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/store.User"
+                    "$ref": "#/definitions/users.User"
                 }
             }
         },
@@ -4556,556 +5082,7 @@ const docTemplate = `{
                 }
             }
         },
-        "store.AppReview": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "feedback": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "rating": {
-                    "type": "integer"
-                },
-                "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "store.BookingStatus": {
-            "type": "string",
-            "enum": [
-                "pending",
-                "requested",
-                "booked",
-                "rejected",
-                "cancelled"
-            ],
-            "x-enum-varnames": [
-                "BookingPending",
-                "BookingRequested",
-                "BookingBooked",
-                "BookingRejected",
-                "BookingCancelled"
-            ]
-        },
-        "store.Game": {
-            "type": "object",
-            "properties": {
-                "admin_id": {
-                    "description": "Foreign key to users table (game admin)",
-                    "type": "integer"
-                },
-                "booking_status": {
-                    "$ref": "#/definitions/store.BookingStatus"
-                },
-                "created_at": {
-                    "description": "Timestamp when the game was created",
-                    "type": "string"
-                },
-                "end_time": {
-                    "description": "Game end time",
-                    "type": "string"
-                },
-                "format": {
-                    "description": "Game format (nullable)",
-                    "type": "string"
-                },
-                "game_level": {
-                    "description": "Skill level (beginner, intermediate, advanced)",
-                    "type": "string"
-                },
-                "id": {
-                    "description": "Primary key",
-                    "type": "integer"
-                },
-                "instruction": {
-                    "description": "Game instructions (nullable)",
-                    "type": "string"
-                },
-                "match_full": {
-                    "description": "Whether the game is full",
-                    "type": "boolean"
-                },
-                "max_players": {
-                    "description": "Maximum number of players",
-                    "type": "integer"
-                },
-                "price": {
-                    "description": "Price of the game (nullable)",
-                    "type": "integer"
-                },
-                "sport_type": {
-                    "description": "Type of sport (e.g., futsal, basketball)",
-                    "type": "string"
-                },
-                "start_time": {
-                    "description": "Game start time",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "Game status (active, cancelled, completed)",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "description": "Timestamp when the game was last updated",
-                    "type": "string"
-                },
-                "venue_id": {
-                    "description": "Foreign key to venues table",
-                    "type": "integer"
-                },
-                "visibility": {
-                    "description": "Visibility (public or private)",
-                    "type": "string"
-                }
-            }
-        },
-        "store.GameDetails": {
-            "type": "object",
-            "properties": {
-                "admin_id": {
-                    "type": "integer"
-                },
-                "booking_status": {
-                    "$ref": "#/definitions/store.BookingStatus"
-                },
-                "current_player": {
-                    "type": "integer"
-                },
-                "end_time": {
-                    "type": "string"
-                },
-                "format": {
-                    "type": "string"
-                },
-                "game_admin_name": {
-                    "type": "string"
-                },
-                "game_id": {
-                    "type": "integer"
-                },
-                "game_level": {
-                    "type": "string"
-                },
-                "match_full": {
-                    "type": "boolean"
-                },
-                "max_players": {
-                    "type": "integer"
-                },
-                "player_ids": {
-                    "description": "all joined player user IDs",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "player_images": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "price": {
-                    "type": "integer"
-                },
-                "requested_player_ids": {
-                    "description": "pending request user IDs",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "sport_type": {
-                    "type": "string"
-                },
-                "start_time": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "venue_id": {
-                    "type": "integer"
-                },
-                "venue_lat": {
-                    "type": "number"
-                },
-                "venue_lon": {
-                    "type": "number"
-                },
-                "venue_name": {
-                    "type": "string"
-                }
-            }
-        },
-        "store.GameRequestStatus": {
-            "type": "string",
-            "enum": [
-                "pending",
-                "accepted",
-                "rejected"
-            ],
-            "x-enum-varnames": [
-                "GameRequestStatusPending",
-                "GameRequestStatusAccepted",
-                "GameRequestStatusRejected"
-            ]
-        },
-        "store.GameRequestWithUser": {
-            "type": "object",
-            "properties": {
-                "first_name": {
-                    "type": "string"
-                },
-                "game_id": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "phone": {
-                    "type": "string"
-                },
-                "profile_picture_url": {
-                    "type": "string"
-                },
-                "request_time": {
-                    "type": "string"
-                },
-                "skill_level": {
-                    "type": "string"
-                },
-                "status": {
-                    "$ref": "#/definitions/store.GameRequestStatus"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "store.GameSummary": {
-            "type": "object",
-            "properties": {
-                "booking_status": {
-                    "$ref": "#/definitions/store.BookingStatus"
-                },
-                "current_player": {
-                    "type": "integer"
-                },
-                "end_time": {
-                    "type": "string"
-                },
-                "format": {
-                    "type": "string"
-                },
-                "game_admin_name": {
-                    "type": "string"
-                },
-                "game_id": {
-                    "type": "integer"
-                },
-                "game_level": {
-                    "type": "string"
-                },
-                "match_full": {
-                    "type": "boolean"
-                },
-                "max_players": {
-                    "type": "integer"
-                },
-                "player_images": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "price": {
-                    "type": "integer"
-                },
-                "shortlisted": {
-                    "type": "boolean"
-                },
-                "sport_type": {
-                    "type": "string"
-                },
-                "start_time": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "venue_id": {
-                    "type": "integer"
-                },
-                "venue_lat": {
-                    "description": "Venue latitude",
-                    "type": "number"
-                },
-                "venue_lon": {
-                    "description": "Venue longitude",
-                    "type": "number"
-                },
-                "venue_name": {
-                    "type": "string"
-                }
-            }
-        },
-        "store.PricingSlot": {
-            "type": "object",
-            "properties": {
-                "dayOfWeek": {
-                    "type": "string"
-                },
-                "endTime": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "price": {
-                    "type": "integer"
-                },
-                "startTime": {
-                    "description": "Note: start_time and end_time are stored as TIME in the DB.\nWe use time.Time to hold the time part.",
-                    "type": "string"
-                },
-                "venueID": {
-                    "type": "integer"
-                }
-            }
-        },
-        "store.Question": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "game_id": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "question": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "store.QuestionWithReplies": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "question": {
-                    "type": "string"
-                },
-                "replies": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/store.Reply"
-                    }
-                }
-            }
-        },
-        "store.Reply": {
-            "type": "object",
-            "properties": {
-                "admin_id": {
-                    "type": "integer"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "question_id": {
-                    "type": "integer"
-                },
-                "reply": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "store.Review": {
-            "type": "object",
-            "properties": {
-                "avatar_url": {
-                    "type": "string"
-                },
-                "comment": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "rating": {
-                    "description": "1-5",
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                },
-                "user_name": {
-                    "description": "Joined fields",
-                    "type": "string"
-                },
-                "venue_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "store.ScheduledBooking": {
-            "type": "object",
-            "properties": {
-                "accepted_at": {
-                    "type": "string"
-                },
-                "booking_id": {
-                    "type": "integer"
-                },
-                "customer_name": {
-                    "description": "optional",
-                    "type": "string"
-                },
-                "customer_phone": {
-                    "description": "optional",
-                    "type": "string"
-                },
-                "end_time": {
-                    "type": "string"
-                },
-                "note": {
-                    "description": "optional",
-                    "type": "string"
-                },
-                "price": {
-                    "type": "integer"
-                },
-                "start_time": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                },
-                "user_image": {
-                    "type": "string"
-                },
-                "user_name": {
-                    "type": "string"
-                },
-                "user_number": {
-                    "type": "string"
-                }
-            }
-        },
-        "store.ShortlistedGameDetail": {
-            "type": "object",
-            "properties": {
-                "admin_id": {
-                    "description": "Foreign key to users table (game admin)",
-                    "type": "integer"
-                },
-                "booking_status": {
-                    "$ref": "#/definitions/store.BookingStatus"
-                },
-                "created_at": {
-                    "description": "Timestamp when the game was created",
-                    "type": "string"
-                },
-                "end_time": {
-                    "description": "Game end time",
-                    "type": "string"
-                },
-                "format": {
-                    "description": "Game format (nullable)",
-                    "type": "string"
-                },
-                "game_level": {
-                    "description": "Skill level (beginner, intermediate, advanced)",
-                    "type": "string"
-                },
-                "id": {
-                    "description": "Primary key",
-                    "type": "integer"
-                },
-                "instruction": {
-                    "description": "Game instructions (nullable)",
-                    "type": "string"
-                },
-                "match_full": {
-                    "description": "Whether the game is full",
-                    "type": "boolean"
-                },
-                "max_players": {
-                    "description": "Maximum number of players",
-                    "type": "integer"
-                },
-                "price": {
-                    "description": "Price of the game (nullable)",
-                    "type": "integer"
-                },
-                "sport_type": {
-                    "description": "Type of sport (e.g., futsal, basketball)",
-                    "type": "string"
-                },
-                "start_time": {
-                    "description": "Game start time",
-                    "type": "string"
-                },
-                "status": {
-                    "description": "Game status (active, cancelled, completed)",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "description": "Timestamp when the game was last updated",
-                    "type": "string"
-                },
-                "venue_address": {
-                    "type": "string"
-                },
-                "venue_id": {
-                    "description": "Foreign key to venues table",
-                    "type": "integer"
-                },
-                "venue_name": {
-                    "type": "string"
-                },
-                "visibility": {
-                    "description": "Visibility (public or private)",
-                    "type": "string"
-                }
-            }
-        },
-        "store.User": {
+        "users.User": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -5143,7 +5120,41 @@ const docTemplate = `{
                 }
             }
         },
-        "store.Venue": {
+        "venuereviews.Review": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "comment": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "description": "1-5",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_name": {
+                    "description": "Joined fields",
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "venues.Venue": {
             "type": "object",
             "properties": {
                 "address": {
@@ -5199,7 +5210,7 @@ const docTemplate = `{
                 }
             }
         },
-        "store.VenueInfo": {
+        "venues.VenueInfo": {
             "type": "object",
             "properties": {
                 "address": {

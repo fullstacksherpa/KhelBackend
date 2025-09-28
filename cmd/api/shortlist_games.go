@@ -85,7 +85,7 @@ func (app *application) removeShortlistedGameHandler(w http.ResponseWriter, r *h
 //	@Tags			Shortlist_Games
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{array}		[]store.ShortlistedGameDetail	"List of shortlisted games"
+//	@Success		200	{array}		[]games.ShortlistedGameDetail	"List of shortlisted games"
 //	@Failure		400	{object}	error							"Bad Request: Unauthenticated request"
 //	@Failure		500	{object}	error							"Internal Server Error: Could not retrieve shortlist"
 //	@Security		ApiKeyAuth

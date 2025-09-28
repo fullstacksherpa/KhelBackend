@@ -61,9 +61,9 @@ func (app *application) submitReviewHandler(w http.ResponseWriter, r *http.Reque
 //	@Tags			App_Reviews
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{array}		store.AppReview	"List of all reviews"
-//	@Failure		401	{object}	error			"unauthorized route"
-//	@Failure		500	{object}	error			"Internal Server Error"
+//	@Success		200	{array}		appreviews.AppReview	"List of all reviews"
+//	@Failure		401	{object}	error					"unauthorized route"
+//	@Failure		500	{object}	error					"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/app-reviews [get]
 func (app *application) getAllAppReviewsHandler(w http.ResponseWriter, r *http.Request) {

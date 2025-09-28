@@ -240,22 +240,22 @@ type VenueListResponse struct {
 	IsFavorite    bool      `json:"is_favorite"`
 }
 
-// @Summary		List venues
-// @Description	Get paginated list of venues with filters
-// @Tags			Venue
-// @Accept			json
-// @Produce		json
-// @Param			sport		query	string	false	"Filter by sport type"
-// @Param			lat			query	number	false	"Latitude for location filter"
-// @Param			lng			query	number	false	"Longitude for location filter"
-// @Param			distance	query	number	false	"Distance in meters from location"
-// @Param			page		query	int		false	"Page number"		default(1)
-// @Param			limit		query	int		false	"Items per page"	default(7)
-// @Success		200			{array}	VenueListResponse
+//	@Summary		List venues
+//	@Description	Get paginated list of venues with filters
+//	@Tags			Venue
+//	@Accept			json
+//	@Produce		json
+//	@Param			sport		query	string	false	"Filter by sport type"
+//	@Param			lat			query	number	false	"Latitude for location filter"
+//	@Param			lng			query	number	false	"Longitude for location filter"
+//	@Param			distance	query	number	false	"Distance in meters from location"
+//	@Param			page		query	int		false	"Page number"		default(1)
+//	@Param			limit		query	int		false	"Items per page"	default(7)
+//	@Success		200			{array}	VenueListResponse
 //
-// @Security		ApiKeyAuth
+//	@Security		ApiKeyAuth
 //
-// @Router			/venues/list-venues [get]
+//	@Router			/venues/list-venues [get]
 func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	q := r.URL.Query()
@@ -392,12 +392,12 @@ func (app *application) CreateAndUploadVenue(ctx context.Context, venue *venues.
 //	@Tags			Venue-Owner
 //	@Accept			multipart/form-data
 //	@Produce		json
-//	@Param			venue	formData	string		true	"Venue details (JSON string)"
-//	@Param			images	formData	[]file		false	"Venue images (up to 7 files)"
-//	@Success		201		{object}	store.Venue	"Venue created successfully"
-//	@Failure		400		{object}	error		"Invalid request payload"
-//	@Failure		401		{object}	error		"Unauthorized"
-//	@Failure		500		{object}	error		"Internal server error"
+//	@Param			venue	formData	string			true	"Venue details (JSON string)"
+//	@Param			images	formData	[]file			false	"Venue images (up to 7 files)"
+//	@Success		201		{object}	venues.Venue	"Venue created successfully"
+//	@Failure		400		{object}	error			"Invalid request payload"
+//	@Failure		401		{object}	error			"Unauthorized"
+//	@Failure		500		{object}	error			"Internal server error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues [post]
 func (app *application) createVenueHandler(w http.ResponseWriter, r *http.Request) {
@@ -617,12 +617,12 @@ func (app *application) getVenueAllPhotosHandler(w http.ResponseWriter, r *http.
 //	@Description	Retrieves detailed information (name, address, description, status, etc.) about a venue by its ID.
 //	@Tags			Venue-Owner
 //	@Produce		json
-//	@Param			venueID	path		int64			true	"Venue ID"
-//	@Success		200		{object}	store.VenueInfo	"Detailed venue information"
-//	@Failure		400		{object}	error			"Invalid venue ID"
-//	@Failure		401		{object}	error			"Unauthorized"
-//	@Failure		404		{object}	error			"Venue not found"
-//	@Failure		500		{object}	error			"Internal server error"
+//	@Param			venueID	path		int64				true	"Venue ID"
+//	@Success		200		{object}	venues.VenueInfo	"Detailed venue information"
+//	@Failure		400		{object}	error				"Invalid venue ID"
+//	@Failure		401		{object}	error				"Unauthorized"
+//	@Failure		404		{object}	error				"Venue not found"
+//	@Failure		500		{object}	error				"Internal server error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/venue-info [get]
 func (app *application) getVenueInfoHandler(w http.ResponseWriter, r *http.Request) {

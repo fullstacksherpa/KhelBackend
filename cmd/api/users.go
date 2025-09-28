@@ -402,7 +402,7 @@ func (app *application) editProfileHandler(w http.ResponseWriter, r *http.Reques
 //	@Tags			users
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	store.User	"Current user data"
+//	@Success		200	{object}	users.User	"Current user data"
 //	@Failure		401	{object}	error		"Unauthorized"
 //	@Failure		500	{object}	error		"Internal server error"
 //	@Security		ApiKeyAuth

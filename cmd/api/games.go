@@ -37,7 +37,7 @@ type CreateGamePayload struct {
 //	@Accept			json
 //	@Produce		json
 //	@Param			payload	body		CreateGamePayload	true	"Game details payload"
-//	@Success		201		{object}	store.Game			"Game created successfully"
+//	@Success		201		{object}	games.Game			"Game created successfully"
 //	@Failure		400		{object}	error				"Invalid request payload"
 //	@Failure		401		{object}	error				"Unauthorized"
 //	@Failure		409		{object}	error				"Game overlaps with existing game"
@@ -494,7 +494,7 @@ func (app *application) AssignAssistantHandler(w http.ResponseWriter, r *http.Re
 //	@Param			limit			query		int					false	"Maximum number of results to return"
 //	@Param			offset			query		int					false	"Pagination offset"
 //	@Param			sort			query		string				false	"Sort order, either 'asc' or 'desc'"
-//	@Success		200				{object}	[]store.GameSummary	"List of games and GeoJSON features"
+//	@Success		200				{object}	[]games.GameSummary	"List of games and GeoJSON features"
 //	@Failure		400				{object}	error				"Invalid request parameters"
 //	@Failure		500				{object}	error				"Internal server error"
 //	@Router			/games/get-games [get]
@@ -639,7 +639,7 @@ func (app *application) cancelGameHandler(w http.ResponseWriter, r *http.Request
 //	@Accept			json
 //	@Produce		json
 //	@Param			gameID	path		int							true	"Game ID"
-//	@Success		200		{array}		store.GameRequestWithUser	"List of join requests with user details"
+//	@Success		200		{array}		games.GameRequestWithUser	"List of join requests with user details"
 //	@Failure		400		{object}	error						"Invalid game ID"
 //	@Failure		500		{object}	error						"Internal server error"
 //	@Security		ApiKeyAuth
@@ -675,7 +675,7 @@ func (app *application) getAllGameJoinRequestsHandler(w http.ResponseWriter, r *
 //	@Accept			json
 //	@Produce		json
 //	@Param			gameID	path		int	true	"Game ID"
-//	@Success		200		{object}	store.GameDetails
+//	@Success		200		{object}	games.GameDetails
 //	@Failure		400		{object}	error	"Invalid game ID"
 //	@Failure		404		{object}	error	"Game not found"
 //	@Failure		500		{object}	error	"Internal server error"
@@ -715,7 +715,7 @@ func (app *application) getGameDetailsHandler(w http.ResponseWriter, r *http.Req
 //	@Accept			json
 //	@Produce		json
 //	@Param			venueID	path		int					true	"Venue ID"
-//	@Success		200		{array}		store.GameSummary	"List of upcoming active games"
+//	@Success		200		{array}		games.GameSummary	"List of upcoming active games"
 //	@Failure		400		{object}	error				"Bad Request: Missing or invalid venueID"
 //	@Failure		500		{object}	error				"Internal Server Error: Could not retrieve upcoming games"
 //	@Security		ApiKeyAuth
@@ -753,7 +753,7 @@ func (app *application) getUpcomingGamesByVenueHandler(w http.ResponseWriter, r 
 //	@Tags			Games
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{array}		store.GameSummary	"List of upcoming active games for user"
+//	@Success		200	{array}		games.GameSummary	"List of upcoming active games for user"
 //	@Failure		401	{object}	error				"Unauthorized: missing or invalid API key"
 //	@Failure		500	{object}	error				"Internal Server Error: could not retrieve upcoming games"
 //	@Security		ApiKeyAuth

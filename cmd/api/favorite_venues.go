@@ -93,9 +93,9 @@ func (app *application) removeFavoriteHandler(w http.ResponseWriter, r *http.Req
 //	@Tags			Favorite_Venues
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{array}		store.Venue	"List of favorite venues"
-//	@Failure		400	{object}	error		"Bad Request: Unauthenticated request"
-//	@Failure		500	{object}	error		"Internal Server Error: Could not retrieve favorites"
+//	@Success		200	{array}		venues.Venue	"List of favorite venues"
+//	@Failure		400	{object}	error			"Bad Request: Unauthenticated request"
+//	@Failure		500	{object}	error			"Internal Server Error: Could not retrieve favorites"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/favorites [get]
 func (app *application) listFavoritesHandler(w http.ResponseWriter, r *http.Request) {

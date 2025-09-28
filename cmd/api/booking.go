@@ -581,11 +581,11 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID	path		int					true	"Venue ID"
-//	@Param			day		query		string				false	"Day of week (sunday, monday, tuesday, wednesday, thursday, friday, saturday)"
-//	@Success		200		{array}		store.PricingSlot	"List of pricing slots"
-//	@Failure		400		{object}	error				"Bad Request"
-//	@Failure		500		{object}	error				"Internal Server Error"
+//	@Param			venueID	path		int						true	"Venue ID"
+//	@Param			day		query		string					false	"Day of week (sunday, monday, tuesday, wednesday, thursday, friday, saturday)"
+//	@Success		200		{array}		bookings.PricingSlot	"List of pricing slots"
+//	@Failure		400		{object}	error					"Bad Request"
+//	@Failure		500		{object}	error					"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/pricing [get]
 func (app *application) getVenuePricing(w http.ResponseWriter, r *http.Request) {
@@ -626,7 +626,7 @@ type UpdatePricingPayload struct {
 //	@Param			venueID		path		int						true	"Venue ID"
 //	@Param			pricingID	path		int						true	"Pricing Slot ID"
 //	@Param			payload		body		UpdatePricingPayload	true	"Pricing update payload"
-//	@Success		200			{object}	store.PricingSlot		"Pricing updated successfully"
+//	@Success		200			{object}	bookings.PricingSlot	"Pricing updated successfully"
 //	@Failure		400			{object}	error					"Bad Request: Invalid input"
 //	@Failure		500			{object}	error					"Internal Server Error: Could not update pricing"
 //	@Security		ApiKeyAuth
@@ -747,7 +747,7 @@ type CreatePricingPayload struct {
 //	@Produce		json
 //	@Param			venueID	path		int							true	"Venue ID"
 //	@Param			payload	body		BulkCreatePricingPayload	true	"Pricing slots"
-//	@Success		201		{array}		store.PricingSlot			"Pricing slots created"
+//	@Success		201		{array}		bookings.PricingSlot		"Pricing slots created"
 //	@Failure		400		{object}	error						"Bad Request"
 //	@Failure		500		{object}	error						"Internal Server Error"
 //	@Security		ApiKeyAuth
@@ -946,11 +946,11 @@ func (app *application) getScheduledBookingsHandler(w http.ResponseWriter, r *ht
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID	path		int						true	"Venue ID"
-//	@Param			date	query		string					true	"Date in YYYY-MM-DD format"
-//	@Success		200		{array}		store.ScheduledBooking	"Scheduled bookings"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Param			venueID	path		int							true	"Venue ID"
+//	@Param			date	query		string						true	"Date in YYYY-MM-DD format"
+//	@Success		200		{array}		bookings.ScheduledBooking	"Scheduled bookings"
+//	@Failure		400		{object}	error						"Bad Request"
+//	@Failure		500		{object}	error						"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/venues/{venueID}/canceled-bookings [get]
 func (app *application) getCanceledBookingsHandler(w http.ResponseWriter, r *http.Request) {

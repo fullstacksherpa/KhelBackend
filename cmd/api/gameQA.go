@@ -28,7 +28,7 @@ type ReplyPayload struct {
 // @Produce		json
 // @Param			gameID	path		int				true	"Game ID"
 // @Param			payload	body		QuestionPayload	true	"Question payload"
-// @Success		201		{object}	store.Question
+// @Success		201		{object}	gameqa.Question
 // @Failure		400		{object}	error
 // @Failure		401		{object}	error
 // @Failure		404		{object}	error
@@ -80,7 +80,7 @@ func (app *application) createQuestionHandler(w http.ResponseWriter, r *http.Req
 // @Accept			json
 // @Produce		json
 // @Param			gameID	path		int	true	"Game ID"
-// @Success		200		{array}		store.Question
+// @Success		200		{array}		gameqa.Question
 // @Failure		400		{object}	error
 // @Security		ApiKeyAuth
 // @Router			/games/{gameID}/questions [get]
@@ -108,7 +108,7 @@ func (app *application) getGameQuestionsHandler(w http.ResponseWriter, r *http.R
 // @Param			gameID		path		int				true	"Game ID"
 // @Param			questionID	path		int				true	"Question ID"
 // @Param			payload		body		ReplyPayload	true	"Reply payload"
-// @Success		201			{object}	store.Reply
+// @Success		201			{object}	gameqa.Reply
 // @Failure		400			{object}	error
 // @Failure		401			{object}	error
 // @Security		ApiKeyAuth
@@ -197,7 +197,7 @@ func (app *application) deleteQuestionHandler(w http.ResponseWriter, r *http.Req
 // @Accept			json
 // @Produce		json
 // @Param			gameID	path		int	true	"Game ID"
-// @Success		200		{array}		store.QuestionWithReplies
+// @Success		200		{array}		gameqa.QuestionWithReplies
 // @Failure		400		{object}	error
 // @Router			/games/{gameID}/qa [get]
 func (app *application) getGameQAHandler(w http.ResponseWriter, r *http.Request) {

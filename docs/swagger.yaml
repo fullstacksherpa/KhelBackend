@@ -1,5 +1,364 @@
 basePath: /v1
 definitions:
+  appreviews.AppReview:
+    properties:
+      created_at:
+        type: string
+      feedback:
+        type: string
+      id:
+        type: integer
+      rating:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+  bookings.PricingSlot:
+    properties:
+      dayOfWeek:
+        type: string
+      endTime:
+        type: string
+      id:
+        type: integer
+      price:
+        type: integer
+      startTime:
+        description: |-
+          Note: start_time and end_time are stored as TIME in the DB.
+          We use time.Time to hold the time part.
+        type: string
+      venueID:
+        type: integer
+    type: object
+  bookings.ScheduledBooking:
+    properties:
+      accepted_at:
+        type: string
+      booking_id:
+        type: integer
+      customer_name:
+        description: optional
+        type: string
+      customer_phone:
+        description: optional
+        type: string
+      end_time:
+        type: string
+      note:
+        description: optional
+        type: string
+      price:
+        type: integer
+      start_time:
+        type: string
+      user_id:
+        type: integer
+      user_image:
+        type: string
+      user_name:
+        type: string
+      user_number:
+        type: string
+    type: object
+  gameqa.Question:
+    properties:
+      created_at:
+        type: string
+      game_id:
+        type: integer
+      id:
+        type: integer
+      question:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  gameqa.QuestionWithReplies:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      question:
+        type: string
+      replies:
+        items:
+          $ref: '#/definitions/gameqa.Reply'
+        type: array
+    type: object
+  gameqa.Reply:
+    properties:
+      admin_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      question_id:
+        type: integer
+      reply:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  games.BookingStatus:
+    enum:
+    - pending
+    - requested
+    - booked
+    - rejected
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - BookingPending
+    - BookingRequested
+    - BookingBooked
+    - BookingRejected
+    - BookingCancelled
+  games.Game:
+    properties:
+      admin_id:
+        description: Foreign key to users table (game admin)
+        type: integer
+      booking_status:
+        $ref: '#/definitions/games.BookingStatus'
+      created_at:
+        description: Timestamp when the game was created
+        type: string
+      end_time:
+        description: Game end time
+        type: string
+      format:
+        description: Game format (nullable)
+        type: string
+      game_level:
+        description: Skill level (beginner, intermediate, advanced)
+        type: string
+      id:
+        description: Primary key
+        type: integer
+      instruction:
+        description: Game instructions (nullable)
+        type: string
+      match_full:
+        description: Whether the game is full
+        type: boolean
+      max_players:
+        description: Maximum number of players
+        type: integer
+      price:
+        description: Price of the game (nullable)
+        type: integer
+      sport_type:
+        description: Type of sport (e.g., futsal, basketball)
+        type: string
+      start_time:
+        description: Game start time
+        type: string
+      status:
+        description: Game status (active, cancelled, completed)
+        type: string
+      updated_at:
+        description: Timestamp when the game was last updated
+        type: string
+      venue_id:
+        description: Foreign key to venues table
+        type: integer
+      visibility:
+        description: Visibility (public or private)
+        type: string
+    type: object
+  games.GameDetails:
+    properties:
+      admin_id:
+        type: integer
+      booking_status:
+        $ref: '#/definitions/games.BookingStatus'
+      current_player:
+        type: integer
+      end_time:
+        type: string
+      format:
+        type: string
+      game_admin_name:
+        type: string
+      game_id:
+        type: integer
+      game_level:
+        type: string
+      match_full:
+        type: boolean
+      max_players:
+        type: integer
+      player_ids:
+        description: all joined player user IDs
+        items:
+          type: integer
+        type: array
+      player_images:
+        items:
+          type: string
+        type: array
+      price:
+        type: integer
+      requested_player_ids:
+        description: pending request user IDs
+        items:
+          type: integer
+        type: array
+      sport_type:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      venue_id:
+        type: integer
+      venue_lat:
+        type: number
+      venue_lon:
+        type: number
+      venue_name:
+        type: string
+    type: object
+  games.GameRequestStatus:
+    enum:
+    - pending
+    - accepted
+    - rejected
+    type: string
+    x-enum-varnames:
+    - GameRequestStatusPending
+    - GameRequestStatusAccepted
+    - GameRequestStatusRejected
+  games.GameRequestWithUser:
+    properties:
+      first_name:
+        type: string
+      game_id:
+        type: integer
+      id:
+        type: integer
+      phone:
+        type: string
+      profile_picture_url:
+        type: string
+      request_time:
+        type: string
+      skill_level:
+        type: string
+      status:
+        $ref: '#/definitions/games.GameRequestStatus'
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  games.GameSummary:
+    properties:
+      booking_status:
+        $ref: '#/definitions/games.BookingStatus'
+      current_player:
+        type: integer
+      end_time:
+        type: string
+      format:
+        type: string
+      game_admin_name:
+        type: string
+      game_id:
+        type: integer
+      game_level:
+        type: string
+      match_full:
+        type: boolean
+      max_players:
+        type: integer
+      player_images:
+        items:
+          type: string
+        type: array
+      price:
+        type: integer
+      shortlisted:
+        type: boolean
+      sport_type:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      venue_id:
+        type: integer
+      venue_lat:
+        description: Venue latitude
+        type: number
+      venue_lon:
+        description: Venue longitude
+        type: number
+      venue_name:
+        type: string
+    type: object
+  games.ShortlistedGameDetail:
+    properties:
+      admin_id:
+        description: Foreign key to users table (game admin)
+        type: integer
+      booking_status:
+        $ref: '#/definitions/games.BookingStatus'
+      created_at:
+        description: Timestamp when the game was created
+        type: string
+      end_time:
+        description: Game end time
+        type: string
+      format:
+        description: Game format (nullable)
+        type: string
+      game_level:
+        description: Skill level (beginner, intermediate, advanced)
+        type: string
+      id:
+        description: Primary key
+        type: integer
+      instruction:
+        description: Game instructions (nullable)
+        type: string
+      match_full:
+        description: Whether the game is full
+        type: boolean
+      max_players:
+        description: Maximum number of players
+        type: integer
+      price:
+        description: Price of the game (nullable)
+        type: integer
+      sport_type:
+        description: Type of sport (e.g., futsal, basketball)
+        type: string
+      start_time:
+        description: Game start time
+        type: string
+      status:
+        description: Game status (active, cancelled, completed)
+        type: string
+      updated_at:
+        description: Timestamp when the game was last updated
+        type: string
+      venue_address:
+        type: string
+      venue_id:
+        description: Foreign key to venues table
+        type: integer
+      venue_name:
+        type: string
+      visibility:
+        description: Visibility (public or private)
+        type: string
+    type: object
   main.AppReviewPayload:
     properties:
       feedback:
@@ -337,6 +696,13 @@ definitions:
     - token
     type: object
   main.SavePushTokenRequest:
+    properties:
+      device_info:
+        type: object
+      token:
+        type: string
+    required:
+    - token
     type: object
   main.ScheduledBookingResponse:
     properties:
@@ -419,7 +785,7 @@ definitions:
       token:
         type: string
       user:
-        $ref: '#/definitions/store.User'
+        $ref: '#/definitions/users.User'
     type: object
   main.VenueDetailResponse:
     properties:
@@ -517,389 +883,7 @@ definitions:
           type: integer
         type: array
     type: object
-  store.AppReview:
-    properties:
-      created_at:
-        type: string
-      feedback:
-        type: string
-      id:
-        type: integer
-      rating:
-        type: integer
-      user_id:
-        type: integer
-    type: object
-  store.BookingStatus:
-    enum:
-    - pending
-    - requested
-    - booked
-    - rejected
-    - cancelled
-    type: string
-    x-enum-varnames:
-    - BookingPending
-    - BookingRequested
-    - BookingBooked
-    - BookingRejected
-    - BookingCancelled
-  store.Game:
-    properties:
-      admin_id:
-        description: Foreign key to users table (game admin)
-        type: integer
-      booking_status:
-        $ref: '#/definitions/store.BookingStatus'
-      created_at:
-        description: Timestamp when the game was created
-        type: string
-      end_time:
-        description: Game end time
-        type: string
-      format:
-        description: Game format (nullable)
-        type: string
-      game_level:
-        description: Skill level (beginner, intermediate, advanced)
-        type: string
-      id:
-        description: Primary key
-        type: integer
-      instruction:
-        description: Game instructions (nullable)
-        type: string
-      match_full:
-        description: Whether the game is full
-        type: boolean
-      max_players:
-        description: Maximum number of players
-        type: integer
-      price:
-        description: Price of the game (nullable)
-        type: integer
-      sport_type:
-        description: Type of sport (e.g., futsal, basketball)
-        type: string
-      start_time:
-        description: Game start time
-        type: string
-      status:
-        description: Game status (active, cancelled, completed)
-        type: string
-      updated_at:
-        description: Timestamp when the game was last updated
-        type: string
-      venue_id:
-        description: Foreign key to venues table
-        type: integer
-      visibility:
-        description: Visibility (public or private)
-        type: string
-    type: object
-  store.GameDetails:
-    properties:
-      admin_id:
-        type: integer
-      booking_status:
-        $ref: '#/definitions/store.BookingStatus'
-      current_player:
-        type: integer
-      end_time:
-        type: string
-      format:
-        type: string
-      game_admin_name:
-        type: string
-      game_id:
-        type: integer
-      game_level:
-        type: string
-      match_full:
-        type: boolean
-      max_players:
-        type: integer
-      player_ids:
-        description: all joined player user IDs
-        items:
-          type: integer
-        type: array
-      player_images:
-        items:
-          type: string
-        type: array
-      price:
-        type: integer
-      requested_player_ids:
-        description: pending request user IDs
-        items:
-          type: integer
-        type: array
-      sport_type:
-        type: string
-      start_time:
-        type: string
-      status:
-        type: string
-      venue_id:
-        type: integer
-      venue_lat:
-        type: number
-      venue_lon:
-        type: number
-      venue_name:
-        type: string
-    type: object
-  store.GameRequestStatus:
-    enum:
-    - pending
-    - accepted
-    - rejected
-    type: string
-    x-enum-varnames:
-    - GameRequestStatusPending
-    - GameRequestStatusAccepted
-    - GameRequestStatusRejected
-  store.GameRequestWithUser:
-    properties:
-      first_name:
-        type: string
-      game_id:
-        type: integer
-      id:
-        type: integer
-      phone:
-        type: string
-      profile_picture_url:
-        type: string
-      request_time:
-        type: string
-      skill_level:
-        type: string
-      status:
-        $ref: '#/definitions/store.GameRequestStatus'
-      updated_at:
-        type: string
-      user_id:
-        type: integer
-    type: object
-  store.GameSummary:
-    properties:
-      booking_status:
-        $ref: '#/definitions/store.BookingStatus'
-      current_player:
-        type: integer
-      end_time:
-        type: string
-      format:
-        type: string
-      game_admin_name:
-        type: string
-      game_id:
-        type: integer
-      game_level:
-        type: string
-      match_full:
-        type: boolean
-      max_players:
-        type: integer
-      player_images:
-        items:
-          type: string
-        type: array
-      price:
-        type: integer
-      shortlisted:
-        type: boolean
-      sport_type:
-        type: string
-      start_time:
-        type: string
-      status:
-        type: string
-      venue_id:
-        type: integer
-      venue_lat:
-        description: Venue latitude
-        type: number
-      venue_lon:
-        description: Venue longitude
-        type: number
-      venue_name:
-        type: string
-    type: object
-  store.PricingSlot:
-    properties:
-      dayOfWeek:
-        type: string
-      endTime:
-        type: string
-      id:
-        type: integer
-      price:
-        type: integer
-      startTime:
-        description: |-
-          Note: start_time and end_time are stored as TIME in the DB.
-          We use time.Time to hold the time part.
-        type: string
-      venueID:
-        type: integer
-    type: object
-  store.Question:
-    properties:
-      created_at:
-        type: string
-      game_id:
-        type: integer
-      id:
-        type: integer
-      question:
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: integer
-    type: object
-  store.QuestionWithReplies:
-    properties:
-      created_at:
-        type: string
-      id:
-        type: integer
-      question:
-        type: string
-      replies:
-        items:
-          $ref: '#/definitions/store.Reply'
-        type: array
-    type: object
-  store.Reply:
-    properties:
-      admin_id:
-        type: integer
-      created_at:
-        type: string
-      id:
-        type: integer
-      question_id:
-        type: integer
-      reply:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  store.Review:
-    properties:
-      avatar_url:
-        type: string
-      comment:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: integer
-      rating:
-        description: 1-5
-        type: integer
-      updated_at:
-        type: string
-      user_id:
-        type: integer
-      user_name:
-        description: Joined fields
-        type: string
-      venue_id:
-        type: integer
-    type: object
-  store.ScheduledBooking:
-    properties:
-      accepted_at:
-        type: string
-      booking_id:
-        type: integer
-      customer_name:
-        description: optional
-        type: string
-      customer_phone:
-        description: optional
-        type: string
-      end_time:
-        type: string
-      note:
-        description: optional
-        type: string
-      price:
-        type: integer
-      start_time:
-        type: string
-      user_id:
-        type: integer
-      user_image:
-        type: string
-      user_name:
-        type: string
-      user_number:
-        type: string
-    type: object
-  store.ShortlistedGameDetail:
-    properties:
-      admin_id:
-        description: Foreign key to users table (game admin)
-        type: integer
-      booking_status:
-        $ref: '#/definitions/store.BookingStatus'
-      created_at:
-        description: Timestamp when the game was created
-        type: string
-      end_time:
-        description: Game end time
-        type: string
-      format:
-        description: Game format (nullable)
-        type: string
-      game_level:
-        description: Skill level (beginner, intermediate, advanced)
-        type: string
-      id:
-        description: Primary key
-        type: integer
-      instruction:
-        description: Game instructions (nullable)
-        type: string
-      match_full:
-        description: Whether the game is full
-        type: boolean
-      max_players:
-        description: Maximum number of players
-        type: integer
-      price:
-        description: Price of the game (nullable)
-        type: integer
-      sport_type:
-        description: Type of sport (e.g., futsal, basketball)
-        type: string
-      start_time:
-        description: Game start time
-        type: string
-      status:
-        description: Game status (active, cancelled, completed)
-        type: string
-      updated_at:
-        description: Timestamp when the game was last updated
-        type: string
-      venue_address:
-        type: string
-      venue_id:
-        description: Foreign key to venues table
-        type: integer
-      venue_name:
-        type: string
-      visibility:
-        description: Visibility (public or private)
-        type: string
-    type: object
-  store.User:
+  users.User:
     properties:
       created_at:
         type: string
@@ -924,7 +908,30 @@ definitions:
       updated_at:
         type: string
     type: object
-  store.Venue:
+  venuereviews.Review:
+    properties:
+      avatar_url:
+        type: string
+      comment:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      rating:
+        description: 1-5
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+      user_name:
+        description: Joined fields
+        type: string
+      venue_id:
+        type: integer
+    type: object
+  venues.Venue:
     properties:
       address:
         type: string
@@ -962,7 +969,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  store.VenueInfo:
+  venues.VenueInfo:
     properties:
       address:
         type: string
@@ -1012,7 +1019,7 @@ paths:
           description: List of all reviews
           schema:
             items:
-              $ref: '#/definitions/store.AppReview'
+              $ref: '#/definitions/appreviews.AppReview'
             type: array
         "401":
           description: unauthorized route
@@ -1226,7 +1233,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/store.GameDetails'
+            $ref: '#/definitions/games.GameDetails'
         "400":
           description: Invalid game ID
           schema: {}
@@ -1415,7 +1422,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/store.QuestionWithReplies'
+              $ref: '#/definitions/gameqa.QuestionWithReplies'
             type: array
         "400":
           description: Bad Request
@@ -1441,7 +1448,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/store.Question'
+              $ref: '#/definitions/gameqa.Question'
             type: array
         "400":
           description: Bad Request
@@ -1473,7 +1480,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/store.Question'
+            $ref: '#/definitions/gameqa.Question'
         "400":
           description: Bad Request
           schema: {}
@@ -1551,7 +1558,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/store.Reply'
+            $ref: '#/definitions/gameqa.Reply'
         "400":
           description: Bad Request
           schema: {}
@@ -1693,7 +1700,7 @@ paths:
           description: List of join requests with user details
           schema:
             items:
-              $ref: '#/definitions/store.GameRequestWithUser'
+              $ref: '#/definitions/games.GameRequestWithUser'
             type: array
         "400":
           description: Invalid game ID
@@ -1822,7 +1829,7 @@ paths:
           description: List of upcoming active games
           schema:
             items:
-              $ref: '#/definitions/store.GameSummary'
+              $ref: '#/definitions/games.GameSummary'
             type: array
         "400":
           description: 'Bad Request: Missing or invalid venueID'
@@ -1854,7 +1861,7 @@ paths:
         "201":
           description: Game created successfully
           schema:
-            $ref: '#/definitions/store.Game'
+            $ref: '#/definitions/games.Game'
         "400":
           description: Invalid request payload
           schema: {}
@@ -1947,7 +1954,7 @@ paths:
           description: List of games and GeoJSON features
           schema:
             items:
-              $ref: '#/definitions/store.GameSummary'
+              $ref: '#/definitions/games.GameSummary'
             type: array
         "400":
           description: Invalid request parameters
@@ -1971,7 +1978,7 @@ paths:
           description: List of upcoming active games for user
           schema:
             items:
-              $ref: '#/definitions/store.GameSummary'
+              $ref: '#/definitions/games.GameSummary'
             type: array
         "401":
           description: 'Unauthorized: missing or invalid API key'
@@ -1997,7 +2004,7 @@ paths:
           schema:
             items:
               items:
-                $ref: '#/definitions/store.ShortlistedGameDetail'
+                $ref: '#/definitions/games.ShortlistedGameDetail'
               type: array
             type: array
         "400":
@@ -2281,7 +2288,7 @@ paths:
         "200":
           description: Current user data
           schema:
-            $ref: '#/definitions/store.User'
+            $ref: '#/definitions/users.User'
         "401":
           description: Unauthorized
           schema: {}
@@ -2555,7 +2562,7 @@ paths:
         "201":
           description: Venue created successfully
           schema:
-            $ref: '#/definitions/store.Venue'
+            $ref: '#/definitions/venues.Venue'
         "400":
           description: Invalid request payload
           schema: {}
@@ -2818,7 +2825,7 @@ paths:
           description: Scheduled bookings
           schema:
             items:
-              $ref: '#/definitions/store.ScheduledBooking'
+              $ref: '#/definitions/bookings.ScheduledBooking'
             type: array
         "400":
           description: Bad Request
@@ -3135,7 +3142,7 @@ paths:
           description: List of pricing slots
           schema:
             items:
-              $ref: '#/definitions/store.PricingSlot'
+              $ref: '#/definitions/bookings.PricingSlot'
             type: array
         "400":
           description: Bad Request
@@ -3171,7 +3178,7 @@ paths:
           description: Pricing slots created
           schema:
             items:
-              $ref: '#/definitions/store.PricingSlot'
+              $ref: '#/definitions/bookings.PricingSlot'
             type: array
         "400":
           description: Bad Request
@@ -3247,7 +3254,7 @@ paths:
         "200":
           description: Pricing updated successfully
           schema:
-            $ref: '#/definitions/store.PricingSlot'
+            $ref: '#/definitions/bookings.PricingSlot'
         "400":
           description: 'Bad Request: Invalid input'
           schema: {}
@@ -3311,7 +3318,7 @@ paths:
         "201":
           description: Review created successfully
           schema:
-            $ref: '#/definitions/store.Review'
+            $ref: '#/definitions/venuereviews.Review'
         "400":
           description: 'Bad Request: Invalid input'
           schema: {}
@@ -3418,7 +3425,7 @@ paths:
         "200":
           description: Detailed venue information
           schema:
-            $ref: '#/definitions/store.VenueInfo'
+            $ref: '#/definitions/venues.VenueInfo'
         "400":
           description: Invalid venue ID
           schema: {}
@@ -3449,7 +3456,7 @@ paths:
           description: List of favorite venues
           schema:
             items:
-              $ref: '#/definitions/store.Venue'
+              $ref: '#/definitions/venues.Venue'
             type: array
         "400":
           description: 'Bad Request: Unauthenticated request'

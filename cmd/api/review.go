@@ -28,7 +28,7 @@ type createReviewPayload struct {
 //	@Produce		json
 //	@Param			venueID	path		int					true	"Venue ID"
 //	@Param			payload	body		createReviewPayload	true	"Review payload"
-//	@Success		201		{object}	store.Review		"Review created successfully"
+//	@Success		201		{object}	venuereviews.Review	"Review created successfully"
 //	@Failure		400		{object}	error				"Bad Request: Invalid input"
 //	@Failure		500		{object}	error				"Internal Server Error"
 //	@Security		ApiKeyAuth
