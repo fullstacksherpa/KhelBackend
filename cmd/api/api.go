@@ -11,6 +11,7 @@ import (
 	"khel/internal/domain/storage"
 	"khel/internal/mailer"
 	"khel/internal/notifications"
+	"khel/internal/payments"
 	"khel/internal/ratelimiter"
 
 	"net/http"
@@ -38,6 +39,7 @@ type application struct {
 	rateLimiter   ratelimiter.Limiter
 	push          *notifications.ExpoAdapter
 	hashID        *hashids.HashID
+	payments      *payments.PaymentManager
 }
 
 type config struct {
@@ -49,6 +51,7 @@ type config struct {
 	frontendURL string
 	auth        authConfig
 	rateLimiter ratelimiter.Config
+	payment     paymentConfig
 }
 
 type authConfig struct {
@@ -81,6 +84,23 @@ type dbConfig struct {
 	addr         string
 	maxOpenConns int
 	maxIdleTime  string
+}
+
+type paymentConfig struct {
+	Esewa  esewaConfig
+	Khalti khaltiConfig
+}
+
+type esewaConfig struct {
+	MerchantID string
+	SecretKey  string
+	SuccessURL string
+	FailureURL string
+}
+
+type khaltiConfig struct {
+	SecretKey  string
+	SuccessURL string
 }
 
 func (app *application) mount() http.Handler {

@@ -9,6 +9,7 @@ import (
 	"khel/internal/domain/storage"
 	"khel/internal/mailer"
 	"khel/internal/notifications"
+	"khel/internal/payments"
 	"khel/internal/ratelimiter"
 	"log"
 	"net/http"
@@ -154,6 +155,18 @@ func main() {
 			},
 		},
 		rateLimiter: LoadRateLimiterConfig(),
+		payment: paymentConfig{
+			Esewa: esewaConfig{
+				MerchantID: os.Getenv("ESEWA_MERCHANT_ID"),
+				SecretKey:  os.Getenv("ESEWA_SECRET_KEY"),
+				SuccessURL: os.Getenv("ESEWA_SUCCESS_URL"),
+				FailureURL: os.Getenv("ESEWA_FAILURE_URL"),
+			},
+			Khalti: khaltiConfig{
+				SecretKey:  os.Getenv("KHALTI_SECRET_KEY"),
+				SuccessURL: os.Getenv("KHALTI_SUCCESS_URL"),
+			},
+		},
 	}
 
 	// Logger
@@ -226,6 +239,25 @@ func main() {
 		cfg.auth.token.iss,
 	)
 
+	// Payments
+	pm := payments.NewPaymentManager()
+
+	pm.RegisterGateway("esewa",
+		payments.NewEsewaAdapter(
+			cfg.payment.Esewa.MerchantID,
+			cfg.payment.Esewa.SecretKey,
+			cfg.payment.Esewa.SuccessURL,
+			cfg.payment.Esewa.FailureURL,
+		),
+	)
+
+	pm.RegisterGateway("khalti",
+		payments.NewKhaltiAdapter(
+			cfg.payment.Khalti.SecretKey,
+			cfg.payment.Khalti.SuccessURL,
+		),
+	)
+
 	app := &application{
 		config:        cfg,
 		logger:        logger,
@@ -236,6 +268,7 @@ func main() {
 		rateLimiter:   rateLimiter,
 		push:          sender,
 		hashID:        h,
+		payments:      pm,
 	}
 
 	//Metrics collected http://localhost:8080/v1/debug/vars
