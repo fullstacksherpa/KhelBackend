@@ -8,6 +8,7 @@ import (
 	"khel/internal/domain/followers"
 	"khel/internal/domain/gameqa"
 	"khel/internal/domain/games"
+	"khel/internal/domain/products"
 	"khel/internal/domain/pushtokens"
 	"khel/internal/domain/users"
 	venuereviews "khel/internal/domain/venuereview"
@@ -28,6 +29,7 @@ type Container struct {
 	PushTokens    pushtokens.Store
 	Ads           ads.Store
 	AccessControl accesscontrol.Store
+	Products      products.Store
 }
 
 func NewContainer(db *pgxpool.Pool) *Container {
@@ -43,5 +45,6 @@ func NewContainer(db *pgxpool.Pool) *Container {
 		PushTokens:    pushtokens.NewRepository(db),
 		Ads:           ads.NewRepository(db),
 		AccessControl: accesscontrol.NewRepository(db),
+		Products:      products.NewRepository(db),
 	}
 }

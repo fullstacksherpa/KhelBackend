@@ -281,6 +281,47 @@ func (app *application) mount() http.Handler {
 
 		})
 
+		// ---------- ADMIN E-COMMERCE ROUTES ----------
+
+		r.Route("/store/admin", func(r chi.Router) {
+			r.Post("/brands", app.createBrandHandler)
+			r.Patch("/brands/{brandID}", app.updateBrandHandler)
+			r.Delete("/brands/{brandID}", app.deleteBrandHandler)
+			r.Post("/categories", app.createCategoryHandler)
+			r.Patch("/categories/{categoryID}", app.updateCategoryHandler)
+			r.Delete("/categories/{categoryID}", app.deleteCategoryHandler)
+
+			r.Get("/products", app.adminListProductsHandler)
+			r.Post("/products", app.createProductHandler)
+			r.Post("/products/{productID}/publish", app.publishProductHandler)
+			r.Post("/products/images", app.createProductImageHandler)
+			r.Get("/products/{productID}/images", app.listProductImagesHandler)
+			r.Post("/products/{productID}/images/{imageID}/primary", app.setPrimaryImageHandler)
+			r.Patch("/products/images/{id}", app.updateProductImageHandler)
+			r.Delete("/products/images/{id}", app.deleteProductImageHandler)
+			r.Post("/products/{productID}/images/reorder", app.reorderProductImagesHandler)
+			r.Post("/products/variants", app.createVariantHandler)
+			r.Patch("/products/variants/{id}", app.updateVariantHandler)
+			r.Delete("/products/variants/{id}", app.deleteVariantHandler)
+			r.Get("/products/variants", app.listAllVariantsHandler)
+
+		})
+
+		// ---------- PUBLIC E-COMMERCE ROUTES ----------
+
+		r.Route("/store", func(r chi.Router) {
+			r.Get("/brands", app.getAllBrandsHandler)
+			r.Get("/categories", app.listCategoriesHandler)
+			r.Get("/categories/{categoryID}", app.getCategoryByIDHandler)
+			r.Get("/categories/tree", app.getCategoryTreeHandler)
+			r.Get("/categories/search", app.searchCategoriesHandler)             // GET /v1/store/categories/search?q=electronics&page=1&limit=20
+			r.Get("/categories/search/fts", app.fullTextSearchCategoriesHandler) // GET /v1/store/categories/search/fts?q=electronics&page=1&limit=20
+			r.Get("/products", app.listProductsHandler)                          // ?category_slug=&page=&limit=
+			r.Get("/products/slug/{slug}", app.getProductDetailHandler)
+			r.Get("/{product_id}/variants", app.listVariantsByProductHandler)
+			r.Get("/variants/{id}", app.getVariantHandler)
+		})
+
 	})
 	return r
 }
