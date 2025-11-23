@@ -284,6 +284,8 @@ func (app *application) mount() http.Handler {
 		// ---------- ADMIN E-COMMERCE ROUTES ----------
 
 		r.Route("/store/admin", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
 			r.Post("/brands", app.createBrandHandler)
 			r.Patch("/brands/{brandID}", app.updateBrandHandler)
 			r.Delete("/brands/{brandID}", app.deleteBrandHandler)
@@ -305,21 +307,53 @@ func (app *application) mount() http.Handler {
 			r.Delete("/products/variants/{id}", app.deleteVariantHandler)
 			r.Get("/products/variants", app.listAllVariantsHandler)
 
+			r.Get("/carts", app.adminListCartsHandler)
+			r.Get("/carts/{cartID}", app.adminGetCartHandler)
+			r.Post("/carts/mark-abandoned", app.adminMarkExpiredCartsHandler)
+
+			// orders admin
+			r.Get("/orders", app.adminListOrdersHandler)
+			r.Get("/orders/{orderID}", app.adminGetOrderHandler)
+			r.Patch("/orders/{orderID}/status", app.adminUpdateOrderStatusHandler)
+
 		})
 
 		// ---------- PUBLIC E-COMMERCE ROUTES ----------
-
 		r.Route("/store", func(r chi.Router) {
+			// ---------- PUBLIC CATALOG ----------
 			r.Get("/brands", app.getAllBrandsHandler)
 			r.Get("/categories", app.listCategoriesHandler)
 			r.Get("/categories/{categoryID}", app.getCategoryByIDHandler)
 			r.Get("/categories/tree", app.getCategoryTreeHandler)
-			r.Get("/categories/search", app.searchCategoriesHandler)             // GET /v1/store/categories/search?q=electronics&page=1&limit=20
-			r.Get("/categories/search/fts", app.fullTextSearchCategoriesHandler) // GET /v1/store/categories/search/fts?q=electronics&page=1&limit=20
-			r.Get("/products", app.listProductsHandler)                          // ?category_slug=&page=&limit=
+			r.Get("/categories/search", app.searchCategoriesHandler)
+			r.Get("/categories/search/fts", app.fullTextSearchCategoriesHandler)
+			r.Get("/products", app.listProductsHandler)
 			r.Get("/products/slug/{slug}", app.getProductDetailHandler)
 			r.Get("/{product_id}/variants", app.listVariantsByProductHandler)
+
+			r.Get("/products/search", app.searchProductsHandler)
+			r.Get("/products/search/fts", app.fullTextSearchProductsHandler)
+
 			r.Get("/variants/{id}", app.getVariantHandler)
+
+			r.Post("/payments/webhook", app.paymentWebhookHandler)
+
+			// ---------- AUTH-REQUIRED STORE FLOW ----------
+			r.Group(func(r chi.Router) {
+				r.Use(app.AuthTokenMiddleware)
+
+				r.Get("/cart", app.getCartHandler)
+				r.Post("/cart/items", app.addCartItemHandler)
+				r.Patch("/cart/items/{itemID}", app.updateCartItemQtyHandler)
+				r.Delete("/cart/items/{itemID}", app.removeCartItemHandler)
+				r.Delete("/cart", app.clearCartHandler)
+
+				r.Get("/orders", app.listMyOrdersHandler)
+				r.Get("/orders/{orderID}", app.getMyOrderHandler)
+
+				r.Post("/checkout", app.checkoutHandler)
+				r.Post("/payments/verify", app.verifyPaymentHandler)
+			})
 		})
 
 	})

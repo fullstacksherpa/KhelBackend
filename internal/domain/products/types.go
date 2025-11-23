@@ -101,3 +101,8 @@ type ProductDetail struct {
 	Variants []*ProductVariant `json:"variants"`
 	Images   []*ProductImage   `json:"images"`
 }
+
+type ProductWithRank struct {
+	Product
+	Rank float64 `json:"rank"`
+}

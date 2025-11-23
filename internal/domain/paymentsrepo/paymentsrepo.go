@@ -1,0 +1,151 @@
+// paymentsrepo/repository.go
+package paymentsrepo
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	"khel/internal/infra/dbx"
+
+	"github.com/jackc/pgx/v5"
+)
+
+type Repository struct{ q dbx.Querier }
+
+func NewRepository(q dbx.Querier) *Repository { return &Repository{q: q} }
+
+func (r *Repository) Create(ctx context.Context, p *Payment) (*Payment, error) {
+	if err := r.q.QueryRow(ctx, `
+		INSERT INTO payments (order_id, provider, amount_cents, currency, status)
+		VALUES ($1,$2,$3,COALESCE($4,'NPR'),COALESCE($5,'pending'))
+		RETURNING id, created_at, updated_at
+	`, p.OrderID, p.Provider, p.AmountCents, p.Currency, p.Status).
+		Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		return nil, fmt.Errorf("create payment: %w", err)
+	}
+	return p, nil
+}
+
+func (r *Repository) GetByID(ctx context.Context, id int64) (*Payment, error) {
+	var p Payment
+	err := r.q.QueryRow(ctx, `
+		SELECT id, order_id, provider, provider_ref, amount_cents, currency, status,
+		       gateway_response, created_at, updated_at
+		FROM payments WHERE id=$1
+	`, id).Scan(
+		&p.ID, &p.OrderID, &p.Provider, &p.ProviderRef, &p.AmountCents, &p.Currency, &p.Status,
+		&p.GatewayResp, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get payment: %w", err)
+	}
+	return &p, nil
+}
+
+func (r *Repository) GetByOrderID(ctx context.Context, orderID int64) ([]*Payment, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT id, order_id, provider, provider_ref, amount_cents, currency, status,
+		       gateway_response, created_at, updated_at
+		FROM payments WHERE order_id=$1 ORDER BY id ASC
+	`, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("list payments: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*Payment
+	for rows.Next() {
+		var p Payment
+		if err := rows.Scan(
+			&p.ID, &p.OrderID, &p.Provider, &p.ProviderRef, &p.AmountCents, &p.Currency, &p.Status,
+			&p.GatewayResp, &p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan payment: %w", err)
+		}
+		out = append(out, &p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *Repository) SetPrimaryToOrder(ctx context.Context, orderID, paymentID int64) error {
+	_, err := r.q.Exec(ctx, `
+		UPDATE orders SET primary_payment_id=$2, updated_at=now() WHERE id=$1
+	`, orderID, paymentID)
+	return err
+}
+
+func (r *Repository) MarkPaid(ctx context.Context, paymentID int64) error {
+	_, err := r.q.Exec(ctx, `
+		UPDATE payments 
+		   SET status='paid', updated_at=now() 
+		 WHERE id=$1;
+		UPDATE orders 
+		   SET payment_status='paid', status='processing', paid_at=now(), updated_at=now()
+		 WHERE id=(SELECT order_id FROM payments WHERE id=$1);
+	`, paymentID)
+	return err
+}
+
+func (r *Repository) SetStatus(ctx context.Context, paymentID int64, status string) error {
+	_, err := r.q.Exec(ctx, `
+		UPDATE payments SET status=$2, updated_at=now() WHERE id=$1
+	`, paymentID, status)
+	return err
+}
+
+func (r *Repository) SetProviderRef(ctx context.Context, paymentID int64, ref string, raw any) error {
+	var jb []byte
+	if raw != nil {
+		if b, err := json.Marshal(raw); err == nil {
+			jb = b
+		}
+	}
+	_, err := r.q.Exec(ctx, `
+		UPDATE payments SET provider_ref=$2, gateway_response=$3, updated_at=now() WHERE id=$1
+	`, paymentID, ref, jb)
+	return err
+}
+
+func (r *Repository) GetByProviderRef(ctx context.Context, provider, ref string) (*Payment, error) {
+	var p Payment
+	var providerRef *string
+	var gatewayResp any
+
+	err := r.q.QueryRow(ctx, `
+		SELECT id, order_id, provider, provider_ref, amount_cents, currency, status,
+		       gateway_response, created_at, updated_at
+		FROM payments
+		WHERE provider = $1 AND provider_ref = $2
+		LIMIT 1
+	`, provider, ref).Scan(
+		&p.ID,
+		&p.OrderID,
+		&p.Provider,
+		&providerRef,
+		&p.AmountCents,
+		&p.Currency,
+		&p.Status,
+		&gatewayResp,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get payment by provider_ref: %w", err)
+	}
+
+	p.ProviderRef = providerRef
+	p.GatewayResp = gatewayResp
+
+	return &p, nil
+}

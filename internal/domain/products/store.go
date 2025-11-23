@@ -71,6 +71,9 @@ type Store interface {
 	GetProductDetailBySlug(ctx context.Context, slug string) (*ProductDetail, error)
 	ListAdminProductCards(ctx context.Context, limit, offset int) ([]*ProductCard, int, error)
 
+	SearchProducts(ctx context.Context, query string, limit, offset int) ([]*Product, int, error)
+	FullTextSearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductWithRank, int, error)
+
 	// Variants
 	CreateVariant(ctx context.Context, v *ProductVariant) (*ProductVariant, error)
 	GetVariantByID(ctx context.Context, id int64) (*ProductVariant, error)
@@ -1628,4 +1631,96 @@ func (r *Repository) ListAdminProductCards(ctx context.Context, limit, offset in
 		return nil, 0, fmt.Errorf("count products: %w", err)
 	}
 	return out, total, nil
+}
+
+func (r *Repository) SearchProducts(ctx context.Context, query string, limit, offset int) ([]*Product, int, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	q := `
+SELECT id, name, slug, description, category_id, brand_id, is_active, created_at, updated_at,
+       COUNT(*) OVER() AS total
+FROM products
+WHERE is_active = true
+  AND (name ILIKE '%' || $1 || '%' OR description ILIKE '%' || $1 || '%')
+ORDER BY id DESC
+LIMIT $2 OFFSET $3;
+`
+	rows, err := r.db.Query(ctx, q, query, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("search products: %w", err)
+	}
+	defer rows.Close()
+
+	var products []*Product
+	var total int
+	for rows.Next() {
+		var p Product
+		var t int
+		if err := rows.Scan(
+			&p.ID, &p.Name, &p.Slug, &p.Description, &p.CategoryID, &p.BrandID, &p.IsActive,
+			&p.CreatedAt, &p.UpdatedAt, &t,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan: %w", err)
+		}
+		if total == 0 {
+			total = t
+		}
+		products = append(products, &p)
+	}
+
+	return products, total, nil
+}
+
+func (r *Repository) FullTextSearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductWithRank, int, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	q := `
+WITH ranked AS (
+  SELECT
+    id, name, slug, description, category_id, brand_id, is_active,
+    created_at, updated_at,
+    ts_rank_cd(fts, plainto_tsquery('english', $1)) AS rank
+  FROM products
+  WHERE fts @@ plainto_tsquery('english', $1)
+)
+SELECT *,
+       COUNT(*) OVER() AS total
+FROM ranked
+ORDER BY rank DESC
+LIMIT $2 OFFSET $3;
+`
+	rows, err := r.db.Query(ctx, q, query, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("fts search products: %w", err)
+	}
+	defer rows.Close()
+
+	var list []*ProductWithRank
+	var total int
+	for rows.Next() {
+		var p ProductWithRank
+		var t int
+		if err := rows.Scan(
+			&p.ID, &p.Name, &p.Slug, &p.Description,
+			&p.CategoryID, &p.BrandID, &p.IsActive,
+			&p.CreatedAt, &p.UpdatedAt, &p.Rank, &t,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan: %w", err)
+		}
+		if total == 0 {
+			total = t
+		}
+		list = append(list, &p)
+	}
+	return list, total, nil
 }

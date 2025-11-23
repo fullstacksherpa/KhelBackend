@@ -762,7 +762,7 @@ func (app *application) updateCategoryHandler(w http.ResponseWriter, r *http.Req
 				upd.ImageURLs = append(upd.ImageURLs, newLogoURL)
 			}
 		}
-	} else if err != http.ErrMissingFile && err != nil {
+	} else if err != http.ErrMissingFile {
 		app.badRequestResponse(w, r, fmt.Errorf("invalid logo part: %v", err))
 		return
 	}
@@ -1057,5 +1057,61 @@ func (app *application) publishProductHandler(w http.ResponseWriter, r *http.Req
 	app.jsonResponse(w, http.StatusOK, map[string]any{
 		"message": "published",
 		"product": updated,
+	})
+}
+
+func (app *application) searchProductsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		app.badRequestResponse(w, r, fmt.Errorf("search query is required"))
+		return
+	}
+
+	pagination := params.ParsePagination(r.URL.Query())
+
+	products, total, err := app.store.Products.SearchProducts(ctx, q, pagination.Limit, pagination.Offset)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	pagination.ComputeMeta(total)
+
+	app.jsonResponse(w, http.StatusOK, map[string]any{
+		"products":    products,
+		"pagination":  pagination,
+		"query":       q,
+		"search_type": "basic",
+	})
+}
+
+func (app *application) fullTextSearchProductsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		app.badRequestResponse(w, r, fmt.Errorf("search query is required"))
+		return
+	}
+
+	pagination := params.ParsePagination(r.URL.Query())
+
+	products, total, err := app.store.Products.FullTextSearchProducts(ctx, q, pagination.Limit, pagination.Offset)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	pagination.ComputeMeta(total)
+
+	app.jsonResponse(w, http.StatusOK, map[string]any{
+		"products":    products,
+		"pagination":  pagination,
+		"query":       q,
+		"search_type": "full_text",
 	})
 }
