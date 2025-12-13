@@ -1442,30 +1442,78 @@ func (r *Repository) GetProductDetailBySlug(ctx context.Context, slug string) (*
       WHERE p.slug = $1 AND p.is_active = true
       LIMIT 1;
     `
+
 	var (
-		p                   Product
-		b                   Brand
-		c                   Category
-		bNullID             sql.NullInt64
-		cNullID             sql.NullInt64
-		bSlug, bDesc, bLogo sql.NullString
-		cSlug               sql.NullString
-		cParent             sql.NullInt64
-		cImgURLs            []string
+		p Product
+
+		// brand bits
+		b          Brand
+		bNullID    sql.NullInt64
+		bName      sql.NullString
+		bSlug      sql.NullString
+		bDesc      sql.NullString
+		bLogo      sql.NullString
+		bCreatedAt sql.NullTime
+		bUpdatedAt sql.NullTime
+
+		// category bits
+		c          Category
+		cNullID    sql.NullInt64
+		cName      sql.NullString
+		cSlug      sql.NullString
+		cParent    sql.NullInt64
+		cImgURLs   []string
+		cIsActive  sql.NullBool
+		cCreatedAt sql.NullTime
+		cUpdatedAt sql.NullTime
 	)
+
 	row := r.db.QueryRow(ctx, pSQL, slug)
 	if err := row.Scan(
-		&p.ID, &p.Name, &p.Slug, &p.Description, &p.CategoryID, &p.BrandID, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
-		&bNullID, &b.Name, &bSlug, &bDesc, &bLogo, &b.CreatedAt, &b.UpdatedAt,
-		&cNullID, &c.Name, &cSlug, &cParent, &cImgURLs, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+		// product
+		&p.ID,
+		&p.Name,
+		&p.Slug,
+		&p.Description,
+		&p.CategoryID,
+		&p.BrandID,
+		&p.IsActive,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+
+		// brand (can all be NULL because of LEFT JOIN)
+		&bNullID,
+		&bName,
+		&bSlug,
+		&bDesc,
+		&bLogo,
+		&bCreatedAt,
+		&bUpdatedAt,
+
+		// category (can all be NULL because of LEFT JOIN)
+		&cNullID,
+		&cName,
+		&cSlug,
+		&cParent,
+		&cImgURLs,
+		&cIsActive,
+		&cCreatedAt,
+		&cUpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("product detail: %w", err)
 	}
+
+	// --- map brand if present ---
+	var brandPtr *Brand
 	if bNullID.Valid {
 		b.ID = bNullID.Int64
+
+		if bName.Valid {
+			b.Name = bName.String
+		}
 		if bSlug.Valid {
 			s := bSlug.String
 			b.Slug = &s
@@ -1478,12 +1526,26 @@ func (r *Repository) GetProductDetailBySlug(ctx context.Context, slug string) (*
 			s := bLogo.String
 			b.LogoURL = &s
 		}
+		if bCreatedAt.Valid {
+			b.CreatedAt = bCreatedAt.Time
+		}
+		if bUpdatedAt.Valid {
+			b.UpdatedAt = bUpdatedAt.Time
+		}
+
+		brandPtr = &b
 	} else {
-		// no brand
-		b = Brand{}
+		brandPtr = nil
 	}
+
+	// --- map category if present ---
+	var categoryPtr *Category
 	if cNullID.Valid {
 		c.ID = cNullID.Int64
+
+		if cName.Valid {
+			c.Name = cName.String
+		}
 		if cSlug.Valid {
 			c.Slug = cSlug.String
 		}
@@ -1491,9 +1553,25 @@ func (r *Repository) GetProductDetailBySlug(ctx context.Context, slug string) (*
 			pid := cParent.Int64
 			c.ParentID = &pid
 		}
+		// image_urls: if the row exists but column is NULL, pgx will usually give nil slice,
+		// which is fine. If you prefer, guard on len(cImgURLs) > 0
 		c.ImageURLs = cImgURLs
+
+		if cIsActive.Valid {
+			c.IsActive = cIsActive.Bool
+		} else {
+			c.IsActive = false
+		}
+		if cCreatedAt.Valid {
+			c.CreatedAt = cCreatedAt.Time
+		}
+		if cUpdatedAt.Valid {
+			c.UpdatedAt = cUpdatedAt.Time
+		}
+
+		categoryPtr = &c
 	} else {
-		c = Category{}
+		categoryPtr = nil
 	}
 
 	// 2) active variants (ordered by price asc)
@@ -1508,11 +1586,20 @@ func (r *Repository) GetProductDetailBySlug(ctx context.Context, slug string) (*
 		return nil, fmt.Errorf("variants: %w", err)
 	}
 	defer vRows.Close()
+
 	vars := make([]*ProductVariant, 0, 8)
 	for vRows.Next() {
 		var v ProductVariant
 		var attr []byte
-		if err := vRows.Scan(&v.ID, &v.ProductID, &v.PriceCents, &attr, &v.IsActive, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := vRows.Scan(
+			&v.ID,
+			&v.ProductID,
+			&v.PriceCents,
+			&attr,
+			&v.IsActive,
+			&v.CreatedAt,
+			&v.UpdatedAt,
+		); err != nil {
 			return nil, fmt.Errorf("scan variant: %w", err)
 		}
 		_ = json.Unmarshal(attr, &v.Attributes)
@@ -1529,19 +1616,9 @@ func (r *Repository) GetProductDetailBySlug(ctx context.Context, slug string) (*
 	}
 
 	return &ProductDetail{
-		Product: &p,
-		Brand: func() *Brand {
-			if bNullID.Valid {
-				return &b
-			}
-			return nil
-		}(),
-		Category: func() *Category {
-			if cNullID.Valid {
-				return &c
-			}
-			return nil
-		}(),
+		Product:  &p,
+		Brand:    brandPtr,
+		Category: categoryPtr,
 		Variants: vars,
 		Images:   imgs,
 	}, nil

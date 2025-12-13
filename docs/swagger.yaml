@@ -1,5 +1,18 @@
 basePath: /v1
 definitions:
+  accesscontrol.Role:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
   ads.Ad:
     properties:
       active:
@@ -912,6 +925,12 @@ definitions:
       total_reviews:
         type: integer
     type: object
+  main.assignRoleRequest:
+    properties:
+      role_id:
+        description: ID from roles table
+        type: integer
+    type: object
   main.bulkUpdateDisplayOrderPayload:
     properties:
       updates:
@@ -943,6 +962,27 @@ definitions:
         items:
           type: integer
         type: array
+    type: object
+  products.Category:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      image_urls:
+        items:
+          type: string
+        type: array
+      is_active:
+        type: boolean
+      name:
+        type: string
+      parent_id:
+        type: integer
+      slug:
+        type: string
+      updated_at:
+        type: string
     type: object
   users.User:
     properties:
@@ -1358,6 +1398,108 @@ paths:
       summary: Bulk update display order (Admin)
       tags:
       - Admin
+  /admin/users/{userID}/roles:
+    get:
+      description: Returns all roles assigned to the given user.
+      parameters:
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/accesscontrol.Role'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List roles for a user
+      tags:
+      - Admin-Roles
+    post:
+      consumes:
+      - application/json
+      description: Assigns a role (by role_id) to the specified user.
+      parameters:
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: Role assignment payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/main.assignRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role assigned successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Assign a role to a user
+      tags:
+      - Admin-Roles
+  /admin/users/{userID}/roles/{roleID}:
+    delete:
+      description: Removes a specific role from a user by role_id.
+      parameters:
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: Role ID
+        in: path
+        name: roleID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role removed successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Role not found for user
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Remove a role from a user
+      tags:
+      - Admin-Roles
   /ads/{adID}/click:
     post:
       consumes:
@@ -2496,6 +2638,484 @@ paths:
       summary: Remove a push notification token
       tags:
       - Notifications
+  /store/admin/brands:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Creates a new brand with optional logo upload to Cloudinary. Name
+        is required; slug is optional (auto-generated from name if empty).
+      parameters:
+      - description: Brand name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Brand slug (optional, auto-generated from name if empty)
+        in: formData
+        name: slug
+        type: string
+      - description: Brand description
+        in: formData
+        name: description
+        type: string
+      - description: Brand logo image (JPEG, PNG, WEBP; max 3MB)
+        in: formData
+        name: logo
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Brand created successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 'Bad Request: invalid form data, missing name, or invalid slug/image
+            type'
+          schema: {}
+        "409":
+          description: 'Conflict: brand with the same name or slug already exists'
+          schema: {}
+        "500":
+          description: 'Internal Server Error: failed to upload logo or create brand'
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new brand
+      tags:
+      - Store-Admin
+  /store/admin/brands/{brandID}:
+    delete:
+      description: Deletes a brand by ID. Fails if the brand is referenced by any
+        products.
+      parameters:
+      - description: Brand ID
+        in: path
+        name: brandID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: 'Bad Request: invalid brand ID'
+          schema: {}
+        "404":
+          description: 'Not Found: brand not found'
+          schema: {}
+        "409":
+          description: 'Conflict: brand has dependent products or records'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a brand
+      tags:
+      - Store-Admin
+    patch:
+      consumes:
+      - multipart/form-data
+      description: 'Updates brand fields (name, slug, description) and optionally
+        replaces the logo image. Partial updates are supported: only provided fields
+        are changed.'
+      parameters:
+      - description: Brand ID
+        in: path
+        name: brandID
+        required: true
+        type: integer
+      - description: Brand name
+        in: formData
+        name: name
+        type: string
+      - description: Brand slug (must be URL-safe)
+        in: formData
+        name: slug
+        type: string
+      - description: Brand description
+        in: formData
+        name: description
+        type: string
+      - description: Optional brand logo image (jpeg, png, webp)
+        in: formData
+        name: logo
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns message and updated brand
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: invalid input'
+          schema: {}
+        "404":
+          description: Brand not found
+          schema: {}
+        "409":
+          description: 'Conflict: brand name or slug already exists'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update an existing brand
+      tags:
+      - Store-Admin
+  /store/admin/categories:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Creates a new product category with optional parent and logo image.
+      parameters:
+      - description: Category name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: URL-friendly slug (auto-generated from name if omitted)
+        in: formData
+        name: slug
+        type: string
+      - description: Optional parent category ID
+        in: formData
+        name: parent_id
+        type: integer
+      - description: 'Whether the category is active (default: true)'
+        in: formData
+        name: is_active
+        type: boolean
+      - description: Category logo image (jpeg/png/webp, max 3MB)
+        in: formData
+        name: logo
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Category created successfully
+          schema:
+            $ref: '#/definitions/products.Category'
+        "400":
+          description: 'Bad Request: invalid input or file'
+          schema: {}
+        "409":
+          description: 'Conflict: category with same name or slug already exists'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new category
+      tags:
+      - Store-Admin
+  /store/admin/categories/{categoryID}:
+    delete:
+      description: Deletes a category and asynchronously removes its images from Cloudinary.
+        Fails if category has children or dependent records.
+      parameters:
+      - description: Category ID
+        in: path
+        name: categoryID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: message + deleted_category info
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: invalid category ID or category has children'
+          schema: {}
+        "404":
+          description: Category not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a category
+      tags:
+      - Store-Admin
+    patch:
+      consumes:
+      - multipart/form-data
+      description: Partially updates a category's fields and optionally uploads/replaces
+        a logo image.
+      parameters:
+      - description: Category ID
+        in: path
+        name: categoryID
+        required: true
+        type: integer
+      - description: New category name
+        in: formData
+        name: name
+        type: string
+      - description: New slug (must be URL-friendly)
+        in: formData
+        name: slug
+        type: string
+      - description: New parent category ID
+        in: formData
+        name: parent_id
+        type: integer
+      - description: Whether the category is active
+        in: formData
+        name: is_active
+        type: boolean
+      - description: New logo image (jpeg/png/webp, max 3MB)
+        in: formData
+        name: logo
+        type: file
+      - description: If true, replaces existing logos instead of appending
+        in: query
+        name: replace_logo
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: message + updated category
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: invalid input'
+          schema: {}
+        "404":
+          description: Category not found
+          schema: {}
+        "409":
+          description: 'Conflict: slug already exists'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update a category
+      tags:
+      - Store-Admin
+  /store/brands:
+    get:
+      description: Returns a paginated list of brands.
+      parameters:
+      - description: Page number (starting from 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default from server, max usually 100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: brands list with pagination metadata
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: List all brands
+      tags:
+      - Store
+  /store/categories:
+    get:
+      description: Returns a paginated list of categories.
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: categories + pagination metadata
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: List categories
+      tags:
+      - Store-Categories
+  /store/categories/{categoryID}:
+    get:
+      description: Returns a single category by its ID, with some basic stats (e.g.
+        product count, children count).
+      parameters:
+      - description: Category ID
+        in: path
+        name: categoryID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: category + stats
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: invalid category ID'
+          schema: {}
+        "404":
+          description: Category not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get category by ID
+      tags:
+      - Store-Categories
+  /store/categories/search:
+    get:
+      description: Performs a simple search on categories by name/slug using ILIKE
+        or trigram search.
+      parameters:
+      - description: Search query string
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: categories + pagination + search_type=basic
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: missing query'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Search categories (basic)
+      tags:
+      - Store-Categories
+  /store/categories/search/fts:
+    get:
+      description: Performs full-text search on categories using the FTS index.
+      parameters:
+      - description: Search query string
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: categories + pagination + search_type=full_text
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: missing query'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Search categories (full-text)
+      tags:
+      - Store-Categories
+  /store/categories/tree:
+    get:
+      description: Returns the full category tree (parent/children hierarchy). Optionally
+        includes inactive categories.
+      parameters:
+      - description: 'Include inactive categories (default: false)'
+        in: query
+        name: include_inactive
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'tree: array of nested categories'
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get category tree
+      tags:
+      - Store-Categories
+  /store/products/{productID}:
+    get:
+      description: Returns a single product by its ID.
+      parameters:
+      - description: Product ID
+        in: path
+        name: productID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: product
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: invalid product ID'
+          schema: {}
+        "404":
+          description: Product not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get product by ID
+      tags:
+      - Store-Products
   /users:
     put:
       consumes:

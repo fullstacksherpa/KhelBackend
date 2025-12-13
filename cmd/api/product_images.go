@@ -70,7 +70,7 @@ func (app *application) createProductImageHandler(w http.ResponseWriter, r *http
 	}
 
 	publicID := fmt.Sprintf("products/%d/%d_%d", productID, time.Now().Unix(), rand.Intn(9999))
-	imageURL, err := app.uploadToCloudinaryWithID(file, publicID)
+	imageURL, err := app.uploadToCloudinaryWithID(file, publicID, "products")
 	if err != nil {
 		app.internalServerError(w, r, fmt.Errorf("failed to upload image: %w", err))
 		return

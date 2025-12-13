@@ -160,6 +160,14 @@ func (app *application) mount() http.Handler {
 			r.Get("/analytics", app.getAdsAnalyticsHandler)
 			r.Post("/bulk-update-order", app.bulkUpdateDisplayOrderHandler)
 		})
+		r.Route("/admin/users", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
+
+			r.Get("/{userID}/roles", app.adminGetUserRolesHandler)
+			r.Post("/{userID}/roles", app.adminAssignUserRoleHandler)
+			r.Delete("/{userID}/roles/{roleID}", app.adminRemoveUserRoleHandler)
+		})
 
 		r.With(app.optionalAuth).Get("/venues/list-venues", app.listVenuesHandler)
 
@@ -328,6 +336,7 @@ func (app *application) mount() http.Handler {
 			r.Get("/categories/search", app.searchCategoriesHandler)
 			r.Get("/categories/search/fts", app.fullTextSearchCategoriesHandler)
 			r.Get("/products", app.listProductsHandler)
+			r.Get("/products/{productID}", app.getProductByIDHandler)
 			r.Get("/products/slug/{slug}", app.getProductDetailHandler)
 			r.Get("/{product_id}/variants", app.listVariantsByProductHandler)
 

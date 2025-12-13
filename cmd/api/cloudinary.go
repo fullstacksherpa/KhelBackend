@@ -63,25 +63,31 @@ func (app *application) extractPublicIDFromURL(photoURL string) (string, error) 
 // Cloudinary Upload Functions with Controlled Naming
 // -----------------------------------------------
 
-// uploadToCloudinaryWithID uploads a file to Cloudinary using a custom public ID.
-func (app *application) uploadToCloudinaryWithID(file io.Reader, publicID string) (string, error) {
+func (app *application) uploadToCloudinaryWithID(
+	file io.Reader,
+	publicID string,
+	folder string,
+) (string, error) {
 
-	env := os.Getenv("APP_ENV")
-
-	folder := "testVenues"
-	if env == "prod" || env == "production" {
-		folder = "venues"
+	// If caller passed empty folder → choose based on environment
+	if strings.TrimSpace(folder) == "" {
+		env := os.Getenv("APP_ENV")
+		if env == "prod" || env == "production" {
+			folder = "venues"
+		} else {
+			folder = "testVenues"
+		}
 	}
+
 	resp, err := app.cld.Upload.Upload(
-		context.Background(), // using a background context for external call
+		context.Background(),
 		file,
 		uploader.UploadParams{
 			Folder:    folder,
-			PublicID:  publicID, // Set custom name (e.g., "venue_12_image_1")
+			PublicID:  publicID,
 			Overwrite: api.Bool(false),
 		},
 	)
-
 	if err != nil {
 		return "", fmt.Errorf("cloudinary upload: %w", err)
 	}
@@ -107,7 +113,8 @@ func (app *application) uploadImagesWithVenueID(
 
 		// Generate a custom Cloudinary public ID using the venue ID and image number.
 		publicID := fmt.Sprintf("venue_%d_image_%d", venueID, time.Now().UnixNano())
-		url, err := app.uploadToCloudinaryWithID(file, publicID)
+		url, err := app.uploadToCloudinaryWithID(file, publicID,
+			"")
 		if err != nil {
 			return nil, fmt.Errorf("cloudinary upload: %w", err)
 		}

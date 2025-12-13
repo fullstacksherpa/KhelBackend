@@ -54,6 +54,23 @@ func sniffMIME(file multipart.File) (string, error) {
 	return mime, nil
 }
 
+// CreateBrand godoc
+//
+//	@Summary		Create a new brand
+//	@Description	Creates a new brand with optional logo upload to Cloudinary. Name is required; slug is optional (auto-generated from name if empty).
+//	@Tags			Store-Admin
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			name		formData	string				true	"Brand name"
+//	@Param			slug		formData	string				false	"Brand slug (optional, auto-generated from name if empty)"
+//	@Param			description	formData	string				false	"Brand description"
+//	@Param			logo		formData	file				false	"Brand logo image (JPEG, PNG, WEBP; max 3MB)"
+//	@Success		201			{object}	map[string]string	"Brand created successfully"
+//	@Failure		400			{object}	error				"Bad Request: invalid form data, missing name, or invalid slug/image type"
+//	@Failure		409			{object}	error				"Conflict: brand with the same name or slug already exists"
+//	@Failure		500			{object}	error				"Internal Server Error: failed to upload logo or create brand"
+//	@Security		ApiKeyAuth
+//	@Router			/store/admin/brands [post]
 func (app *application) createBrandHandler(w http.ResponseWriter, r *http.Request) {
 	const maxBytes = 3 * 1024 * 1024 // 3MB
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
@@ -95,7 +112,6 @@ func (app *application) createBrandHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// --- logo upload (optional) with MIME sniffing ---
 	var logoURL string
 	if file, _, err := r.FormFile("logo"); err == nil {
 		defer file.Close()
@@ -116,10 +132,10 @@ func (app *application) createBrandHandler(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		publicID := fmt.Sprintf("brands/%s_logo_%d", slug, time.Now().UnixNano())
+		publicID := fmt.Sprintf("brand/%s_logo_%d", slug, time.Now().UnixNano())
 
 		// upload using the same file reader (we reset it in sniffMIME)
-		url, upErr := app.uploadToCloudinaryWithID(file, publicID)
+		url, upErr := app.uploadToCloudinaryWithID(file, publicID, "brands")
 		if upErr != nil {
 			app.internalServerError(w, r, fmt.Errorf("upload logo: %w", upErr))
 			return
@@ -162,7 +178,25 @@ func (app *application) createBrandHandler(w http.ResponseWriter, r *http.Reques
 	app.jsonResponse(w, http.StatusCreated, created)
 }
 
-// PATCH /v1/store/admin/brands/{brandID}
+// UpdateBrand godoc
+//
+//	@Summary		Update an existing brand
+//	@Description	Updates brand fields (name, slug, description) and optionally replaces the logo image. Partial updates are supported: only provided fields are changed.
+//	@Tags			Store-Admin
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			brandID		path		int				true	"Brand ID"
+//	@Param			name		formData	string			false	"Brand name"
+//	@Param			slug		formData	string			false	"Brand slug (must be URL-safe)"
+//	@Param			description	formData	string			false	"Brand description"
+//	@Param			logo		formData	file			false	"Optional brand logo image (jpeg, png, webp)"
+//	@Success		200			{object}	map[string]any	"Returns message and updated brand"
+//	@Failure		400			{object}	error			"Bad Request: invalid input"
+//	@Failure		404			{object}	error			"Brand not found"
+//	@Failure		409			{object}	error			"Conflict: brand name or slug already exists"
+//	@Failure		500			{object}	error			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/admin/brands/{brandID} [patch]
 func (app *application) updateBrandHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -270,8 +304,8 @@ func (app *application) updateBrandHandler(w http.ResponseWriter, r *http.Reques
 			baseSlug = generateSlug(upd.Name)
 		}
 
-		publicID := fmt.Sprintf("brands/%s_logo_%d", baseSlug, time.Now().UnixNano())
-		url, upErr := app.uploadToCloudinaryWithID(file, publicID)
+		publicID := fmt.Sprintf("brand/%s_logo_%d", baseSlug, time.Now().UnixNano())
+		url, upErr := app.uploadToCloudinaryWithID(file, publicID, "brands")
 		if upErr != nil {
 			app.internalServerError(w, r, fmt.Errorf("upload logo: %w", upErr))
 			return
@@ -317,6 +351,20 @@ func (app *application) updateBrandHandler(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// DeleteBrand godoc
+//
+//	@Summary		Delete a brand
+//	@Description	Deletes a brand by ID. Fails if the brand is referenced by any products.
+//	@Tags			Store-Admin
+//	@Produce		json
+//	@Param			brandID	path		int		true	"Brand ID"
+//	@Success		204		{string}	string	"No Content"
+//	@Failure		400		{object}	error	"Bad Request: invalid brand ID"
+//	@Failure		404		{object}	error	"Not Found: brand not found"
+//	@Failure		409		{object}	error	"Conflict: brand has dependent products or records"
+//	@Failure		500		{object}	error	"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/admin/brands/{brandID} [delete]
 func (app *application) deleteBrandHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -379,6 +427,17 @@ func (app *application) deleteBrandHandler(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ListBrands godoc
+//
+//	@Summary		List all brands
+//	@Description	Returns a paginated list of brands.
+//	@Tags			Store
+//	@Produce		json
+//	@Param			page	query		int						false	"Page number (starting from 1)"
+//	@Param			limit	query		int						false	"Items per page (default from server, max usually 100)"
+//	@Success		200		{object}	map[string]interface{}	"brands list with pagination metadata"
+//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Router			/store/brands [get]
 func (app *application) getAllBrandsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -407,6 +466,24 @@ func (app *application) getAllBrandsHandler(w http.ResponseWriter, r *http.Reque
 
 // -------- Admin: Categories ---------
 
+// CreateCategory godoc
+//
+//	@Summary		Create a new category
+//	@Description	Creates a new product category with optional parent and logo image.
+//	@Tags			Store-Admin
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			name		formData	string				true	"Category name"
+//	@Param			slug		formData	string				false	"URL-friendly slug (auto-generated from name if omitted)"
+//	@Param			parent_id	formData	int64				false	"Optional parent category ID"
+//	@Param			is_active	formData	bool				false	"Whether the category is active (default: true)"
+//	@Param			logo		formData	file				false	"Category logo image (jpeg/png/webp, max 3MB)"
+//	@Success		201			{object}	products.Category	"Category created successfully"
+//	@Failure		400			{object}	error				"Bad Request: invalid input or file"
+//	@Failure		409			{object}	error				"Conflict: category with same name or slug already exists"
+//	@Failure		500			{object}	error				"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/admin/categories [post]
 func (app *application) createCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse the multipart form to get brand data and logo
 	const maxBytes = 3 * 1024 * 1024 // 3MB for Category logos
@@ -494,7 +571,7 @@ func (app *application) createCategoryHandler(w http.ResponseWriter, r *http.Req
 		publicID := fmt.Sprintf("category/%s_logo_%d", slug, time.Now().UnixNano())
 
 		// upload using the same file reader (we reset it in sniffMIME)
-		url, upErr := app.uploadToCloudinaryWithID(file, publicID)
+		url, upErr := app.uploadToCloudinaryWithID(file, publicID, "categories")
 		if upErr != nil {
 			app.internalServerError(w, r, fmt.Errorf("upload logo: %w", upErr))
 			return
@@ -531,6 +608,17 @@ func (app *application) createCategoryHandler(w http.ResponseWriter, r *http.Req
 	app.jsonResponse(w, http.StatusCreated, CreatedCategory)
 }
 
+// ListCategories godoc
+//
+//	@Summary		List categories
+//	@Description	Returns a paginated list of categories.
+//	@Tags			Store-Categories
+//	@Produce		json
+//	@Param			page	query		int				false	"Page number (default: 1)"
+//	@Param			limit	query		int				false	"Items per page (default: 20, max: 100)"
+//	@Success		200		{object}	map[string]any	"categories + pagination metadata"
+//	@Failure		500		{object}	error			"Internal Server Error"
+//	@Router			/store/categories [get]
 func (app *application) listCategoriesHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -560,6 +648,19 @@ func (app *application) listCategoriesHandler(w http.ResponseWriter, r *http.Req
 	app.jsonResponse(w, http.StatusOK, response)
 }
 
+// DeleteCategory godoc
+//
+//	@Summary		Delete a category
+//	@Description	Deletes a category and asynchronously removes its images from Cloudinary. Fails if category has children or dependent records.
+//	@Tags			Store-Admin
+//	@Produce		json
+//	@Param			categoryID	path		int				true	"Category ID"
+//	@Success		200			{object}	map[string]any	"message + deleted_category info"
+//	@Failure		400			{object}	error			"Bad Request: invalid category ID or category has children"
+//	@Failure		404			{object}	error			"Category not found"
+//	@Failure		500			{object}	error			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/admin/categories/{categoryID} [delete]
 func (app *application) deleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -639,6 +740,27 @@ func (app *application) deleteCategoryHandler(w http.ResponseWriter, r *http.Req
 	})
 }
 
+// UpdateCategory godoc
+//
+//	@Summary		Update a category
+//	@Description	Partially updates a category's fields and optionally uploads/replaces a logo image.
+//	@Tags			Store-Admin
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			categoryID		path		int				true	"Category ID"
+//	@Param			name			formData	string			false	"New category name"
+//	@Param			slug			formData	string			false	"New slug (must be URL-friendly)"
+//	@Param			parent_id		formData	int64			false	"New parent category ID"
+//	@Param			is_active		formData	bool			false	"Whether the category is active"
+//	@Param			logo			formData	file			false	"New logo image (jpeg/png/webp, max 3MB)"
+//	@Param			replace_logo	query		bool			false	"If true, replaces existing logos instead of appending"
+//	@Success		200				{object}	map[string]any	"message + updated category"
+//	@Failure		400				{object}	error			"Bad Request: invalid input"
+//	@Failure		404				{object}	error			"Category not found"
+//	@Failure		409				{object}	error			"Conflict: slug already exists"
+//	@Failure		500				{object}	error			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/admin/categories/{categoryID} [patch]
 func (app *application) updateCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -741,7 +863,7 @@ func (app *application) updateCategoryHandler(w http.ResponseWriter, r *http.Req
 		}
 
 		publicID := fmt.Sprintf("category/%s_logo_%d", baseSlug, time.Now().UnixNano())
-		url, upErr := app.uploadToCloudinaryWithID(file, publicID)
+		url, upErr := app.uploadToCloudinaryWithID(file, publicID, "categories")
 		if upErr != nil {
 			app.internalServerError(w, r, fmt.Errorf("upload logo: %w", upErr))
 			return
@@ -809,6 +931,18 @@ func (app *application) updateCategoryHandler(w http.ResponseWriter, r *http.Req
 	})
 }
 
+// GetCategoryByID godoc
+//
+//	@Summary		Get category by ID
+//	@Description	Returns a single category by its ID, with some basic stats (e.g. product count, children count).
+//	@Tags			Store-Categories
+//	@Produce		json
+//	@Param			categoryID	path		int				true	"Category ID"
+//	@Success		200			{object}	map[string]any	"category + stats"
+//	@Failure		400			{object}	error			"Bad Request: invalid category ID"
+//	@Failure		404			{object}	error			"Category not found"
+//	@Failure		500			{object}	error			"Internal Server Error"
+//	@Router			/store/categories/{categoryID} [get]
 func (app *application) getCategoryByIDHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -845,6 +979,20 @@ func (app *application) getCategoryByIDHandler(w http.ResponseWriter, r *http.Re
 }
 
 // GET /categories/search?q=electronics&page=1&limit=20
+
+// SearchCategories godoc
+//
+//	@Summary		Search categories (basic)
+//	@Description	Performs a simple search on categories by name/slug using ILIKE or trigram search.
+//	@Tags			Store-Categories
+//	@Produce		json
+//	@Param			q		query		string			true	"Search query string"
+//	@Param			page	query		int				false	"Page number (default: 1)"
+//	@Param			limit	query		int				false	"Items per page (default: 20, max: 100)"
+//	@Success		200		{object}	map[string]any	"categories + pagination + search_type=basic"
+//	@Failure		400		{object}	error			"Bad Request: missing query"
+//	@Failure		500		{object}	error			"Internal Server Error"
+//	@Router			/store/categories/search [get]
 func (app *application) searchCategoriesHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -875,6 +1023,19 @@ func (app *application) searchCategoriesHandler(w http.ResponseWriter, r *http.R
 	})
 }
 
+// FullTextSearchCategories godoc
+//
+//	@Summary		Search categories (full-text)
+//	@Description	Performs full-text search on categories using the FTS index.
+//	@Tags			Store-Categories
+//	@Produce		json
+//	@Param			q		query		string			true	"Search query string"
+//	@Param			page	query		int				false	"Page number (default: 1)"
+//	@Param			limit	query		int				false	"Items per page (default: 20, max: 100)"
+//	@Success		200		{object}	map[string]any	"categories + pagination + search_type=full_text"
+//	@Failure		400		{object}	error			"Bad Request: missing query"
+//	@Failure		500		{object}	error			"Internal Server Error"
+//	@Router			/store/categories/search/fts [get]
 func (app *application) fullTextSearchCategoriesHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -903,6 +1064,16 @@ func (app *application) fullTextSearchCategoriesHandler(w http.ResponseWriter, r
 	})
 }
 
+// GetCategoryTree godoc
+//
+//	@Summary		Get category tree
+//	@Description	Returns the full category tree (parent/children hierarchy). Optionally includes inactive categories.
+//	@Tags			Store-Categories
+//	@Produce		json
+//	@Param			include_inactive	query		bool			false	"Include inactive categories (default: false)"
+//	@Success		200					{object}	map[string]any	"tree: array of nested categories"
+//	@Failure		500					{object}	error			"Internal Server Error"
+//	@Router			/store/categories/tree [get]
 func (app *application) getCategoryTreeHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -916,6 +1087,47 @@ func (app *application) getCategoryTreeHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	app.jsonResponse(w, http.StatusOK, map[string]any{"tree": tree})
+}
+
+// GetProductByID godoc
+//
+//	@Summary		Get product by ID
+//	@Description	Returns a single product by its ID.
+//	@Tags			Store-Products
+//	@Produce		json
+//	@Param			productID	path		int				true	"Product ID"
+//	@Success		200			{object}	map[string]any	"product"
+//	@Failure		400			{object}	error			"Bad Request: invalid product ID"
+//	@Failure		404			{object}	error			"Product not found"
+//	@Failure		500			{object}	error			"Internal Server Error"
+//	@Router			/store/products/{productID} [get]
+func (app *application) getProductByIDHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Parse and validate ID from route
+	idStr := chi.URLParam(r, "productID")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid product ID: %s", idStr))
+		return
+	}
+
+	// Fetch from repository
+	p, err := app.store.Products.GetProductByID(ctx, id)
+	if err != nil {
+		app.internalServerError(w, r, fmt.Errorf("get product: %w", err))
+		return
+	}
+	if p == nil {
+		// repo returns nil, nil when not found
+		app.notFoundResponse(w, r, fmt.Errorf("product not found"))
+		return
+	}
+
+	// Wrap in a map like listProductsHandler
+	app.jsonResponse(w, http.StatusOK, map[string]any{
+		"product": p,
+	})
 }
 
 func (app *application) listProductsHandler(w http.ResponseWriter, r *http.Request) {
@@ -944,6 +1156,7 @@ func (app *application) getProductDetailHandler(w http.ResponseWriter, r *http.R
 		app.badRequestResponse(w, r, fmt.Errorf("slug is required"))
 		return
 	}
+	fmt.Printf("got slug: %s", slug)
 
 	detail, err := app.store.Products.GetProductDetailBySlug(ctx, slug)
 	if err != nil {

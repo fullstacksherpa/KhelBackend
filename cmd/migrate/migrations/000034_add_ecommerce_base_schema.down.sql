@@ -11,8 +11,6 @@ DROP TRIGGER IF EXISTS cart_items_set_updated_at ON cart_items;
 DROP TRIGGER IF EXISTS orders_set_updated_at ON orders;
 DROP TRIGGER IF EXISTS order_items_set_updated_at ON order_items;
 DROP TRIGGER IF EXISTS payments_set_updated_at ON payments;
-DROP TRIGGER IF EXISTS payment_logs_set_updated_at ON payment_logs;
-DROP TRIGGER IF EXISTS order_status_history_set_updated_at ON order_status_history;
 DROP TRIGGER IF EXISTS order_status_change_trigger ON orders;
 
 -- Drop FK from orders -> payments (if exists)

@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS carts (
     (user_id IS NOT NULL AND guest_token IS NULL)
   )
 );
+
 CREATE INDEX IF NOT EXISTS idx_carts_user_id ON carts(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_carts_guest_token ON carts(guest_token) WHERE guest_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_carts_expires ON carts(expires_at) WHERE status = 'active';
@@ -336,7 +337,5 @@ CREATE TRIGGER cart_items_set_updated_at BEFORE UPDATE ON cart_items FOR EACH RO
 CREATE TRIGGER orders_set_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 CREATE TRIGGER order_items_set_updated_at BEFORE UPDATE ON order_items FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 CREATE TRIGGER payments_set_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-CREATE TRIGGER payment_logs_set_updated_at BEFORE UPDATE ON payment_logs FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
-CREATE TRIGGER order_status_history_set_updated_at BEFORE UPDATE ON order_status_history FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
 
 COMMIT;

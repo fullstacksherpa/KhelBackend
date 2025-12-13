@@ -467,6 +467,162 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/users/{userID}/roles": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns all roles assigned to the given user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin-Roles"
+                ],
+                "summary": "List roles for a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/accesscontrol.Role"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Assigns a role (by role_id) to the specified user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin-Roles"
+                ],
+                "summary": "Assign a role to a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Role assignment payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.assignRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Role assigned successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/admin/users/{userID}/roles/{roleID}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Removes a specific role from a user by role_id.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin-Roles"
+                ],
+                "summary": "Remove a role from a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Role ID",
+                        "name": "roleID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Role removed successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Role not found for user",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/ads/active": {
             "get": {
                 "description": "Retrieves all active ads for the mobile app carousel",
@@ -2158,6 +2314,705 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/admin/brands": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a new brand with optional logo upload to Cloudinary. Name is required; slug is optional (auto-generated from name if empty).",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin"
+                ],
+                "summary": "Create a new brand",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Brand name",
+                        "name": "name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brand slug (optional, auto-generated from name if empty)",
+                        "name": "slug",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brand description",
+                        "name": "description",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Brand logo image (JPEG, PNG, WEBP; max 3MB)",
+                        "name": "logo",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Brand created successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid form data, missing name, or invalid slug/image type",
+                        "schema": {}
+                    },
+                    "409": {
+                        "description": "Conflict: brand with the same name or slug already exists",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error: failed to upload logo or create brand",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/admin/brands/{brandID}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Deletes a brand by ID. Fails if the brand is referenced by any products.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin"
+                ],
+                "summary": "Delete a brand",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Brand ID",
+                        "name": "brandID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid brand ID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found: brand not found",
+                        "schema": {}
+                    },
+                    "409": {
+                        "description": "Conflict: brand has dependent products or records",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Updates brand fields (name, slug, description) and optionally replaces the logo image. Partial updates are supported: only provided fields are changed.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin"
+                ],
+                "summary": "Update an existing brand",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Brand ID",
+                        "name": "brandID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brand name",
+                        "name": "name",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brand slug (must be URL-safe)",
+                        "name": "slug",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brand description",
+                        "name": "description",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Optional brand logo image (jpeg, png, webp)",
+                        "name": "logo",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns message and updated brand",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid input",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Brand not found",
+                        "schema": {}
+                    },
+                    "409": {
+                        "description": "Conflict: brand name or slug already exists",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/admin/categories": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a new product category with optional parent and logo image.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin"
+                ],
+                "summary": "Create a new category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category name",
+                        "name": "name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "URL-friendly slug (auto-generated from name if omitted)",
+                        "name": "slug",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Optional parent category ID",
+                        "name": "parent_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether the category is active (default: true)",
+                        "name": "is_active",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Category logo image (jpeg/png/webp, max 3MB)",
+                        "name": "logo",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Category created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/products.Category"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid input or file",
+                        "schema": {}
+                    },
+                    "409": {
+                        "description": "Conflict: category with same name or slug already exists",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/admin/categories/{categoryID}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Deletes a category and asynchronously removes its images from Cloudinary. Fails if category has children or dependent records.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin"
+                ],
+                "summary": "Delete a category",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "categoryID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "message + deleted_category info",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid category ID or category has children",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Partially updates a category's fields and optionally uploads/replaces a logo image.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin"
+                ],
+                "summary": "Update a category",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "categoryID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "New category name",
+                        "name": "name",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "New slug (must be URL-friendly)",
+                        "name": "slug",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "New parent category ID",
+                        "name": "parent_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether the category is active",
+                        "name": "is_active",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "New logo image (jpeg/png/webp, max 3MB)",
+                        "name": "logo",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "If true, replaces existing logos instead of appending",
+                        "name": "replace_logo",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "message + updated category",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid input",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {}
+                    },
+                    "409": {
+                        "description": "Conflict: slug already exists",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/brands": {
+            "get": {
+                "description": "Returns a paginated list of brands.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store"
+                ],
+                "summary": "List all brands",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (starting from 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default from server, max usually 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "brands list with pagination metadata",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/categories": {
+            "get": {
+                "description": "Returns a paginated list of categories.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Categories"
+                ],
+                "summary": "List categories",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 20, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "categories + pagination metadata",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/categories/search": {
+            "get": {
+                "description": "Performs a simple search on categories by name/slug using ILIKE or trigram search.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Categories"
+                ],
+                "summary": "Search categories (basic)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query string",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 20, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "categories + pagination + search_type=basic",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: missing query",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/categories/search/fts": {
+            "get": {
+                "description": "Performs full-text search on categories using the FTS index.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Categories"
+                ],
+                "summary": "Search categories (full-text)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query string",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 20, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "categories + pagination + search_type=full_text",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: missing query",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/categories/tree": {
+            "get": {
+                "description": "Returns the full category tree (parent/children hierarchy). Optionally includes inactive categories.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Categories"
+                ],
+                "summary": "Get category tree",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Include inactive categories (default: false)",
+                        "name": "include_inactive",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "tree: array of nested categories",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/categories/{categoryID}": {
+            "get": {
+                "description": "Returns a single category by its ID, with some basic stats (e.g. product count, children count).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Categories"
+                ],
+                "summary": "Get category by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "categoryID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "category + stats",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid category ID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/products/{productID}": {
+            "get": {
+                "description": "Returns a single product by its ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Products"
+                ],
+                "summary": "Get product by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Product ID",
+                        "name": "productID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "product",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid product ID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Product not found",
                         "schema": {}
                     },
                     "500": {
@@ -4372,6 +5227,26 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "accesscontrol.Role": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "ads.Ad": {
             "type": "object",
             "properties": {
@@ -5694,6 +6569,15 @@ const docTemplate = `{
                 }
             }
         },
+        "main.assignRoleRequest": {
+            "type": "object",
+            "properties": {
+                "role_id": {
+                    "description": "ID from roles table",
+                    "type": "integer"
+                }
+            }
+        },
         "main.bulkUpdateDisplayOrderPayload": {
             "type": "object",
             "required": [
@@ -5738,6 +6622,38 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "products.Category": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_urls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
