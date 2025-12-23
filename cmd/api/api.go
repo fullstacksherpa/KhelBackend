@@ -302,7 +302,9 @@ func (app *application) mount() http.Handler {
 			r.Delete("/categories/{categoryID}", app.deleteCategoryHandler)
 
 			r.Get("/products", app.adminListProductsHandler)
+			r.Get("/category/products", app.listProductsHandler)
 			r.Post("/products", app.createProductHandler)
+			r.Patch("/products/{productID}", app.updateProductHandler)
 			r.Post("/products/{productID}/publish", app.publishProductHandler)
 			r.Post("/products/images", app.createProductImageHandler)
 			r.Get("/products/{productID}/images", app.listProductImagesHandler)

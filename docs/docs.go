@@ -2980,6 +2980,102 @@ const docTemplate = `{
                 }
             }
         },
+        "/store/products": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of product cards for the admin panel. Supports optional filtering by category slug.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin-Products"
+                ],
+                "summary": "List products (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter products by category slug",
+                        "name": "category_slug",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 15)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "products list with pagination and applied filters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/products/slug/{slug}": {
+            "get": {
+                "description": "Returns product detail (product + related entities) by slug. Only active products are returned.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Products"
+                ],
+                "summary": "Get product detail by slug",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "product detail",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: slug is required",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Product not found (missing or inactive)",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/store/products/{productID}": {
             "get": {
                 "description": "Returns a single product by its ID.",

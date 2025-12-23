@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -1130,6 +1131,22 @@ func (app *application) getProductByIDHandler(w http.ResponseWriter, r *http.Req
 	})
 }
 
+// ListProducts godoc
+//
+//	@Summary		List products (admin)
+//	@Description	Returns a paginated list of product cards for the admin panel. Supports optional filtering by category slug.
+//	@Tags			Store-Admin-Products
+//	@Produce		json
+//
+//	@Param			category_slug	query		string			false	"Filter products by category slug"
+//	@Param			page			query		int				false	"Page number (default: 1)"
+//	@Param			limit			query		int				false	"Items per page (default: 15)"
+//
+//	@Success		200				{object}	map[string]any	"products list with pagination and applied filters"
+//	@Failure		400				{object}	error			"Bad Request"
+//	@Failure		500				{object}	error			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/products [get]
 func (app *application) listProductsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	pg := params.ParsePagination(r.URL.Query())
@@ -1149,6 +1166,18 @@ func (app *application) listProductsHandler(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// GetProductDetailBySlug godoc
+//
+//	@Summary		Get product detail by slug
+//	@Description	Returns product detail (product + related entities) by slug. Only active products are returned.
+//	@Tags			Store-Products
+//	@Produce		json
+//	@Param			slug	path		string			true	"Product slug"
+//	@Success		200		{object}	map[string]any	"product detail"
+//	@Failure		400		{object}	error			"Bad Request: slug is required"
+//	@Failure		404		{object}	error			"Product not found (missing or inactive)"
+//	@Failure		500		{object}	error			"Internal Server Error"
+//	@Router			/store/products/slug/{slug} [get]
 func (app *application) getProductDetailHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	slug := chi.URLParam(r, "slug")
@@ -1228,6 +1257,115 @@ func (app *application) createProductHandler(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Location", fmt.Sprintf("/v1/store/admin/products/%d", created.ID))
 	app.jsonResponse(w, http.StatusCreated, created)
+}
+
+// PATCH /v1/store/admin/products/{productID}
+func (app *application) updateProductHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+
+	// 1) Read productID from route
+	// If you already have a helper like app.readIDParam(r), use that instead.
+	idStr := chi.URLParam(r, "productID")
+	productID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || productID <= 0 {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
+	// 2) Decode patch input
+	// Using **T lets us distinguish:
+	// - field missing   => nil
+	// - field present null => &nil  (clear it)
+	// - field present value => &value
+	var in struct {
+		Name        *string  `json:"name"`
+		Slug        *string  `json:"slug"`
+		Description **string `json:"description"`
+		CategoryID  **int64  `json:"category_id"`
+		BrandID     **int64  `json:"brand_id"`
+		IsActive    *bool    `json:"is_active"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// 3) Load existing product (so we can patch it)
+	existing, err := app.store.Products.GetProductByID(ctx, productID)
+	if err != nil {
+		// Adjust to your DAL error (e.g., products.ErrNotFound / store.ErrRecordNotFound)
+		if errors.Is(err, sql.ErrNoRows) {
+			app.notFoundResponse(w, r, err)
+			return
+		}
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 4) Apply changes + validate
+	if in.Name != nil {
+		if strings.TrimSpace(*in.Name) == "" {
+			app.badRequestResponse(w, r, fmt.Errorf("name required"))
+			return
+		}
+		existing.Name = *in.Name
+	}
+
+	if in.Slug != nil {
+		// If slug is explicitly provided but blank, auto-generate from current name.
+		s := strings.TrimSpace(*in.Slug)
+		if s == "" {
+			s = generateSlug(existing.Name)
+		}
+		if !isValidSlug(s) {
+			app.badRequestResponse(w, r, fmt.Errorf("invalid slug"))
+			return
+		}
+		existing.Slug = s
+	} else {
+		// No slug change requested, but ensure stored slug remains valid
+		// (optional safety; remove if you don’t want this).
+		if strings.TrimSpace(existing.Slug) == "" {
+			existing.Slug = generateSlug(existing.Name)
+		}
+		if !isValidSlug(existing.Slug) {
+			app.badRequestResponse(w, r, fmt.Errorf("invalid slug"))
+			return
+		}
+	}
+
+	// description: nullable
+	if in.Description != nil {
+		// *in.Description may be nil => clear description
+		existing.Description = *in.Description
+	}
+
+	// category_id: nullable
+	if in.CategoryID != nil {
+		existing.CategoryID = *in.CategoryID
+	}
+
+	// brand_id: nullable
+	if in.BrandID != nil {
+		existing.BrandID = *in.BrandID
+	}
+
+	// is_active (optional)
+	if in.IsActive != nil {
+		existing.IsActive = *in.IsActive
+	}
+
+	// 5) Persist via your DAL
+	updated, err := app.store.Products.UpdateProduct(ctx, existing)
+	if err != nil {
+		// If you enforce unique slug, you may want to translate that to 409/422 here.
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 6) Respond
+	app.jsonResponse(w, http.StatusOK, updated)
 }
 
 func (app *application) publishProductHandler(w http.ResponseWriter, r *http.Request) {

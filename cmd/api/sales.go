@@ -482,6 +482,7 @@ func (app *application) checkoutHandler(w http.ResponseWriter, r *http.Request) 
 			}
 			payID = &p.ID
 
+			//in the order table migration primary_payment_id is added later so its sure it exist
 			if err := s.Payments.SetPrimaryToOrder(ctx, order.ID, p.ID); err != nil {
 				return err
 			}
@@ -501,10 +502,9 @@ func (app *application) checkoutHandler(w http.ResponseWriter, r *http.Request) 
 		resp, gerr := app.payments.InitiatePayment(ctx, method, payments.PaymentRequest{
 			Amount:        float64(cartView.TotalCents) / 100.0,
 			TransactionID: fmt.Sprintf("%d", *payID), // your internal payment id
-			ProductName:   fmt.Sprintf("Order #%d", orderID),
+			ProductName:   fmt.Sprintf("Order #2K8H4E6L%d", orderID),
 			CustomerName:  ship.Name,
 			CustomerPhone: ship.Phone,
-			// CustomerEmail: "...",
 		})
 		_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, *payID, "response", resp.Data)
 		if gerr != nil {

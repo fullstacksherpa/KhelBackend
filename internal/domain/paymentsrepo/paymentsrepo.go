@@ -19,7 +19,13 @@ func NewRepository(q dbx.Querier) *Repository { return &Repository{q: q} }
 func (r *Repository) Create(ctx context.Context, p *Payment) (*Payment, error) {
 	if err := r.q.QueryRow(ctx, `
 		INSERT INTO payments (order_id, provider, amount_cents, currency, status)
-		VALUES ($1,$2,$3,COALESCE($4,'NPR'),COALESCE($5,'pending'))
+		VALUES (
+			$1,
+			$2,
+			$3,
+			COALESCE($4,'NPR'),
+			COALESCE($5,'pending')::payment_status
+		)
 		RETURNING id, created_at, updated_at
 	`, p.OrderID, p.Provider, p.AmountCents, p.Currency, p.Status).
 		Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt); err != nil {
@@ -84,11 +90,15 @@ func (r *Repository) SetPrimaryToOrder(ctx context.Context, orderID, paymentID i
 
 func (r *Repository) MarkPaid(ctx context.Context, paymentID int64) error {
 	_, err := r.q.Exec(ctx, `
-		UPDATE payments 
-		   SET status='paid', updated_at=now() 
+		UPDATE payments
+		   SET status='paid'::payment_status, updated_at=now()
 		 WHERE id=$1;
-		UPDATE orders 
-		   SET payment_status='paid', status='processing', paid_at=now(), updated_at=now()
+
+		UPDATE orders
+		   SET payment_status='paid'::payment_status,
+		       status='processing'::order_status,
+		       paid_at=now(),
+		       updated_at=now()
 		 WHERE id=(SELECT order_id FROM payments WHERE id=$1);
 	`, paymentID)
 	return err
@@ -96,7 +106,9 @@ func (r *Repository) MarkPaid(ctx context.Context, paymentID int64) error {
 
 func (r *Repository) SetStatus(ctx context.Context, paymentID int64, status string) error {
 	_, err := r.q.Exec(ctx, `
-		UPDATE payments SET status=$2, updated_at=now() WHERE id=$1
+		UPDATE payments
+		   SET status=$2::payment_status, updated_at=now()
+		 WHERE id=$1
 	`, paymentID, status)
 	return err
 }

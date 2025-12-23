@@ -6,6 +6,7 @@ import (
 	"khel/internal/params"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -36,11 +37,24 @@ func (app *application) getVariantHandler(w http.ResponseWriter, r *http.Request
 // List all variants for a given product (user)
 func (app *application) listVariantsByProductHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
 	productIDStr := chi.URLParam(r, "product_id")
 	productID, err := strconv.ParseInt(productIDStr, 10, 64)
 	if err != nil {
 		app.badRequestResponse(w, r, fmt.Errorf("invalid product id"))
 		return
+	}
+
+	// ✅ query param: include_inactive=true to return ALL variants (admin use)
+	includeInactive := false
+	if v := strings.TrimSpace(r.URL.Query().Get("include_inactive")); v != "" {
+		// accepts: true/false/1/0
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			app.badRequestResponse(w, r, fmt.Errorf("invalid include_inactive"))
+			return
+		}
+		includeInactive = b
 	}
 
 	variants, err := app.store.Products.ListVariantsByProduct(ctx, productID)
@@ -49,11 +63,15 @@ func (app *application) listVariantsByProductHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	// filter only active variants for customers
-	var filtered []*products.ProductVariant
-	for _, v := range variants {
-		if v.IsActive {
-			filtered = append(filtered, v)
+	// default: filter only active variants for customers
+	filtered := make([]*products.ProductVariant, 0, len(variants))
+	if includeInactive {
+		filtered = variants
+	} else {
+		for _, v := range variants {
+			if v.IsActive {
+				filtered = append(filtered, v)
+			}
 		}
 	}
 

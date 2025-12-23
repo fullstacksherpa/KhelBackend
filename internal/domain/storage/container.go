@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"khel/internal/domain/accesscontrol"
 	"khel/internal/domain/ads"
 	"khel/internal/domain/appreviews"
@@ -48,6 +49,7 @@ type Container struct {
 
 func NewContainer(db *pgxpool.Pool) *Container {
 	return &Container{
+		pool:          db,
 		Users:         users.NewRepository(db),
 		Venues:        venues.NewRepository(db),
 		VenuesReviews: venuereviews.NewRepository(db),
@@ -79,19 +81,29 @@ type SalesTx struct {
 
 // WithSalesTx runs a sales unit-of-work atomically.
 func (c *Container) WithSalesTx(ctx context.Context, fn func(s *SalesTx) error) error {
+	if c.pool == nil {
+		return fmt.Errorf("storage container pool is nil (did you forget to set pool in NewContainer?)")
+	}
+
 	tx, err := c.pool.BeginTx(ctx, pgx.TxOptions{})
-	defer tx.Rollback(ctx)
 	if err != nil {
 		return err
 	}
+
+	defer func() {
+		_ = tx.Rollback(ctx) // safe even if already committed
+	}()
+
 	s := &SalesTx{
 		Carts:    carts.NewRepository(tx),
 		Orders:   orders.NewRepository(tx),
 		Payments: paymentsrepo.NewRepository(tx),
 		PayLogs:  paymentsrepo.NewLogsRepository(tx),
 	}
+
 	if err := fn(s); err != nil {
 		return err
 	}
+
 	return tx.Commit(ctx)
 }

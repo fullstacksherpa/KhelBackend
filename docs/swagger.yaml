@@ -3087,6 +3087,42 @@ paths:
       summary: Get category tree
       tags:
       - Store-Categories
+  /store/products:
+    get:
+      description: Returns a paginated list of product cards for the admin panel.
+        Supports optional filtering by category slug.
+      parameters:
+      - description: Filter products by category slug
+        in: query
+        name: category_slug
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 15)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: products list with pagination and applied filters
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List products (admin)
+      tags:
+      - Store-Admin-Products
   /store/products/{productID}:
     get:
       description: Returns a single product by its ID.
@@ -3114,6 +3150,36 @@ paths:
           description: Internal Server Error
           schema: {}
       summary: Get product by ID
+      tags:
+      - Store-Products
+  /store/products/slug/{slug}:
+    get:
+      description: Returns product detail (product + related entities) by slug. Only
+        active products are returned.
+      parameters:
+      - description: Product slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: product detail
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: slug is required'
+          schema: {}
+        "404":
+          description: Product not found (missing or inactive)
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get product detail by slug
       tags:
       - Store-Products
   /users:
