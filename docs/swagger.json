@@ -2719,6 +2719,326 @@
                 }
             }
         },
+        "/store/admin/orders": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List all orders for the admin dashboard. Supports optional status filter and pagination.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin-Orders"
+                ],
+                "summary": "List orders (admin)",
+                "parameters": [
+                    {
+                        "enum": [
+                            "pending",
+                            "processing",
+                            "shipped",
+                            "delivered",
+                            "cancelled",
+                            "refunded"
+                        ],
+                        "type": "string",
+                        "description": "Filter by status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 15, max: 30)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/main.envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/main.AdminOrderListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/admin/orders/{orderID}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get a single order with its line items for the admin dashboard.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin-Orders"
+                ],
+                "summary": "Get order detail (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Order ID",
+                        "name": "orderID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/main.envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/main.AdminOrderDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid orderID",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found: order not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/admin/orders/{orderID}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update an order's status. If status is cancelled, cancelled_reason may be provided and cancelled_at is set.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin-Orders"
+                ],
+                "summary": "Update order status (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Order ID",
+                        "name": "orderID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Status update payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.AdminUpdateOrderStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/main.envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/main.AdminUpdateOrderStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid payload/status",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found: order not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns paginated users. Optional role filter (?role=admin|owner|customer|merchant). Includes each user's roles.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin-Users"
+                ],
+                "summary": "List users (admin)",
+                "parameters": [
+                    {
+                        "enum": [
+                            "admin",
+                            "owner",
+                            "customer",
+                            "merchant"
+                        ],
+                        "type": "string",
+                        "description": "Filter by role",
+                        "name": "role",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 15)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "users list with pagination and filters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/admin/users/{userID}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a user profile + aggregated stats + up to 5 recent items per section (orders, bookings, upcoming games).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin-Users"
+                ],
+                "summary": "Get user overview (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Envelope: { data: { user, stats, recent } }",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid userID",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found: user not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/store/brands": {
             "get": {
                 "description": "Returns a paginated list of brands.",
@@ -4019,6 +4339,80 @@
                                 "$ref": "#/definitions/main.VenueListResponse"
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/venues/search": {
+            "get": {
+                "description": "Search active venues by name or sport using partial (ILIKE + trigram) matching.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Search venues (basic)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query (venue name or sport)",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response with matching venues",
+                        "schema": {
+                            "$ref": "#/definitions/main.VenueSearchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Missing or empty search query",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/search/fts": {
+            "get": {
+                "description": "Perform full-text search on active venues using weighted ranking on name and sport.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue"
+                ],
+                "summary": "Search venues (full text)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query (ranked full-text search)",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response with ranked venue results",
+                        "schema": {
+                            "$ref": "#/definitions/main.VenueSearchFTSResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: Missing or empty search query",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
                     }
                 }
             }
@@ -5928,6 +6322,64 @@
                 }
             }
         },
+        "main.AdminOrderDetailResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/orders.OrderItem"
+                    }
+                },
+                "order": {
+                    "$ref": "#/definitions/orders.Order"
+                }
+            }
+        },
+        "main.AdminOrderListResponse": {
+            "type": "object",
+            "properties": {
+                "orders": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/orders.Order"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/params.Pagination"
+                },
+                "status": {
+                    "description": "applied filter (echoed back)",
+                    "type": "string"
+                }
+            }
+        },
+        "main.AdminUpdateOrderStatusRequest": {
+            "type": "object",
+            "properties": {
+                "cancelled_reason": {
+                    "type": "string",
+                    "example": "Customer requested"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "shipped"
+                }
+            }
+        },
+        "main.AdminUpdateOrderStatusResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "status updated"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "shipped"
+                }
+            }
+        },
         "main.AppReviewPayload": {
             "type": "object",
             "properties": {
@@ -6657,6 +7109,50 @@
                 }
             }
         },
+        "main.VenueSearchFTSResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string"
+                        },
+                        "search_type": {
+                            "type": "string"
+                        },
+                        "venues": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/venues.VenueListingWithRank"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "main.VenueSearchResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string"
+                        },
+                        "search_type": {
+                            "type": "string"
+                        },
+                        "venues": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/venues.VenueListing"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "main.assignRoleRequest": {
             "type": "object",
             "properties": {
@@ -6699,6 +7195,12 @@
                 }
             }
         },
+        "main.envelope": {
+            "type": "object",
+            "properties": {
+                "data": {}
+            }
+        },
         "main.isOwnerResponse": {
             "type": "object",
             "properties": {
@@ -6710,6 +7212,114 @@
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "orders.Order": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "discount_cents": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "order_number": {
+                    "type": "string"
+                },
+                "paid_at": {
+                    "type": "string"
+                },
+                "payment_method": {
+                    "type": "string"
+                },
+                "payment_status": {
+                    "type": "string"
+                },
+                "shipping_cents": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "subtotal_cents": {
+                    "type": "integer"
+                },
+                "tax_cents": {
+                    "type": "integer"
+                },
+                "total_cents": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "orders.OrderItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "product_variant_id": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "total_price_cents": {
+                    "type": "integer"
+                },
+                "unit_price_cents": {
+                    "type": "integer"
+                },
+                "variant_attributes": {
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
+        "params.Pagination": {
+            "type": "object",
+            "properties": {
+                "has_next": {
+                    "type": "boolean"
+                },
+                "has_prev": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "description": "items per page",
+                    "type": "integer"
+                },
+                "offset": {
+                    "description": "SQL OFFSET value",
+                    "type": "integer"
+                },
+                "page": {
+                    "description": "Current Page number",
+                    "type": "integer"
+                },
+                "total": {
+                    "description": "Total item in database",
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "description": "Total pages available",
+                    "type": "integer"
                 }
             }
         },
@@ -6910,6 +7520,91 @@
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "venues.VenueListing": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "averageRating": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "imageURLs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "openTime": {
+                    "type": "string"
+                },
+                "phoneNumber": {
+                    "type": "string"
+                },
+                "sport": {
+                    "type": "string"
+                },
+                "totalReviews": {
+                    "type": "integer"
+                }
+            }
+        },
+        "venues.VenueListingWithRank": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "averageRating": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "imageURLs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "openTime": {
+                    "type": "string"
+                },
+                "phoneNumber": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "number"
+                },
+                "sport": {
+                    "type": "string"
+                },
+                "totalReviews": {
+                    "type": "integer"
                 }
             }
         }

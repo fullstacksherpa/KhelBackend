@@ -71,8 +71,8 @@ type Store interface {
 	GetProductDetailBySlug(ctx context.Context, slug string) (*ProductDetail, error)
 	ListAdminProductCards(ctx context.Context, limit, offset int) ([]*ProductCard, int, error)
 
-	SearchProducts(ctx context.Context, query string, limit, offset int) ([]*Product, int, error)
-	FullTextSearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductWithRank, int, error)
+	FullTextSearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductCardWithRank, int, error)
+	SearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductCard, int, error)
 
 	// Variants
 	CreateVariant(ctx context.Context, v *ProductVariant) (*ProductVariant, error)
@@ -1710,7 +1710,7 @@ func (r *Repository) ListAdminProductCards(ctx context.Context, limit, offset in
 	return out, total, nil
 }
 
-func (r *Repository) SearchProducts(ctx context.Context, query string, limit, offset int) ([]*Product, int, error) {
+func (r *Repository) SearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductCard, int, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -1719,41 +1719,88 @@ func (r *Repository) SearchProducts(ctx context.Context, query string, limit, of
 	}
 
 	q := `
-SELECT id, name, slug, description, category_id, brand_id, is_active, created_at, updated_at,
-       COUNT(*) OVER() AS total
-FROM products
-WHERE is_active = true
-  AND (name ILIKE '%' || $1 || '%' OR description ILIKE '%' || $1 || '%')
-ORDER BY id DESC
+SELECT
+  p.id, p.name, p.slug, p.description,
+  p.category_id, NULL::text AS category_name,
+  p.brand_id, NULL::text AS brand_name,
+  p.is_active, p.created_at, p.updated_at,
+  NULL::bigint AS min_price_cents,
+  img.url AS primary_image_url,
+  COUNT(*) OVER() AS total
+FROM products p
+LEFT JOIN LATERAL (
+  SELECT i.url
+  FROM product_images i
+  WHERE i.product_id = p.id
+  ORDER BY i.is_primary DESC, i.sort_order ASC, i.id ASC
+  LIMIT 1
+) img ON true
+WHERE p.is_active = true
+  AND (
+    p.name ILIKE '%' || $1 || '%'
+    OR COALESCE(p.description, '') ILIKE '%' || $1 || '%'
+  )
+ORDER BY p.id DESC
 LIMIT $2 OFFSET $3;
 `
+
 	rows, err := r.db.Query(ctx, q, query, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("search products: %w", err)
 	}
 	defer rows.Close()
 
-	var products []*Product
-	var total int
+	out := make([]*ProductCard, 0, limit)
+	total := 0
+
 	for rows.Next() {
-		var p Product
-		var t int
+		var (
+			pc         ProductCard
+			t          int
+			desc       sql.NullString
+			catName    sql.NullString
+			brandName  sql.NullString
+			primaryURL sql.NullString
+			minPrice   sql.NullInt64
+		)
+
 		if err := rows.Scan(
-			&p.ID, &p.Name, &p.Slug, &p.Description, &p.CategoryID, &p.BrandID, &p.IsActive,
-			&p.CreatedAt, &p.UpdatedAt, &t,
+			&pc.ID, &pc.Name, &pc.Slug, &desc,
+			&pc.CategoryID, &catName,
+			&pc.BrandID, &brandName,
+			&pc.IsActive, &pc.CreatedAt, &pc.UpdatedAt,
+			&minPrice,
+			&primaryURL,
+			&t,
 		); err != nil {
-			return nil, 0, fmt.Errorf("scan: %w", err)
+			return nil, 0, fmt.Errorf("scan search product card: %w", err)
 		}
+
 		if total == 0 {
 			total = t
 		}
-		products = append(products, &p)
+
+		if desc.Valid {
+			s := desc.String
+			pc.Description = &s
+		}
+		if primaryURL.Valid {
+			s := primaryURL.String
+			pc.PrimaryImageURL = &s
+		}
+
+		// optional: if you want brand/category names in search too, join like ListProductCards
+		out = append(out, &pc)
 	}
 
-	return products, total, nil
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("rows: %w", err)
+	}
+
+	return out, total, nil
 }
 
-func (r *Repository) FullTextSearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductWithRank, int, error) {
+func (r *Repository) FullTextSearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductCardWithRank, int, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -1764,40 +1811,86 @@ func (r *Repository) FullTextSearchProducts(ctx context.Context, query string, l
 	q := `
 WITH ranked AS (
   SELECT
-    id, name, slug, description, category_id, brand_id, is_active,
-    created_at, updated_at,
-    ts_rank_cd(fts, plainto_tsquery('english', $1)) AS rank
-  FROM products
-  WHERE fts @@ plainto_tsquery('english', $1)
+    p.id, p.name, p.slug, p.description,
+    p.category_id, p.brand_id, p.is_active,
+    p.created_at, p.updated_at,
+    ts_rank_cd(p.fts, plainto_tsquery('english', $1)) AS rank
+  FROM products p
+  WHERE p.fts @@ plainto_tsquery('english', $1)
 )
-SELECT *,
-       COUNT(*) OVER() AS total
-FROM ranked
-ORDER BY rank DESC
+SELECT
+  r.id, r.name, r.slug, r.description,
+  r.category_id, NULL::text AS category_name,
+  r.brand_id, NULL::text AS brand_name,
+  r.is_active, r.created_at, r.updated_at,
+  NULL::bigint AS min_price_cents,
+  img.url AS primary_image_url,
+  r.rank,
+  COUNT(*) OVER() AS total
+FROM ranked r
+LEFT JOIN LATERAL (
+  SELECT i.url
+  FROM product_images i
+  WHERE i.product_id = r.id
+  ORDER BY i.is_primary DESC, i.sort_order ASC, i.id ASC
+  LIMIT 1
+) img ON true
+ORDER BY r.rank DESC
 LIMIT $2 OFFSET $3;
 `
+
 	rows, err := r.db.Query(ctx, q, query, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("fts search products: %w", err)
 	}
 	defer rows.Close()
 
-	var list []*ProductWithRank
-	var total int
+	out := make([]*ProductCardWithRank, 0, limit)
+	total := 0
+
 	for rows.Next() {
-		var p ProductWithRank
-		var t int
+		var (
+			row        ProductCardWithRank
+			t          int
+			desc       sql.NullString
+			catName    sql.NullString
+			brandName  sql.NullString
+			primaryURL sql.NullString
+			minPrice   sql.NullInt64
+		)
+
 		if err := rows.Scan(
-			&p.ID, &p.Name, &p.Slug, &p.Description,
-			&p.CategoryID, &p.BrandID, &p.IsActive,
-			&p.CreatedAt, &p.UpdatedAt, &p.Rank, &t,
+			&row.ID, &row.Name, &row.Slug, &desc,
+			&row.CategoryID, &catName,
+			&row.BrandID, &brandName,
+			&row.IsActive, &row.CreatedAt, &row.UpdatedAt,
+			&minPrice,
+			&primaryURL,
+			&row.Rank,
+			&t,
 		); err != nil {
-			return nil, 0, fmt.Errorf("scan: %w", err)
+			return nil, 0, fmt.Errorf("scan fts product card: %w", err)
 		}
+
 		if total == 0 {
 			total = t
 		}
-		list = append(list, &p)
+
+		if desc.Valid {
+			s := desc.String
+			row.Description = &s
+		}
+		if primaryURL.Valid {
+			s := primaryURL.String
+			row.PrimaryImageURL = &s
+		}
+
+		out = append(out, &row)
 	}
-	return list, total, nil
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("rows: %w", err)
+	}
+
+	return out, total, nil
 }

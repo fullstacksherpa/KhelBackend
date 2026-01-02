@@ -127,6 +127,8 @@ func (app *application) mount() http.Handler {
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/venue/{id}", app.getVenueDetailHandler)
+		r.Get("/venues/search", app.searchVenuesHandler)
+		r.Get("/venues/search/fts", app.fullTextSearchVenuesHandler)
 		r.Get("/health", app.healthCheckHandler)
 		docsURL := fmt.Sprintf("%s/v1/swagger/doc.json", app.config.addr)
 		r.With(app.BasicAuthMiddleware()).Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
@@ -294,6 +296,8 @@ func (app *application) mount() http.Handler {
 		r.Route("/store/admin", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
 			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
+			r.Get("/users", app.adminListUsersHandler)
+			r.Get("/users/{userID}", app.AdminUserOverviewHandler)
 			r.Post("/brands", app.createBrandHandler)
 			r.Patch("/brands/{brandID}", app.updateBrandHandler)
 			r.Delete("/brands/{brandID}", app.deleteBrandHandler)

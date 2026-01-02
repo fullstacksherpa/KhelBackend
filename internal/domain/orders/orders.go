@@ -1,9 +1,10 @@
-// internal/domain/orders/repo.go
 package orders
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"khel/internal/infra/dbx"
 	"time"
@@ -234,7 +235,7 @@ ORDER BY id ASC`, orderID)
 	return items, nil
 }
 
-// ListAll: admin – optional filter by status, with pagination
+// ListAll: admin – optional filter by status, with pagination,default limit is 30
 func (r *Repository) ListAll(ctx context.Context, status string, limit, offset int) ([]Order, int, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 30
@@ -297,19 +298,27 @@ LIMIT $%d OFFSET $%d`, where, arg, arg+1)
 
 func (r *Repository) GetDetail(ctx context.Context, orderID int64) (*OrderDetail, error) {
 	var o Order
+
 	err := r.q.QueryRow(ctx, `
 SELECT id,user_id,order_number,status,payment_status,payment_method,paid_at,
        subtotal_cents,discount_cents,tax_cents,shipping_cents,total_cents,created_at
-FROM orders WHERE id=$1`, orderID).
-		Scan(&o.ID, &o.UserID, &o.OrderNumber, &o.Status, &o.PaymentStatus, &o.PaymentMethod, &o.PaidAt,
-			&o.SubtotalCents, &o.DiscountCents, &o.TaxCents, &o.ShippingCents, &o.TotalCents, &o.CreatedAt)
+FROM orders
+WHERE id=$1
+`, orderID).Scan(
+		&o.ID, &o.UserID, &o.OrderNumber, &o.Status, &o.PaymentStatus, &o.PaymentMethod, &o.PaidAt,
+		&o.SubtotalCents, &o.DiscountCents, &o.TaxCents, &o.ShippingCents, &o.TotalCents, &o.CreatedAt,
+	)
+
 	if err != nil {
-		return nil, fmt.Errorf("order not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("order not found")
+		}
+		return nil, fmt.Errorf("get order detail: %w", err)
 	}
 
 	items, err := r.loadItems(ctx, orderID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load order items: %w", err)
 	}
 
 	return &OrderDetail{Order: o, Items: items}, nil

@@ -102,6 +102,11 @@ type ProductDetail struct {
 	Images   []*ProductImage   `json:"images"`
 }
 
+type ProductCardWithRank struct {
+	ProductCard
+	Rank float64 `json:"rank"`
+}
+
 type ProductWithRank struct {
 	Product
 	Rank float64 `json:"rank"`

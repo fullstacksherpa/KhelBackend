@@ -4,9 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"khel/internal/domain/accesscontrol"
+	"khel/internal/domain/adminview"
+	"khel/internal/domain/bookings"
 	"khel/internal/domain/users"
+	"khel/internal/helpers"
+	"khel/internal/params"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
@@ -500,4 +506,167 @@ func (app *application) deleteUserAccountHandler(w http.ResponseWriter, r *http.
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListUsers (admin) godoc
+//
+//	@Summary		List users (admin)
+//	@Description	Returns paginated users. Optional role filter (?role=admin|owner|customer|merchant). Includes each user's roles.
+//	@Tags			Store-Admin-Users
+//	@Produce		json
+//	@Param			role	query		string			false	"Filter by role"	Enums(admin, owner, customer, merchant)
+//	@Param			page	query		int				false	"Page number (default: 1)"
+//	@Param			limit	query		int				false	"Items per page (default: 15)"
+//	@Success		200		{object}	map[string]any	"users list with pagination and filters"
+//	@Failure		401		{object}	error			"Unauthorized"
+//	@Failure		403		{object}	error			"Forbidden"
+//	@Failure		500		{object}	error			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/admin/users [get]
+func (app *application) adminListUsersHandler(w http.ResponseWriter, r *http.Request) {
+	current := getUserFromContext(r)
+	if current == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+
+	pg := params.ParsePagination(r.URL.Query())
+	role := strings.TrimSpace(r.URL.Query().Get("role"))
+
+	if role != "" {
+		valid := map[string]bool{
+			string(accesscontrol.RoleAdmin):    true,
+			string(accesscontrol.RoleOwner):    true,
+			string(accesscontrol.RoleCustomer): true,
+			string(accesscontrol.RoleMerchant): true,
+		}
+		if !valid[role] {
+			app.badRequestResponse(w, r, fmt.Errorf("invalid role filter: %s", role))
+			return
+		}
+	}
+
+	items, total, err := app.store.Users.ListAdminUsers(ctx, users.AdminListUsersFilters{Role: role}, pg.Limit, pg.Offset)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+	pg.ComputeMeta(total)
+
+	app.jsonResponse(w, http.StatusOK, map[string]any{
+		"users":      items,
+		"pagination": pg,
+		"filters": map[string]any{
+			"role": role,
+		},
+	})
+}
+
+// AdminUserOverviewHandler godoc
+//
+//	@Summary		Get user overview (admin)
+//	@Description	Returns a user profile + aggregated stats + up to 5 recent items per section (orders, bookings, upcoming games).
+//	@Tags			Store-Admin-Users
+//	@Produce		json
+//	@Param			userID	path		int64			true	"User ID"
+//	@Success		200		{object}	map[string]any	"Envelope: { data: { user, stats, recent } }"
+//	@Failure		400		{object}	error			"Bad Request: invalid userID"
+//	@Failure		401		{object}	error			"Unauthorized"
+//	@Failure		403		{object}	error			"Forbidden"
+//	@Failure		404		{object}	error			"Not Found: user not found"
+//	@Failure		500		{object}	error			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/admin/users/{userID} [get]
+func (app *application) AdminUserOverviewHandler(w http.ResponseWriter, r *http.Request) {
+	current := getUserFromContext(r)
+	if current == nil {
+		app.unauthorizedErrorResponse(w, r, errors.New("Not authorized"))
+		return
+	}
+
+	userID, err := strconv.ParseInt(chi.URLParam(r, "userID"), 10, 64)
+	if err != nil || userID <= 0 {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid userID"))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 9*time.Second)
+	defer cancel()
+
+	// 1) Load user
+	u, err := app.store.Users.GetByID(ctx, userID)
+	if err != nil {
+		// adapt to your actual error style
+		if strings.Contains(err.Error(), "not found") {
+			app.notFoundResponse(w, r, err)
+			return
+		}
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 2) Stats
+	stats, err := app.store.Users.GetAdminUserStats(ctx, userID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 3) Recent Orders (5)
+	recentOrders, _, err := app.store.Sales.Orders.ListByUser(ctx, userID, 5, 0)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 4) Recent Bookings (5)
+	recentBookings, err := app.store.Bookings.GetBookingsByUser(ctx, userID, bookings.BookingFilter{
+		Page:   1,
+		Limit:  5,
+		Status: nil,
+	})
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// 5) Upcoming Games (slice 5)
+	upcomingGames, err := app.store.Games.GetUpcomingGamesByUser(ctx, userID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+	if len(upcomingGames) > 5 {
+		upcomingGames = upcomingGames[:5]
+	}
+
+	// --- Map domain -> DTO (to avoid import cycles) ---
+	out := adminview.UserOverview{
+		User:  helpers.ToAdminUserDTO(*u),
+		Stats: helpers.ToAdminUserStatsDTO(*stats),
+		Recent: adminview.UserRecent{
+			Orders:   make([]adminview.OrderDTO, 0, len(recentOrders)),
+			Bookings: make([]adminview.BookingDTO, 0, len(recentBookings)),
+			Games:    make([]adminview.GameDTO, 0, len(upcomingGames)),
+		},
+	}
+
+	for _, o := range recentOrders {
+		out.Recent.Orders = append(out.Recent.Orders, helpers.ToOrderDTO(o))
+	}
+	for _, b := range recentBookings {
+		out.Recent.Bookings = append(out.Recent.Bookings, helpers.ToBookingDTO(b))
+	}
+	for _, g := range upcomingGames {
+		out.Recent.Games = append(out.Recent.Games, helpers.ToGameDTO(g))
+	}
+
+	// respond with your envelope
+	if err := app.jsonResponse(w, http.StatusOK, out); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
 }

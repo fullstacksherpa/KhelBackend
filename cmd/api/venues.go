@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -240,22 +241,22 @@ type VenueListResponse struct {
 	IsFavorite    bool      `json:"is_favorite"`
 }
 
-// @Summary		List venues
-// @Description	Get paginated list of venues with filters
-// @Tags			Venue
-// @Accept			json
-// @Produce		json
-// @Param			sport		query	string	false	"Filter by sport type"
-// @Param			lat			query	number	false	"Latitude for location filter"
-// @Param			lng			query	number	false	"Longitude for location filter"
-// @Param			distance	query	number	false	"Distance in meters from location"
-// @Param			page		query	int		false	"Page number"		default(1)
-// @Param			limit		query	int		false	"Items per page"	default(7)
-// @Success		200			{array}	VenueListResponse
+//	@Summary		List venues
+//	@Description	Get paginated list of venues with filters
+//	@Tags			Venue
+//	@Accept			json
+//	@Produce		json
+//	@Param			sport		query	string	false	"Filter by sport type"
+//	@Param			lat			query	number	false	"Latitude for location filter"
+//	@Param			lng			query	number	false	"Longitude for location filter"
+//	@Param			distance	query	number	false	"Distance in meters from location"
+//	@Param			page		query	int		false	"Page number"		default(1)
+//	@Param			limit		query	int		false	"Items per page"	default(7)
+//	@Success		200			{array}	VenueListResponse
 //
-// @Security		ApiKeyAuth
+//	@Security		ApiKeyAuth
 //
-// @Router			/venues/list-venues [get]
+//	@Router			/venues/list-venues [get]
 func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	q := r.URL.Query()
@@ -646,4 +647,88 @@ func (app *application) getVenueInfoHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	app.jsonResponse(w, http.StatusOK, venueInfo)
+}
+
+type VenueSearchResponse struct {
+	Data struct {
+		Venues     []venues.VenueListing `json:"venues"`
+		Query      string                `json:"query"`
+		SearchType string                `json:"search_type"`
+	} `json:"data"`
+}
+
+// searchVenuesHandler handles the GET /venues/search endpoint.
+//
+//	@Summary		Search venues (basic)
+//	@Description	Search active venues by name or sport using partial (ILIKE + trigram) matching.
+//	@Tags			Venue
+//	@Produce		json
+//	@Param			q	query		string				true	"Search query (venue name or sport)"
+//	@Success		200	{object}	VenueSearchResponse	"Successful response with matching venues"
+//	@Failure		400	{object}	error				"Bad Request: Missing or empty search query"
+//	@Failure		500	{object}	error				"Internal Server Error"
+//	@Router			/venues/search [get]
+func (app *application) searchVenuesHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		app.badRequestResponse(w, r, fmt.Errorf("search query is required"))
+		return
+	}
+
+	venues, err := app.store.Venues.SearchVenues(ctx, q)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusOK, map[string]any{
+		"venues":      venues,
+		"query":       q,
+		"search_type": "basic",
+	})
+}
+
+type VenueSearchFTSResponse struct {
+	Data struct {
+		Venues     []venues.VenueListingWithRank `json:"venues"`
+		Query      string                        `json:"query"`
+		SearchType string                        `json:"search_type"`
+	} `json:"data"`
+}
+
+// fullTextSearchVenuesHandler handles the GET /venues/search/fts endpoint.
+//
+//	@Summary		Search venues (full text)
+//	@Description	Perform full-text search on active venues using weighted ranking on name and sport.
+//	@Tags			Venue
+//	@Produce		json
+//	@Param			q	query		string					true	"Search query (ranked full-text search)"
+//	@Success		200	{object}	VenueSearchFTSResponse	"Successful response with ranked venue results"
+//	@Failure		400	{object}	error					"Bad Request: Missing or empty search query"
+//	@Failure		500	{object}	error					"Internal Server Error"
+//	@Router			/venues/search/fts [get]
+func (app *application) fullTextSearchVenuesHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		app.badRequestResponse(w, r, fmt.Errorf("search query is required"))
+		return
+	}
+
+	venues, err := app.store.Venues.FullTextSearchVenues(ctx, q)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	app.jsonResponse(w, http.StatusOK, map[string]any{
+		"venues":      venues,
+		"query":       q,
+		"search_type": "full_text",
+	})
 }

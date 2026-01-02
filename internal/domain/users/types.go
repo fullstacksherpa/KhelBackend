@@ -34,6 +34,38 @@ type User struct {
 	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
+type AdminUserRow struct {
+	ID                int64     `json:"id"`
+	FirstName         string    `json:"first_name"`
+	LastName          string    `json:"last_name"`
+	Email             string    `json:"email"`
+	Phone             string    `json:"phone"`
+	ProfilePictureURL *string   `json:"profile_picture_url,omitempty"`
+	SkillLevel        *string   `json:"skill_level,omitempty"`
+	NoOfGames         int       `json:"no_of_games"`
+	IsActive          bool      `json:"is_active"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	Roles             []string  `json:"roles"` // e.g. ["admin","customer"]
+}
+
+type AdminListUsersFilters struct {
+	Role string // optional: "admin" | "owner" | "customer" | "merchant"
+}
+
+// Pure DB row / domain struct (NO imports from other domains)
+type AdminUserStatsRow struct {
+	OrdersCount   int
+	BookingsCount int
+	GamesCount    int
+
+	TotalSpentCents int64
+
+	LastOrderAt   *time.Time
+	LastBookingAt *time.Time
+	LastGameAt    *time.Time
+}
+
 // Password struct to store plain text and hash
 type password struct {
 	text *string `json:"-"` // Hide plaintext password

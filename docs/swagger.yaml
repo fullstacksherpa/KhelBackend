@@ -423,6 +423,45 @@ definitions:
         description: Visibility (public or private)
         type: string
     type: object
+  main.AdminOrderDetailResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/orders.OrderItem'
+        type: array
+      order:
+        $ref: '#/definitions/orders.Order'
+    type: object
+  main.AdminOrderListResponse:
+    properties:
+      orders:
+        items:
+          $ref: '#/definitions/orders.Order'
+        type: array
+      pagination:
+        $ref: '#/definitions/params.Pagination'
+      status:
+        description: applied filter (echoed back)
+        type: string
+    type: object
+  main.AdminUpdateOrderStatusRequest:
+    properties:
+      cancelled_reason:
+        example: Customer requested
+        type: string
+      status:
+        example: shipped
+        type: string
+    type: object
+  main.AdminUpdateOrderStatusResponse:
+    properties:
+      message:
+        example: status updated
+        type: string
+      status:
+        example: shipped
+        type: string
+    type: object
   main.AppReviewPayload:
     properties:
       feedback:
@@ -925,6 +964,34 @@ definitions:
       total_reviews:
         type: integer
     type: object
+  main.VenueSearchFTSResponse:
+    properties:
+      data:
+        properties:
+          query:
+            type: string
+          search_type:
+            type: string
+          venues:
+            items:
+              $ref: '#/definitions/venues.VenueListingWithRank'
+            type: array
+        type: object
+    type: object
+  main.VenueSearchResponse:
+    properties:
+      data:
+        properties:
+          query:
+            type: string
+          search_type:
+            type: string
+          venues:
+            items:
+              $ref: '#/definitions/venues.VenueListing'
+            type: array
+        type: object
+    type: object
   main.assignRoleRequest:
     properties:
       role_id:
@@ -954,6 +1021,10 @@ definitions:
     - comment
     - rating
     type: object
+  main.envelope:
+    properties:
+      data: {}
+    type: object
   main.isOwnerResponse:
     properties:
       is_owner:
@@ -962,6 +1033,79 @@ definitions:
         items:
           type: integer
         type: array
+    type: object
+  orders.Order:
+    properties:
+      created_at:
+        type: string
+      discount_cents:
+        type: integer
+      id:
+        type: integer
+      order_number:
+        type: string
+      paid_at:
+        type: string
+      payment_method:
+        type: string
+      payment_status:
+        type: string
+      shipping_cents:
+        type: integer
+      status:
+        type: string
+      subtotal_cents:
+        type: integer
+      tax_cents:
+        type: integer
+      total_cents:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+  orders.OrderItem:
+    properties:
+      id:
+        type: integer
+      order_id:
+        type: integer
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      product_variant_id:
+        type: integer
+      quantity:
+        type: integer
+      total_price_cents:
+        type: integer
+      unit_price_cents:
+        type: integer
+      variant_attributes:
+        additionalProperties: {}
+        type: object
+    type: object
+  params.Pagination:
+    properties:
+      has_next:
+        type: boolean
+      has_prev:
+        type: boolean
+      limit:
+        description: items per page
+        type: integer
+      offset:
+        description: SQL OFFSET value
+        type: integer
+      page:
+        description: Current Page number
+        type: integer
+      total:
+        description: Total item in database
+        type: integer
+      total_pages:
+        description: Total pages available
+        type: integer
     type: object
   products.Category:
     properties:
@@ -1096,6 +1240,62 @@ definitions:
         type: string
       status:
         type: string
+    type: object
+  venues.VenueListing:
+    properties:
+      address:
+        type: string
+      averageRating:
+        type: number
+      id:
+        type: integer
+      imageURLs:
+        items:
+          type: string
+        type: array
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        type: string
+      openTime:
+        type: string
+      phoneNumber:
+        type: string
+      sport:
+        type: string
+      totalReviews:
+        type: integer
+    type: object
+  venues.VenueListingWithRank:
+    properties:
+      address:
+        type: string
+      averageRating:
+        type: number
+      id:
+        type: integer
+      imageURLs:
+        items:
+          type: string
+        type: array
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        type: string
+      openTime:
+        type: string
+      phoneNumber:
+        type: string
+      rank:
+        type: number
+      sport:
+        type: string
+      totalReviews:
+        type: integer
     type: object
 info:
   contact:
@@ -2913,6 +3113,214 @@ paths:
       summary: Update a category
       tags:
       - Store-Admin
+  /store/admin/orders:
+    get:
+      description: List all orders for the admin dashboard. Supports optional status
+        filter and pagination.
+      parameters:
+      - description: Filter by status
+        enum:
+        - pending
+        - processing
+        - shipped
+        - delivered
+        - cancelled
+        - refunded
+        in: query
+        name: status
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 15, max: 30)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/main.envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/main.AdminOrderListResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List orders (admin)
+      tags:
+      - Store-Admin-Orders
+  /store/admin/orders/{orderID}:
+    get:
+      description: Get a single order with its line items for the admin dashboard.
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/main.envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/main.AdminOrderDetailResponse'
+              type: object
+        "400":
+          description: 'Bad Request: invalid orderID'
+          schema: {}
+        "404":
+          description: 'Not Found: order not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get order detail (admin)
+      tags:
+      - Store-Admin-Orders
+  /store/admin/orders/{orderID}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Update an order's status. If status is cancelled, cancelled_reason
+        may be provided and cancelled_at is set.
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderID
+        required: true
+        type: integer
+      - description: Status update payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/main.AdminUpdateOrderStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/main.envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/main.AdminUpdateOrderStatusResponse'
+              type: object
+        "400":
+          description: 'Bad Request: invalid payload/status'
+          schema: {}
+        "404":
+          description: 'Not Found: order not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update order status (admin)
+      tags:
+      - Store-Admin-Orders
+  /store/admin/users:
+    get:
+      description: Returns paginated users. Optional role filter (?role=admin|owner|customer|merchant).
+        Includes each user's roles.
+      parameters:
+      - description: Filter by role
+        enum:
+        - admin
+        - owner
+        - customer
+        - merchant
+        in: query
+        name: role
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 15)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: users list with pagination and filters
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List users (admin)
+      tags:
+      - Store-Admin-Users
+  /store/admin/users/{userID}:
+    get:
+      description: Returns a user profile + aggregated stats + up to 5 recent items
+        per section (orders, bookings, upcoming games).
+      parameters:
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Envelope: { data: { user, stats, recent } }'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 'Bad Request: invalid userID'
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "404":
+          description: 'Not Found: user not found'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get user overview (admin)
+      tags:
+      - Store-Admin-Users
   /store/brands:
     get:
       description: Returns a paginated list of brands.
@@ -4654,6 +5062,58 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List venues
+      tags:
+      - Venue
+  /venues/search:
+    get:
+      description: Search active venues by name or sport using partial (ILIKE + trigram)
+        matching.
+      parameters:
+      - description: Search query (venue name or sport)
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response with matching venues
+          schema:
+            $ref: '#/definitions/main.VenueSearchResponse'
+        "400":
+          description: 'Bad Request: Missing or empty search query'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Search venues (basic)
+      tags:
+      - Venue
+  /venues/search/fts:
+    get:
+      description: Perform full-text search on active venues using weighted ranking
+        on name and sport.
+      parameters:
+      - description: Search query (ranked full-text search)
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response with ranked venue results
+          schema:
+            $ref: '#/definitions/main.VenueSearchFTSResponse'
+        "400":
+          description: 'Bad Request: Missing or empty search query'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Search venues (full text)
       tags:
       - Venue
 securityDefinitions:

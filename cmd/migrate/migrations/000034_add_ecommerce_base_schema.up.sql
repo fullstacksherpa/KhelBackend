@@ -188,7 +188,6 @@ CREATE TABLE IF NOT EXISTS orders (
   status order_status NOT NULL DEFAULT 'pending',
   payment_status payment_status NOT NULL DEFAULT 'pending',
   payment_method payment_method,
-  -- removed payment_gateway_id and payment_gateway_data: keep in payments table
   paid_at timestamptz,
   shipping_name TEXT NOT NULL,
   shipping_phone TEXT NOT NULL,

@@ -12,29 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Store interface {
-	Create(context.Context, *Venue) error
-	UpdateImageURLs(ctx context.Context, venueID int64, urls []string) error
-	Delete(ctx context.Context, venueID int64) error
-	Update(ctx context.Context, venueID int64, updateData map[string]interface{}) error
-	CheckIfVenueExists(context.Context, string, int64) (bool, error)
-	RemovePhotoURL(ctx context.Context, venueID int64, photoURL string) error
-	AddPhotoURL(ctx context.Context, venueID int64, photoURL string) error
-	IsOwner(ctx context.Context, venueID int64, userID int64) (bool, error)
-	GetVenueByID(ctx context.Context, venueID int64) (*Venue, error)
-	GetOwnedVenueIDs(ctx context.Context, userID int64) ([]int64, error)
-	List(ctx context.Context, filter VenueFilter) ([]VenueListing, error)
-	GetVenueDetail(ctx context.Context, venueID int64) (*VenueDetail, error)
-	GetImageURLs(ctx context.Context, venueID int64) ([]string, error)
-	GetVenueInfo(ctx context.Context, venueID int64) (*VenueInfo, error)
-	GetOwnerIDFromVenueID(ctx context.Context, venueID int64) (int64, error)
-	// ... favourite venues
-	AddFavorite(ctx context.Context, userID, venueID int64) error
-	RemoveFavorite(ctx context.Context, userID, venueID int64) error
-	GetFavoritesByUser(ctx context.Context, userID int64) ([]Venue, error)
-	GetFavoriteVenueIDsByUser(ctx context.Context, userID int64) (map[int64]struct{}, error)
-}
-
 type Repository struct {
 	db *pgxpool.Pool
 }
@@ -620,4 +597,174 @@ func (r *Repository) GetFavoriteVenueIDsByUser(ctx context.Context, userID int64
 		return nil, err
 	}
 	return favs, nil
+}
+
+// 8 is limit you can change from data access layer
+func (r *Repository) SearchVenues(ctx context.Context, query string) ([]VenueListing, error) {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return nil, fmt.Errorf("search query is required")
+	}
+
+	const limit = 8
+
+	sqlQuery := `
+	WITH venue_stats AS (
+		SELECT venue_id, COUNT(*) AS total_reviews, AVG(rating) AS average_rating
+		FROM reviews
+		GROUP BY venue_id
+	)
+	SELECT
+		v.id,
+		v.name,
+		v.address,
+		ST_X(v.location::geometry) AS longitude,
+		ST_Y(v.location::geometry) AS latitude,
+		v.image_urls,
+		v.open_time,
+		v.phone_number,
+		v.sport,
+		COALESCE(vs.total_reviews, 0) AS total_reviews,
+		COALESCE(vs.average_rating, 0) AS average_rating
+	FROM venues v
+	LEFT JOIN venue_stats vs ON v.id = vs.venue_id
+	WHERE v.status = 'active'
+	  AND (
+		v.name ILIKE '%' || $1 || '%'
+		OR v.sport ILIKE '%' || $1 || '%'
+	  )
+	ORDER BY v.id DESC
+	LIMIT $2;
+	`
+
+	rows, err := r.db.Query(ctx, sqlQuery, q, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search venues: %w", err)
+	}
+	defer rows.Close()
+
+	var out []VenueListing
+	for rows.Next() {
+		var v VenueListing
+		var openTime sql.NullString
+
+		if err := rows.Scan(
+			&v.ID,
+			&v.Name,
+			&v.Address,
+			&v.Longitude,
+			&v.Latitude,
+			&v.ImageURLs,
+			&openTime,
+			&v.PhoneNumber,
+			&v.Sport,
+			&v.TotalReviews,
+			&v.AverageRating,
+		); err != nil {
+			return nil, fmt.Errorf("scan venues: %w", err)
+		}
+
+		if openTime.Valid {
+			v.OpenTime = &openTime.String
+		}
+
+		out = append(out, v)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows venues: %w", err)
+	}
+
+	return out, nil
+}
+
+// 8 is limit you can change from data access layer
+func (r *Repository) FullTextSearchVenues(ctx context.Context, query string) ([]VenueListingWithRank, error) {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return nil, fmt.Errorf("search query is required")
+	}
+
+	const limit = 8
+
+	sqlQuery := `
+	WITH venue_stats AS (
+		SELECT venue_id, COUNT(*) AS total_reviews, AVG(rating) AS average_rating
+		FROM reviews
+		GROUP BY venue_id
+	),
+	ranked AS (
+		SELECT
+			v.id,
+			v.name,
+			v.address,
+			v.location,
+			v.image_urls,
+			v.open_time,
+			v.phone_number,
+			v.sport,
+			ts_rank_cd(v.fts, plainto_tsquery('english', $1)) AS rank
+		FROM venues v
+		WHERE v.status = 'active'
+		  AND v.fts @@ plainto_tsquery('english', $1)
+	)
+	SELECT
+		r.id,
+		r.name,
+		r.address,
+		ST_X(r.location::geometry) AS longitude,
+		ST_Y(r.location::geometry) AS latitude,
+		r.image_urls,
+		r.open_time,
+		r.phone_number,
+		r.sport,
+		COALESCE(vs.total_reviews, 0) AS total_reviews,
+		COALESCE(vs.average_rating, 0) AS average_rating,
+		r.rank
+	FROM ranked r
+	LEFT JOIN venue_stats vs ON r.id = vs.venue_id
+	ORDER BY r.rank DESC
+	LIMIT $2;
+	`
+
+	rows, err := r.db.Query(ctx, sqlQuery, q, limit)
+	if err != nil {
+		return nil, fmt.Errorf("fts search venues: %w", err)
+	}
+	defer rows.Close()
+
+	var out []VenueListingWithRank
+	for rows.Next() {
+		var v VenueListingWithRank
+		var openTime sql.NullString
+
+		if err := rows.Scan(
+			&v.ID,
+			&v.Name,
+			&v.Address,
+			&v.Longitude,
+			&v.Latitude,
+			&v.ImageURLs,
+			&openTime,
+			&v.PhoneNumber,
+			&v.Sport,
+			&v.TotalReviews,
+			&v.AverageRating,
+			&v.Rank,
+		); err != nil {
+			return nil, fmt.Errorf("scan venues fts: %w", err)
+		}
+
+		if openTime.Valid {
+			v.OpenTime = &openTime.String
+		}
+
+		out = append(out, v)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows venues fts: %w", err)
+	}
+
+	return out, nil
 }

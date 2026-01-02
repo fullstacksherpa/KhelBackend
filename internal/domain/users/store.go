@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"khel/internal/database"
 
@@ -33,6 +34,8 @@ type Store interface {
 	GetByResetToken(ctx context.Context, resetToken string) (*User, error)
 	Update(ctx context.Context, user *User) error
 	UpdateAndUpload(ctx context.Context, userID int64, updates map[string]interface{}, profilePictureURL string) error
+	ListAdminUsers(ctx context.Context, filters AdminListUsersFilters, limit, offset int) ([]AdminUserRow, int, error)
+	GetAdminUserStats(ctx context.Context, userID int64) (*AdminUserStatsRow, error)
 }
 
 type Repository struct {
@@ -41,6 +44,44 @@ type Repository struct {
 
 func NewRepository(db *pgxpool.Pool) Store {
 	return &Repository{db: db}
+}
+
+func (r *Repository) GetAdminUserStats(ctx context.Context, userID int64) (*AdminUserStatsRow, error) {
+	var s AdminUserStatsRow
+
+	err := r.db.QueryRow(ctx, `
+SELECT
+  (SELECT COUNT(*) FROM orders   WHERE user_id = $1) AS orders_count,
+  (SELECT COUNT(*) FROM bookings WHERE user_id = $1) AS bookings_count,
+  (SELECT COUNT(*) FROM game_players WHERE user_id = $1) AS games_count,
+
+  (SELECT COALESCE(SUM(total_cents),0)
+   FROM orders
+   WHERE user_id = $1 AND payment_status = 'paid') AS total_spent_cents,
+
+  (SELECT MAX(created_at) FROM orders   WHERE user_id = $1) AS last_order_at,
+  (SELECT MAX(created_at) FROM bookings WHERE user_id = $1) AS last_booking_at,
+
+  -- last_game_at: latest game start_time the user is in
+  (SELECT MAX(g.start_time)
+   FROM game_players gp
+   JOIN games g ON g.id = gp.game_id
+   WHERE gp.user_id = $1) AS last_game_at
+`, userID).Scan(
+		&s.OrdersCount,
+		&s.BookingsCount,
+		&s.GamesCount,
+		&s.TotalSpentCents,
+		&s.LastOrderAt,
+		&s.LastBookingAt,
+		&s.LastGameAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("admin user stats: %w", err)
+	}
+
+	return &s, nil
 }
 
 func (r *Repository) Create(ctx context.Context, tx pgx.Tx, user *User) error {
@@ -147,9 +188,21 @@ func isValidField(field string) bool {
 
 func (r *Repository) GetByID(ctx context.Context, userID int64) (*User, error) {
 	query := `
-	   SELECT users.id, first_name, last_name, email, phone,  password, profile_picture_url, skill_level, created_at, no_of_games
-	   FROM users
-	   WHERE users.id = $1
+		SELECT
+			id,
+			first_name,
+			last_name,
+			email,
+			phone,
+			password,
+			profile_picture_url,
+			skill_level,
+			no_of_games,
+			is_active,
+			created_at,
+			updated_at
+		FROM users
+		WHERE id = $1
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
@@ -166,17 +219,18 @@ func (r *Repository) GetByID(ctx context.Context, userID int64) (*User, error) {
 		&user.Password.hash,
 		&user.ProfilePictureURL,
 		&user.SkillLevel,
-		&user.CreatedAt,
 		&user.NoOfGames,
+		&user.IsActive,
+		&user.CreatedAt,
+		&user.UpdatedAt,
 	)
 	if err != nil {
-		switch err {
-		case sql.ErrNoRows:
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
-		default:
-			return nil, err
 		}
+		return nil, err
 	}
+
 	return user, nil
 }
 
@@ -515,4 +569,102 @@ func (r *Repository) UpdateAndUpload(ctx context.Context, userID int64, updates 
 
 		return nil
 	})
+}
+
+func (r *Repository) ListAdminUsers(ctx context.Context, filters AdminListUsersFilters, limit, offset int) ([]AdminUserRow, int, error) {
+	// Important: role filter uses EXISTS so that:
+	// - we filter users by role if provided
+	// - but still aggregate ALL roles the user has
+	role := filters.Role
+
+	// 1) total count (distinct users)
+	countQ := `
+		SELECT COUNT(*)
+		FROM users u
+		WHERE ($1 = '' OR EXISTS (
+			SELECT 1
+			FROM user_roles ur
+			JOIN roles rr ON rr.id = ur.role_id
+			WHERE ur.user_id = u.id AND rr.name = $1
+		))
+	`
+	var total int
+	if err := r.db.QueryRow(ctx, countQ, role).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+
+	// 2) page query with roles aggregation
+	// NOTE: ORDER BY created_at desc like admin listings usually do.
+	listQ := `
+		SELECT
+			u.id,
+			u.first_name,
+			u.last_name,
+			u.email,
+			u.phone,
+			u.profile_picture_url,
+			u.skill_level,
+			COALESCE(u.no_of_games, 0) AS no_of_games,
+			u.is_active,
+			u.created_at,
+			u.updated_at,
+			COALESCE(array_remove(array_agg(r.name ORDER BY r.name), NULL), '{}'::text[]) AS roles
+		FROM users u
+		LEFT JOIN user_roles ur ON ur.user_id = u.id
+		LEFT JOIN roles r ON r.id = ur.role_id
+		WHERE ($1 = '' OR EXISTS (
+			SELECT 1
+			FROM user_roles ur2
+			JOIN roles rr2 ON rr2.id = ur2.role_id
+			WHERE ur2.user_id = u.id AND rr2.name = $1
+		))
+		GROUP BY u.id
+		ORDER BY u.created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.db.Query(ctx, listQ, role, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]AdminUserRow, 0, limit)
+	for rows.Next() {
+		var (
+			u             AdminUserRow
+			picNullable   *string
+			skillNullable *string
+		)
+
+		// Because  DB column types might be nullable, scan into *string for url/skill
+		// If your columns are TEXT NULL, pgx can scan into *string directly.
+		if err := rows.Scan(
+			&u.ID,
+			&u.FirstName,
+			&u.LastName,
+			&u.Email,
+			&u.Phone,
+			&picNullable,
+			&skillNullable,
+			&u.NoOfGames,
+			&u.IsActive,
+			&u.CreatedAt,
+			&u.UpdatedAt,
+			&u.Roles,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan user: %w", err)
+		}
+
+		u.ProfilePictureURL = picNullable
+		u.SkillLevel = skillNullable
+
+		out = append(out, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("rows: %w", err)
+	}
+
+	return out, total, nil
 }

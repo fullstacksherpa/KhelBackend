@@ -1,4 +1,3 @@
-// internal/domain/orders/types.go
 package orders
 
 import (
