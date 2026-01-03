@@ -39,6 +39,9 @@ type envelope struct {
 	Data any `json:"data"`
 }
 
+// It creates and immediately discards a value of type envelope. since i am getting unused error through staticcheck
+var _ = envelope{}
+
 // adminListOrdersHandler godoc
 //
 //	@Summary		List orders (admin)

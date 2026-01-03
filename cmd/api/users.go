@@ -583,7 +583,7 @@ func (app *application) adminListUsersHandler(w http.ResponseWriter, r *http.Req
 func (app *application) AdminUserOverviewHandler(w http.ResponseWriter, r *http.Request) {
 	current := getUserFromContext(r)
 	if current == nil {
-		app.unauthorizedErrorResponse(w, r, errors.New("Not authorized"))
+		app.unauthorizedErrorResponse(w, r, errors.New("not authorized"))
 		return
 	}
 

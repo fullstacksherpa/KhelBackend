@@ -111,3 +111,9 @@ type ProductWithRank struct {
 	Product
 	Rank float64 `json:"rank"`
 }
+
+type AdminProductCard struct {
+	ProductCard
+	VariantsCount int `json:"variants_count"`
+	ImagesCount   int `json:"images_count"`
+}

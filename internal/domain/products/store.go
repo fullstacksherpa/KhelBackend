@@ -69,7 +69,7 @@ type Store interface {
 		limit, offset int,
 	) ([]*ProductCard, int, error)
 	GetProductDetailBySlug(ctx context.Context, slug string) (*ProductDetail, error)
-	ListAdminProductCards(ctx context.Context, limit, offset int) ([]*ProductCard, int, error)
+	ListAdminProductCards(ctx context.Context, limit, offset int) ([]*AdminProductCard, int, error)
 
 	FullTextSearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductCardWithRank, int, error)
 	SearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductCard, int, error)
@@ -334,7 +334,7 @@ func (r *Repository) CreateCategory(ctx context.Context, c *Category) (*Category
 func (r *Repository) CountCategories(ctx context.Context) (int, error) {
 	var n int
 	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM categories`).Scan(&n); err != nil {
-		return 0, fmt.Errorf("Count categories: %w", err)
+		return 0, fmt.Errorf("count categories: %w", err)
 	}
 	return n, nil
 }
@@ -1625,7 +1625,7 @@ func (r *Repository) GetProductDetailBySlug(ctx context.Context, slug string) (*
 }
 
 // List admin products with counts (variants_count, images_count)
-func (r *Repository) ListAdminProductCards(ctx context.Context, limit, offset int) ([]*ProductCard, int, error) {
+func (r *Repository) ListAdminProductCards(ctx context.Context, limit, offset int) ([]*AdminProductCard, int, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 50
 	}
@@ -1659,45 +1659,41 @@ func (r *Repository) ListAdminProductCards(ctx context.Context, limit, offset in
 	}
 	defer rows.Close()
 
-	type adminCard struct {
-		ProductCard
-		VariantsCount int `json:"variants_count"`
-		ImagesCount   int `json:"images_count"`
-	}
-
-	out := make([]*ProductCard, 0, limit)
+	out := make([]*AdminProductCard, 0, limit)
 	for rows.Next() {
 		var (
-			pc                         ProductCard
-			desc                       sql.NullString
-			catName, brandName         sql.NullString
-			slug                       string
-			variantsCount, imagesCount int
+			card               AdminProductCard
+			desc               sql.NullString
+			catName, brandName sql.NullString
+			slug               string
 		)
+
 		if err := rows.Scan(
-			&pc.ID, &pc.Name, &slug, &desc,
-			&pc.CategoryID, &catName,
-			&pc.BrandID, &brandName,
-			&pc.IsActive, &pc.CreatedAt, &pc.UpdatedAt,
-			&variantsCount, &imagesCount,
+			&card.ID, &card.Name, &slug, &desc,
+			&card.CategoryID, &catName,
+			&card.BrandID, &brandName,
+			&card.IsActive, &card.CreatedAt, &card.UpdatedAt,
+			&card.VariantsCount, &card.ImagesCount,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan admin product card: %w", err)
 		}
-		pc.Slug = slug
+
+		card.Slug = slug
+
 		if desc.Valid {
 			s := desc.String
-			pc.Description = &s
+			card.Description = &s
 		}
 		if catName.Valid {
 			s := catName.String
-			pc.CategoryName = &s
+			card.CategoryName = &s
 		}
 		if brandName.Valid {
 			s := brandName.String
-			pc.BrandName = &s
+			card.BrandName = &s
 		}
-		// We’ll attach counts in handler if needed
-		out = append(out, &pc)
+
+		out = append(out, &card)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, fmt.Errorf("rows: %w", err)
