@@ -837,6 +837,16 @@ definitions:
       user_number:
         type: string
     type: object
+  main.SessionResponse:
+    properties:
+      expires_at:
+        description: unix seconds (optional but nice)
+        type: integer
+      role:
+        type: string
+      user_id:
+        type: string
+    type: object
   main.TokenResponse:
     properties:
       access_token:
@@ -992,6 +1002,18 @@ definitions:
             type: array
         type: object
     type: object
+  main.adminApproveVenueReqPayload:
+    properties:
+      admin_note:
+        type: string
+      owner_id:
+        type: integer
+    type: object
+  main.adminRejectVenueReqPayload:
+    properties:
+      admin_note:
+        type: string
+    type: object
   main.assignRoleRequest:
     properties:
       role_id:
@@ -1020,6 +1042,36 @@ definitions:
     required:
     - comment
     - rating
+    type: object
+  main.createVenueRequestPayload:
+    properties:
+      address:
+        type: string
+      amenities:
+        items:
+          type: string
+        type: array
+      cf_turnstile_response:
+        description: 'Security fields:'
+        type: string
+      company:
+        description: honeypot field name; hidden input in UI
+        type: string
+      description:
+        type: string
+      location:
+        description: '[lon, lat]'
+        items:
+          type: number
+        type: array
+      name:
+        type: string
+      open_time:
+        type: string
+      phone_number:
+        type: string
+      sport:
+        type: string
     type: object
   main.envelope:
     properties:
@@ -1153,6 +1205,62 @@ definitions:
       updated_at:
         type: string
     type: object
+  venuerequest.VenueRequest:
+    properties:
+      address:
+        type: string
+      admin_note:
+        type: string
+      amenities:
+        items:
+          type: string
+        type: array
+      approved_at:
+        type: string
+      approved_by:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      location:
+        description: '[lon, lat] for inserts in your Create() style'
+        items:
+          type: number
+        type: array
+      name:
+        type: string
+      open_time:
+        type: string
+      phone_number:
+        type: string
+      rejected_at:
+        type: string
+      rejected_by:
+        type: integer
+      requester_ip:
+        type: string
+      requester_user_agent:
+        type: string
+      sport:
+        type: string
+      status:
+        $ref: '#/definitions/venuerequest.VenueRequestStatus'
+      updated_at:
+        type: string
+    type: object
+  venuerequest.VenueRequestStatus:
+    enum:
+    - requested
+    - approved
+    - rejected
+    type: string
+    x-enum-varnames:
+    - VenueRequestRequested
+    - VenueRequestApproved
+    - VenueRequestRejected
   venuereviews.Review:
     properties:
       avatar_url:
@@ -1700,6 +1808,134 @@ paths:
       summary: Remove a role from a user
       tags:
       - Admin-Roles
+  /admin/venue-requests:
+    get:
+      description: Admin route. List venue requests by status with pagination.
+      parameters:
+      - description: requested|approved|rejected
+        in: query
+        name: status
+        type: string
+      - description: page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20, max 60)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/venuerequest.VenueRequest'
+            type: array
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List venue requests (admin)
+      tags:
+      - Admin Venue-Requests
+  /admin/venue-requests/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approves venue request and creates real venues row with owner_id.
+      parameters:
+      - description: Venue request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Owner assignment + optional admin note
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.adminApproveVenueReqPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/venues.Venue'
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Approve a venue request (admin)
+      tags:
+      - Admin Venue-Requests
+  /admin/venue-requests/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Rejects venue request with optional admin note.
+      parameters:
+      - description: Venue request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Optional admin note
+        in: body
+        name: payload
+        schema:
+          $ref: '#/definitions/main.adminRejectVenueReqPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Reject a venue request (admin)
+      tags:
+      - Admin Venue-Requests
   /ads/{adID}/click:
     post:
       consumes:
@@ -1927,6 +2163,24 @@ paths:
           description: Internal Server Error
           schema: {}
       summary: Request password reset
+      tags:
+      - authentication
+  /authentication/session:
+    get:
+      description: Reads access_token cookie, validates it, returns session info.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/main.SessionResponse'
+            type: object
+        "401":
+          description: Unauthorized
+          schema: {}
+      summary: Get current web session (cookie)
       tags:
       - authentication
   /authentication/token:
@@ -4036,6 +4290,38 @@ paths:
       summary: Edit current user’s profile
       tags:
       - users
+  /venue-requests:
+    post:
+      consumes:
+      - application/json
+      description: Public route. Creates a venue request (status=requested). Protected
+        by Turnstile + strict rate limit + honeypot.
+      parameters:
+      - description: Venue request payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.createVenueRequestPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/venuerequest.VenueRequest'
+        "400":
+          description: Bad Request
+          schema: {}
+        "429":
+          description: Too Many Requests
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Request a new venue to be added
+      tags:
+      - Venue-Requests
   /venue/{id}:
     get:
       description: Retrieve detailed information for a venue including aggregated

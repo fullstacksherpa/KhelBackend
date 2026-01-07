@@ -167,6 +167,10 @@ func main() {
 				SuccessURL: os.Getenv("KHALTI_SUCCESS_URL"),
 			},
 		},
+		turnstile: turnstileConfig{
+			secretKey:        os.Getenv("TURNSTILE_SECRET_KEY"),
+			expectedHostname: os.Getenv("TURNSTILE_EXPECTED_HOSTNAME"),
+		},
 	}
 
 	// Logger
@@ -231,6 +235,9 @@ func main() {
 		cfg.rateLimiter.TimeFrame,
 	)
 
+	// 5 req/min per IP
+	venueReqLimiter := ratelimiter.NewFixedWindowLimiter(5, 1*time.Minute)
+
 	// Authenticator
 	jwtAuthenticator := auth.NewJWTAuthenticator(
 		cfg.auth.token.refreshSecret,
@@ -259,16 +266,17 @@ func main() {
 	)
 
 	app := &application{
-		config:        cfg,
-		logger:        logger,
-		store:         storeContainer,
-		cld:           cld,
-		mailer:        mailtrap,
-		authenticator: jwtAuthenticator,
-		rateLimiter:   rateLimiter,
-		push:          sender,
-		hashID:        h,
-		payments:      pm,
+		config:              cfg,
+		logger:              logger,
+		store:               storeContainer,
+		cld:                 cld,
+		mailer:              mailtrap,
+		authenticator:       jwtAuthenticator,
+		rateLimiter:         rateLimiter,
+		venueRequestLimiter: venueReqLimiter,
+		push:                sender,
+		hashID:              h,
+		payments:            pm,
 	}
 
 	//Metrics collected http://localhost:8080/v1/debug/vars

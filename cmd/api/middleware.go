@@ -8,9 +8,11 @@ import (
 	"khel/internal/auth"
 	"khel/internal/domain/accesscontrol"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
@@ -55,22 +57,32 @@ func (app *application) BasicAuthMiddleware() func(http.Handler) http.Handler {
 	}
 }
 
+// Extract token from:
+// 1) Authorization header (mobile)
+// 2) access_token cookie (web)
+func (app *application) getAccessTokenFromRequest(r *http.Request) string {
+	// Header first (mobile)
+	authHeader := r.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		return strings.TrimPrefix(authHeader, "Bearer ")
+	}
+
+	// Cookie next (web)
+	if c, err := r.Cookie("access_token"); err == nil && c.Value != "" {
+		return c.Value
+	}
+
+	return ""
+}
+
 func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		authHeader := r.Header.Get("Authorization")
-		if strings.TrimSpace(authHeader) == "" {
-			app.unauthorizedErrorResponse(w, r, fmt.Errorf("authorization header is missing or blank"))
+		token := app.getAccessTokenFromRequest(r)
+		if token == "" {
+			app.unauthorizedErrorResponse(w, r, errors.New("not authorized"))
 			return
 		}
-
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			app.unauthorizedErrorResponse(w, r, fmt.Errorf("authorization header is malformed"))
-			return
-		}
-
-		token := parts[1]
 		jwtToken, err := app.authenticator.ValidateAccessToken(token)
 		if err != nil {
 			app.unauthorizedErrorResponse(w, r, err)
@@ -368,4 +380,45 @@ func (app *application) RequireRoleMiddleware(role accesscontrol.RoleName) func(
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func (app *application) StrictLimiterMiddleware(limiter interface {
+	Allow(ip string) (bool, time.Duration)
+}) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ip := clientIP(r)
+			if allow, retryAfter := limiter.Allow(ip); !allow {
+				app.rateLimitExceededResponse(w, r, retryAfter.String())
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func clientIP(r *http.Request) string {
+	// If you are behind Cloudflare/Traefik, these headers help.
+	if ip := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); ip != "" {
+		return ip
+	}
+	// X-Forwarded-For may contain multiple, first is client
+	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+		parts := strings.Split(xff, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+
+	// Traefik / some proxies
+	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+		return ip
+	}
+
+	// chi middleware.RealIP sets RemoteAddr, but it may still include port
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil && host != "" {
+		return host
+	}
+	return strings.TrimSpace(r.RemoteAddr)
 }

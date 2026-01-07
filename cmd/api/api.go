@@ -37,9 +37,12 @@ type application struct {
 	mailer        mailer.Client
 	authenticator auth.Authenticator
 	rateLimiter   ratelimiter.Limiter
-	push          *notifications.ExpoAdapter
-	hashID        *hashids.HashID
-	payments      *payments.PaymentManager
+
+	// strict limiter for public venue request endpoint
+	venueRequestLimiter ratelimiter.Limiter
+	push                *notifications.ExpoAdapter
+	hashID              *hashids.HashID
+	payments            *payments.PaymentManager
 }
 
 type config struct {
@@ -52,6 +55,13 @@ type config struct {
 	auth        authConfig
 	rateLimiter ratelimiter.Config
 	payment     paymentConfig
+
+	turnstile turnstileConfig
+}
+
+type turnstileConfig struct {
+	secretKey        string
+	expectedHostname string
 }
 
 type authConfig struct {
@@ -114,11 +124,11 @@ func (app *application) mount() http.Handler {
 	r.Use(app.RateLimiterMiddleware)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedOrigins:   []string{"https://web.gocloudnepal.com", "http://localhost:3000", "https://admin.gocloudnepal.com"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: false,
+		AllowCredentials: true,
 		MaxAge:           300, // Maximum value not ignored by any of major browsers
 	}))
 
@@ -134,6 +144,20 @@ func (app *application) mount() http.Handler {
 		r.With(app.BasicAuthMiddleware()).Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
 
 		r.With(app.BasicAuthMiddleware()).Get("/debug/vars", expvar.Handler().ServeHTTP)
+
+		r.Route("/venue-requests", func(r chi.Router) {
+			// strict limiter ONLY for this endpoint
+			r.With(app.StrictLimiterMiddleware(app.venueRequestLimiter)).Post("/", app.createVenueRequestHandler)
+		})
+
+		r.Route("/admin/venue-requests", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
+
+			r.Get("/", app.adminListVenueRequestsHandler)
+			r.Post("/{id}/approve", app.adminApproveVenueRequestHandler)
+			r.Post("/{id}/reject", app.adminRejectVenueRequestHandler)
+		})
 
 		r.Route("/app-reviews", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
@@ -280,22 +304,30 @@ func (app *application) mount() http.Handler {
 
 			})
 		})
-
+		// for mobile
 		r.Post("/authentication/refresh", app.refreshTokenHandler)
+		//for web
+		r.Post("/authentication/refresh/cookie", app.refreshTokenCookieHandler)
+		r.Post("/authentication/logout/cookie", app.logoutCookieHandler)
 		r.Post("/authentication/reset-password", app.requestResetPasswordHandler)
 		r.Patch("/authentication/reset-password", app.resetPasswordHandler)
 
 		r.Route("/authentication", func(r chi.Router) {
 			r.Post("/user", app.registerUserHandler)
+			// Mobile:
 			r.Post("/token", app.createTokenHandler)
+
+			// Web:
+			r.Post("/token/cookie", app.createTokenCookieHandler)
+			r.Get("/session", app.sessionHandler)
 
 		})
 
-		// ---------- ADMIN E-COMMERCE ROUTES ----------
+		// ---------- Merchant E-COMMERCE ROUTES (written admin on path since api is already integrated on web. might change later)----------
 
 		r.Route("/store/admin", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
-			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
+			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleMerchant))
 			r.Get("/users", app.adminListUsersHandler)
 			r.Get("/users/{userID}", app.AdminUserOverviewHandler)
 			r.Post("/brands", app.createBrandHandler)

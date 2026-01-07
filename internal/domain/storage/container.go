@@ -16,6 +16,7 @@ import (
 	"khel/internal/domain/products"
 	"khel/internal/domain/pushtokens"
 	"khel/internal/domain/users"
+	"khel/internal/domain/venuerequest"
 	venuereviews "khel/internal/domain/venuereview"
 	"khel/internal/domain/venues"
 
@@ -33,6 +34,7 @@ type Sales struct {
 type Container struct {
 	pool          *pgxpool.Pool // IMPORTANT: set the pool so WithSalesTx works
 	Users         users.Store
+	VenueRequests venuerequest.RequestStore
 	Venues        venues.Store
 	VenuesReviews venuereviews.Store
 	Followers     followers.Store
@@ -51,6 +53,7 @@ func NewContainer(db *pgxpool.Pool) *Container {
 	return &Container{
 		pool:          db,
 		Users:         users.NewRepository(db),
+		VenueRequests: venuerequest.NewRepository(db),
 		Venues:        venues.NewRepository(db),
 		VenuesReviews: venuereviews.NewRepository(db),
 		Followers:     followers.NewRepository(db),

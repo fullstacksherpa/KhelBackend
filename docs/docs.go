@@ -623,6 +623,200 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/venue-requests": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Admin route. List venue requests by status with pagination.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Venue-Requests"
+                ],
+                "summary": "List venue requests (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "requested|approved|rejected",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size (default 20, max 60)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/venuerequest.VenueRequest"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/admin/venue-requests/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Approves venue request and creates real venues row with owner_id.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Venue-Requests"
+                ],
+                "summary": "Approve a venue request (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Owner assignment + optional admin note",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.adminApproveVenueReqPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/venues.Venue"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/admin/venue-requests/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Rejects venue request with optional admin note.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Venue-Requests"
+                ],
+                "summary": "Reject a venue request (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue request ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Optional admin note",
+                        "name": "payload",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/main.adminRejectVenueReqPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/ads/active": {
             "get": {
                 "description": "Retrieves all active ads for the mobile app carousel",
@@ -958,6 +1152,33 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/authentication/session": {
+            "get": {
+                "description": "Reads access_token cookie, validates it, returns session info.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authentication"
+                ],
+                "summary": "Get current web session (cookie)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/definitions/main.SessionResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {}
                     }
                 }
@@ -4108,6 +4329,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/venue-requests": {
+            "post": {
+                "description": "Public route. Creates a venue request (status=requested). Protected by Turnstile + strict rate limit + honeypot.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Requests"
+                ],
+                "summary": "Request a new venue to be added",
+                "parameters": [
+                    {
+                        "description": "Venue request payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.createVenueRequestPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/venuerequest.VenueRequest"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venue/{id}": {
             "get": {
                 "description": "Retrieve detailed information for a venue including aggregated review and game statistics.",
@@ -6926,6 +7193,21 @@ const docTemplate = `{
                 }
             }
         },
+        "main.SessionResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "description": "unix seconds (optional but nice)",
+                    "type": "integer"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "main.TokenResponse": {
             "type": "object",
             "properties": {
@@ -7161,6 +7443,25 @@ const docTemplate = `{
                 }
             }
         },
+        "main.adminApproveVenueReqPayload": {
+            "type": "object",
+            "properties": {
+                "admin_note": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.adminRejectVenueReqPayload": {
+            "type": "object",
+            "properties": {
+                "admin_note": {
+                    "type": "string"
+                }
+            }
+        },
         "main.assignRoleRequest": {
             "type": "object",
             "properties": {
@@ -7200,6 +7501,50 @@ const docTemplate = `{
                     "type": "integer",
                     "maximum": 5,
                     "minimum": 1
+                }
+            }
+        },
+        "main.createVenueRequestPayload": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "amenities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "cf_turnstile_response": {
+                    "description": "Security fields:",
+                    "type": "string"
+                },
+                "company": {
+                    "description": "honeypot field name; hidden input in UI",
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "location": {
+                    "description": "[lon, lat]",
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "open_time": {
+                    "type": "string"
+                },
+                "phone_number": {
+                    "type": "string"
+                },
+                "sport": {
+                    "type": "string"
                 }
             }
         },
@@ -7400,6 +7745,88 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "venuerequest.VenueRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "admin_note": {
+                    "type": "string"
+                },
+                "amenities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "approved_at": {
+                    "type": "string"
+                },
+                "approved_by": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "location": {
+                    "description": "[lon, lat] for inserts in your Create() style",
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "open_time": {
+                    "type": "string"
+                },
+                "phone_number": {
+                    "type": "string"
+                },
+                "rejected_at": {
+                    "type": "string"
+                },
+                "rejected_by": {
+                    "type": "integer"
+                },
+                "requester_ip": {
+                    "type": "string"
+                },
+                "requester_user_agent": {
+                    "type": "string"
+                },
+                "sport": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/venuerequest.VenueRequestStatus"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "venuerequest.VenueRequestStatus": {
+            "type": "string",
+            "enum": [
+                "requested",
+                "approved",
+                "rejected"
+            ],
+            "x-enum-varnames": [
+                "VenueRequestRequested",
+                "VenueRequestApproved",
+                "VenueRequestRejected"
+            ]
         },
         "venuereviews.Review": {
             "type": "object",
