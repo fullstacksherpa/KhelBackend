@@ -44,6 +44,7 @@ func (app *application) setAuthCookies(w http.ResponseWriter, accessToken, refre
 }
 
 func (app *application) clearAuthCookies(w http.ResponseWriter) {
+	// Creates cookies with MaxAge: -1, which tells browser to DELETE them
 	expire := func(name, path string) {
 
 		domain := ""

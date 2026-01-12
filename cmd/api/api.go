@@ -175,7 +175,7 @@ func (app *application) mount() http.Handler {
 		// Admin ads routes
 		r.Route("/admin/ads", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
-			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
+			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleMerchant))
 
 			r.Get("/", app.getAllAdsHandler)
 			r.Post("/", app.createAdHandler)

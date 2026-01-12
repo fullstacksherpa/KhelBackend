@@ -616,7 +616,7 @@ func (app *application) AdminUserOverviewHandler(w http.ResponseWriter, r *http.
 	}
 
 	// 3) Recent Orders (5)
-	recentOrders, _, err := app.store.Sales.Orders.ListByUser(ctx, userID, 5, 0)
+	recentOrders, _, err := app.store.Sales.Orders.ListByUser(ctx, userID, "", 5, 0)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return

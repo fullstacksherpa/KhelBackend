@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"khel/internal/infra/dbx"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type Repository struct{ q dbx.Querier }
@@ -104,7 +106,12 @@ WHERE ci.cart_id = $2
 	return &o, nil
 }
 
-func (r *Repository) ListByUser(ctx context.Context, userID int64, limit, offset int) ([]Order, int, error) {
+func (r *Repository) ListByUser(
+	ctx context.Context,
+	userID int64,
+	status string,
+	limit, offset int,
+) ([]Order, int, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -112,15 +119,17 @@ func (r *Repository) ListByUser(ctx context.Context, userID int64, limit, offset
 		offset = 0
 	}
 
+	// If status is empty string => no filter
 	rows, err := r.q.Query(ctx, `
 SELECT id,user_id,order_number,status,payment_status,payment_method,paid_at,
        subtotal_cents,discount_cents,tax_cents,shipping_cents,total_cents,created_at,
        COUNT(*) OVER() AS total_count
 FROM orders
-WHERE user_id=$1
+WHERE user_id = $1
+  AND ($2 = '' OR status = $2)
 ORDER BY created_at DESC
-LIMIT $2 OFFSET $3`,
-		userID, limit, offset,
+LIMIT $3 OFFSET $4`,
+		userID, status, limit, offset, pgx.QueryExecModeSimpleProtocol,
 	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list orders: %w", err)
@@ -131,6 +140,7 @@ LIMIT $2 OFFSET $3`,
 		out   []Order
 		total int
 	)
+
 	for rows.Next() {
 		var o Order
 		var t int
@@ -141,14 +151,17 @@ LIMIT $2 OFFSET $3`,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan order: %w", err)
 		}
+
 		if total == 0 {
 			total = t
 		}
 		out = append(out, o)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
+
 	return out, total, nil
 }
 

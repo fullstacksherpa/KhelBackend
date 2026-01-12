@@ -1115,6 +1115,15 @@ definitions:
       user_id:
         type: integer
     type: object
+  orders.OrderDetail:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/orders.OrderItem'
+        type: array
+      order:
+        $ref: '#/definitions/orders.Order'
+    type: object
   orders.OrderItem:
     properties:
       id:
@@ -3367,6 +3376,42 @@ paths:
       summary: Update a category
       tags:
       - Store-Admin
+  /store/admin/category/products:
+    get:
+      description: Returns a paginated list of product cards for the admin panel.
+        Supports optional filtering by category slug.
+      parameters:
+      - description: Filter products by category slug
+        in: query
+        name: category_slug
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 15)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: products list with pagination and applied filters
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List products (admin)
+      tags:
+      - Store-Admin-Products
   /store/admin/orders:
     get:
       description: List all orders for the admin dashboard. Supports optional status
@@ -3749,42 +3794,75 @@ paths:
       summary: Get category tree
       tags:
       - Store-Categories
-  /store/products:
+  /store/orders:
     get:
-      description: Returns a paginated list of product cards for the admin panel.
-        Supports optional filtering by category slug.
+      description: Returns a paginated list of orders for the authenticated user.
       parameters:
-      - description: Filter products by category slug
-        in: query
-        name: category_slug
-        type: string
       - description: 'Page number (default: 1)'
         in: query
+        minimum: 1
         name: page
         type: integer
-      - description: 'Items per page (default: 15)'
+      - description: 'Items per page (default: 15, max: 30)'
         in: query
+        maximum: 30
+        minimum: 1
         name: limit
         type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: products list with pagination and applied filters
+          description: orders list + pagination
           schema:
             additionalProperties: true
             type: object
-        "400":
-          description: Bad Request
+        "401":
+          description: Unauthorized
           schema: {}
         "500":
           description: Internal Server Error
           schema: {}
       security:
       - ApiKeyAuth: []
-      summary: List products (admin)
+      summary: List my orders
       tags:
-      - Store-Admin-Products
+      - Orders
+  /store/orders/{orderID}:
+    get:
+      description: Returns order detail (order + items) for the authenticated user.
+        Only returns the order if it belongs to the user.
+      parameters:
+      - description: Order ID
+        in: path
+        minimum: 1
+        name: orderID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: order detail
+          schema:
+            $ref: '#/definitions/orders.OrderDetail'
+        "400":
+          description: 'Bad Request: invalid orderID'
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "404":
+          description: Order not found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get my order detail
+      tags:
+      - Orders
   /store/products/{productID}:
     get:
       description: Returns a single product by its ID.

@@ -1146,7 +1146,7 @@ func (app *application) getProductByIDHandler(w http.ResponseWriter, r *http.Req
 //	@Failure		400				{object}	error			"Bad Request"
 //	@Failure		500				{object}	error			"Internal Server Error"
 //	@Security		ApiKeyAuth
-//	@Router			/store/products [get]
+//	@Router			/store/admin/category/products [get]
 func (app *application) listProductsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	pg := params.ParsePagination(r.URL.Query())

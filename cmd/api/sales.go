@@ -226,7 +226,33 @@ func (app *application) adminMarkExpiredCartsHandler(w http.ResponseWriter, r *h
 
 // ============ CHECKOUT (ORDER + PAYMENT) ============
 
-// GET /v1/store/orders
+func normalizeOrderStatusFilter(raw string) (string, error) {
+	s := strings.TrimSpace(strings.ToLower(raw))
+	if s == "" || s == "all" {
+		return "", nil // empty means "no filter"
+	}
+
+	switch s {
+	case "pending", "processing", "shipped", "delivered", "cancelled", "refunded":
+		return s, nil
+	default:
+		return "", fmt.Errorf("invalid status")
+	}
+}
+
+// ListMyOrders godoc
+//
+//	@Summary		List my orders
+//	@Description	Returns a paginated list of orders for the authenticated user.
+//	@Tags			Orders
+//	@Produce		json
+//	@Param			page	query		int				false	"Page number (default: 1)"				minimum(1)
+//	@Param			limit	query		int				false	"Items per page (default: 15, max: 30)"	minimum(1)	maximum(30)
+//	@Success		200		{object}	map[string]any	"orders list + pagination"
+//	@Failure		401		{object}	error			"Unauthorized"
+//	@Failure		500		{object}	error			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/orders [get]
 func (app *application) listMyOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -236,7 +262,14 @@ func (app *application) listMyOrdersHandler(w http.ResponseWriter, r *http.Reque
 
 	p := params.ParsePagination(r.URL.Query())
 
-	ordersList, total, err := app.store.Sales.Orders.ListByUser(ctx, userID, p.Limit, p.Offset)
+	// ✅ Parse status filter
+	status, err := normalizeOrderStatusFilter(r.URL.Query().Get("status"))
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	ordersList, total, err := app.store.Sales.Orders.ListByUser(ctx, userID, status, p.Limit, p.Offset)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -245,12 +278,28 @@ func (app *application) listMyOrdersHandler(w http.ResponseWriter, r *http.Reque
 	p.ComputeMeta(total)
 
 	app.jsonResponse(w, http.StatusOK, map[string]any{
+		"filters": map[string]any{
+			"status": status, // will be "" when no filter
+		},
 		"orders":     ordersList,
 		"pagination": p,
 	})
 }
 
-// GET /v1/store/orders/{orderID}
+// GetMyOrder godoc
+//
+//	@Summary		Get my order detail
+//	@Description	Returns order detail (order + items) for the authenticated user. Only returns the order if it belongs to the user.
+//	@Tags			Orders
+//	@Produce		json
+//	@Param			orderID	path		int					true	"Order ID"	minimum(1)
+//	@Success		200		{object}	orders.OrderDetail	"order detail"
+//	@Failure		400		{object}	error				"Bad Request: invalid orderID"
+//	@Failure		401		{object}	error				"Unauthorized"
+//	@Failure		404		{object}	error				"Order not found"
+//	@Failure		500		{object}	error				"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/orders/{orderID} [get]
 func (app *application) getMyOrderHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()

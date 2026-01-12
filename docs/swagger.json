@@ -2940,6 +2940,60 @@
                 }
             }
         },
+        "/store/admin/category/products": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of product cards for the admin panel. Supports optional filtering by category slug.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin-Products"
+                ],
+                "summary": "List products (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter products by category slug",
+                        "name": "category_slug",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 15)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "products list with pagination and applied filters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/store/admin/orders": {
             "get": {
                 "security": [
@@ -3513,51 +3567,99 @@
                 }
             }
         },
-        "/store/products": {
+        "/store/orders": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Returns a paginated list of product cards for the admin panel. Supports optional filtering by category slug.",
+                "description": "Returns a paginated list of orders for the authenticated user.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Store-Admin-Products"
+                    "Orders"
                 ],
-                "summary": "List products (admin)",
+                "summary": "List my orders",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Filter products by category slug",
-                        "name": "category_slug",
-                        "in": "query"
-                    },
-                    {
+                        "minimum": 1,
                         "type": "integer",
                         "description": "Page number (default: 1)",
                         "name": "page",
                         "in": "query"
                     },
                     {
+                        "maximum": 30,
+                        "minimum": 1,
                         "type": "integer",
-                        "description": "Items per page (default: 15)",
+                        "description": "Items per page (default: 15, max: 30)",
                         "name": "limit",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "products list with pagination and applied filters",
+                        "description": "orders list + pagination",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/orders/{orderID}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns order detail (order + items) for the authenticated user. Only returns the order if it belongs to the user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Get my order detail",
+                "parameters": [
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "description": "Order ID",
+                        "name": "orderID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "order detail",
+                        "schema": {
+                            "$ref": "#/definitions/orders.OrderDetail"
+                        }
+                    },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Bad Request: invalid orderID",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Order not found",
                         "schema": {}
                     },
                     "500": {
@@ -7601,6 +7703,20 @@
                 },
                 "user_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "orders.OrderDetail": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/orders.OrderItem"
+                    }
+                },
+                "order": {
+                    "$ref": "#/definitions/orders.Order"
                 }
             }
         },

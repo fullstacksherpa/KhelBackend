@@ -57,7 +57,7 @@ type Store interface {
 	GetByID(ctx context.Context, id int64) (*Order, error)
 
 	// USER-facing
-	ListByUser(ctx context.Context, userID int64, limit, offset int) ([]Order, int, error)
+	ListByUser(ctx context.Context, userID int64, status string, limit, offset int) ([]Order, int, error)
 	GetDetailForUser(ctx context.Context, userID, orderID int64) (*OrderDetail, error)
 
 	// ADMIN-facing
