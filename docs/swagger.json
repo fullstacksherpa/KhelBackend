@@ -3195,6 +3195,74 @@
                 }
             }
         },
+        "/store/admin/payments": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of payments. Optional filters: status, since.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store-Admin-Payments"
+                ],
+                "summary": "List payments (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment_status filter: pending|paid|failed|refunded|partially_refunded",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "RFC3339 timestamp; returns payments created_at \u003e= since",
+                        "name": "since",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default from server, max usually 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Envelope: { data: { payments, pagination, status, since } }",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/store/admin/users": {
             "get": {
                 "security": [

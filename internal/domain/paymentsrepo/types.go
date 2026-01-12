@@ -23,6 +23,7 @@ type Store interface {
 	SetPrimaryToOrder(ctx context.Context, orderID, paymentID int64) error
 	MarkPaid(ctx context.Context, paymentID int64) error
 	SetProviderRef(ctx context.Context, paymentID int64, ref string, raw any) error
+	List(ctx context.Context, status string, since *time.Time, limit, offset int) ([]*Payment, int, error)
 
 	GetByID(ctx context.Context, id int64) (*Payment, error)
 	GetByOrderID(ctx context.Context, orderID int64) ([]*Payment, error)

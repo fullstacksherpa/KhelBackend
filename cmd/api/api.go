@@ -323,13 +323,12 @@ func (app *application) mount() http.Handler {
 
 		})
 
-		// ---------- Merchant E-COMMERCE ROUTES (written admin on path since api is already integrated on web. might change later)----------
+		// ---------- Merchant E-COMMERCE ROUTES (written admin on path since api is already integrated on web. might change later) admin  = "Merchant" ----------
 
 		r.Route("/store/admin", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
 			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleMerchant))
-			r.Get("/users", app.adminListUsersHandler)
-			r.Get("/users/{userID}", app.AdminUserOverviewHandler)
+			r.Get("/payments", app.adminListPaymentsHandler)
 			r.Post("/brands", app.createBrandHandler)
 			r.Patch("/brands/{brandID}", app.updateBrandHandler)
 			r.Delete("/brands/{brandID}", app.deleteBrandHandler)
@@ -401,6 +400,16 @@ func (app *application) mount() http.Handler {
 				r.Post("/checkout", app.checkoutHandler)
 				r.Post("/payments/verify", app.verifyPaymentHandler)
 			})
+		})
+
+		// ---------- SUPERADMIN ROUTES ----------
+
+		r.Route("/superadmin", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
+			r.Get("/users", app.adminListUsersHandler)
+			r.Get("/users/{userID}", app.AdminUserOverviewHandler)
+
 		})
 
 	})

@@ -1439,7 +1439,7 @@ func (r *Repository) GetProductDetailBySlug(ctx context.Context, slug string) (*
       FROM products p
       LEFT JOIN brands b     ON b.id = p.brand_id
       LEFT JOIN categories c ON c.id = p.category_id
-      WHERE p.slug = $1 AND p.is_active = true
+      WHERE p.slug = $1
       LIMIT 1;
     `
 

@@ -3538,6 +3538,53 @@ paths:
       summary: Update order status (admin)
       tags:
       - Store-Admin-Orders
+  /store/admin/payments:
+    get:
+      description: 'Returns a paginated list of payments. Optional filters: status,
+        since.'
+      parameters:
+      - description: 'payment_status filter: pending|paid|failed|refunded|partially_refunded'
+        in: query
+        name: status
+        type: string
+      - description: RFC3339 timestamp; returns payments created_at >= since
+        in: query
+        name: since
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default from server, max usually 100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Envelope: { data: { payments, pagination, status, since }
+            }'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List payments (admin)
+      tags:
+      - Store-Admin-Payments
   /store/admin/users:
     get:
       description: Returns paginated users. Optional role filter (?role=admin|owner|customer|merchant).

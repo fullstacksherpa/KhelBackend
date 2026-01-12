@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"khel/internal/infra/dbx"
 
@@ -111,6 +112,92 @@ func (r *Repository) SetStatus(ctx context.Context, paymentID int64, status stri
 		 WHERE id=$1
 	`, paymentID, status)
 	return err
+}
+
+// List returns payments with optional filters:
+// - status: if "" => no status filter
+// - since: if nil => no time filter, else created_at >= *since
+// Includes pagination via limit/offset and returns total count for pagination UI.
+func (r *Repository) List(
+	ctx context.Context,
+	status string,
+	since *time.Time,
+	limit, offset int,
+) ([]*Payment, int, error) {
+	// Defensive defaults (same style you use elsewhere)
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	rows, err := r.q.Query(ctx, `
+SELECT
+  id,
+  order_id,
+  provider,
+  provider_ref,
+  amount_cents,
+  currency,
+  status,
+  gateway_response,
+  created_at,
+  updated_at,
+  COUNT(*) OVER() AS total_count
+FROM payments
+WHERE
+  ($1 = '' OR status = $1::payment_status)
+  AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+ORDER BY created_at DESC, id DESC
+LIMIT $3 OFFSET $4
+`,
+		status,
+		since, // nil is okay: $2 becomes NULL
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list payments: %w", err)
+	}
+	defer rows.Close()
+
+	var (
+		out   []*Payment
+		total int
+	)
+
+	for rows.Next() {
+		var p Payment
+		var t int
+
+		if err := rows.Scan(
+			&p.ID,
+			&p.OrderID,
+			&p.Provider,
+			&p.ProviderRef,
+			&p.AmountCents,
+			&p.Currency,
+			&p.Status,
+			&p.GatewayResp,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+			&t,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan payment: %w", err)
+		}
+
+		if total == 0 {
+			total = t
+		}
+		out = append(out, &p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("rows error: %w", err)
+	}
+
+	return out, total, nil
 }
 
 func (r *Repository) SetProviderRef(ctx context.Context, paymentID int64, ref string, raw any) error {
