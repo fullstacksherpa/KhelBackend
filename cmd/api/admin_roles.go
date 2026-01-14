@@ -38,7 +38,7 @@ func (app *application) adminAssignUserRoleHandler(w http.ResponseWriter, r *htt
 	userIDStr := chi.URLParam(r, "userID")
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil || userID <= 0 {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid userID"))
+		app.badRequestResponse(w, r, fmt.Errorf("invalid userid"))
 		return
 	}
 
@@ -48,7 +48,7 @@ func (app *application) adminAssignUserRoleHandler(w http.ResponseWriter, r *htt
 		return
 	}
 	if in.RoleID <= 0 {
-		app.badRequestResponse(w, r, fmt.Errorf("Invalid request"))
+		app.badRequestResponse(w, r, fmt.Errorf("invalid request"))
 		return
 	}
 
