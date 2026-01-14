@@ -238,7 +238,7 @@ type VenueListResponse struct {
 	Sport         string    `json:"sport"`
 	TotalReviews  int       `json:"total_reviews"`
 	AverageRating float64   `json:"average_rating"`
-	IsFavorite    bool      `json:"is_favorite"`
+	IsFavorite    bool      `json:"is_favorite,omitempty"`
 }
 
 // @Summary		List venues
@@ -730,5 +730,87 @@ func (app *application) fullTextSearchVenuesHandler(w http.ResponseWriter, r *ht
 		"venues":      venues,
 		"query":       q,
 		"search_type": "full_text",
+	})
+}
+
+type updateVenueStatusPayload struct {
+	Status string `json:"status"` // "requested" or "active"
+}
+
+// UpdateVenueStatusOwner godoc
+//
+//	@Summary		Owner updates venue status
+//	@Description	Allows venue owner to change status only between requested and active.
+//	@Tags			Venue-Owner
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID	path		int64					true	"Venue ID"
+//	@Param			payload	body		updateVenueStatusPayload	true	"New status (requested|active)"
+//	@Success		200		{object}	map[string]string
+//	@Failure		400		{object}	error
+//	@Failure		401		{object}	error
+//	@Failure		403		{object}	error
+//	@Failure		404		{object}	error
+//	@Failure		500		{object}	error
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/status [patch]
+func (app *application) updateVenueStatusOwnerHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	user := getUserFromContext(r)
+	if user == nil {
+		app.unauthorizedErrorResponse(w, r, fmt.Errorf("unauthorized"))
+		return
+	}
+
+	venueIDStr := chi.URLParam(r, "venueID")
+	venueID, err := strconv.ParseInt(venueIDStr, 10, 64)
+	if err != nil || venueID <= 0 {
+		app.badRequestResponse(w, r, fmt.Errorf("invalid venueID"))
+		return
+	}
+
+	var payload updateVenueStatusPayload
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	next := strings.TrimSpace(payload.Status)
+	if next != "requested" && next != "active" {
+		app.badRequestResponse(w, r, errInvalidRequest("status must be requested or active"))
+		return
+	}
+
+	// ✅ Optional: friendly ownership check first (nicer errors)
+	isOwner, err := app.store.Venues.IsOwner(ctx, venueID, user.ID)
+	if err != nil {
+		// if you return "venue not found" from IsOwner, map that to 404
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			app.notFoundResponse(w, r, err)
+			return
+		}
+		app.internalServerError(w, r, err)
+		return
+	}
+	if !isOwner {
+		app.forbiddenResponse(w, r)
+		return
+	}
+
+	// ✅ DB enforces transition rules too
+	if err := app.store.Venues.UpdateVenueStatusOwner(ctx, venueID, user.ID, next); err != nil {
+		// If transition invalid or already same status, treat as 400 (better UX)
+		if strings.Contains(err.Error(), "not allowed") || strings.Contains(err.Error(), "invalid") {
+			app.badRequestResponse(w, r, errInvalidRequest("status change not allowed"))
+			return
+		}
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	_ = app.jsonResponse(w, http.StatusOK, map[string]string{
+		"message": "venue status updated",
 	})
 }

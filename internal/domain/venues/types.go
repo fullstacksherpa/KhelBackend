@@ -3,10 +3,20 @@ package venues
 import (
 	"context"
 	"errors"
+	"khel/internal/params"
 	"time"
 )
 
 var ErrVenueNotFound = errors.New("venue not found")
+
+type VenueStatus string
+
+const (
+	VenueStatusRequested VenueStatus = "requested"
+	VenueStatusActive    VenueStatus = "active"
+	VenueStatusRejected  VenueStatus = "rejected"
+	VenueStatusHold      VenueStatus = "hold"
+)
 
 // Venue represents a venue in the database
 type Venue struct {
@@ -81,6 +91,16 @@ type VenueListingWithRank struct {
 	Rank float64 `json:"rank"`
 }
 
+type AdminVenueFilter struct {
+	Sport      *string
+	Status     *string
+	Pagination params.Pagination
+}
+
+type AdminVenueListResult struct {
+	Venues []VenueListing
+	Total  int
+}
 type Store interface {
 	Create(context.Context, *Venue) error
 	UpdateImageURLs(ctx context.Context, venueID int64, urls []string) error
@@ -102,6 +122,9 @@ type Store interface {
 	RemoveFavorite(ctx context.Context, userID, venueID int64) error
 	GetFavoritesByUser(ctx context.Context, userID int64) ([]Venue, error)
 	GetFavoriteVenueIDsByUser(ctx context.Context, userID int64) (map[int64]struct{}, error)
+	ListWithTotal(ctx context.Context, filter AdminVenueFilter) (*AdminVenueListResult, error)
+
+	UpdateVenueStatusOwner(ctx context.Context, venueID int64, ownerID int64, nextStatus string) error
 
 	// Search Functionality
 	SearchVenues(ctx context.Context, query string) ([]VenueListing, error)

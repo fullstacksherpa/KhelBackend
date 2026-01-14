@@ -444,6 +444,112 @@ func (r *Repository) GetVenueDetail(ctx context.Context, venueID int64) (*VenueD
 	return &vd, nil
 }
 
+func (r *Repository) ListWithTotal(ctx context.Context, filter AdminVenueFilter) (*AdminVenueListResult, error) {
+	var (
+		where      []string
+		args       []interface{}
+		argCounter = 1
+	)
+
+	// ✅ Default behavior: if status not provided, show only active.
+	if filter.Status == nil || strings.TrimSpace(*filter.Status) == "" {
+		where = append(where, "v.status = 'active'")
+	} else {
+		// ✅ allow explicit status filter
+		where = append(where, fmt.Sprintf("v.status = $%d", argCounter))
+		args = append(args, strings.TrimSpace(*filter.Status))
+		argCounter++
+	}
+
+	// ✅ optional sport filter
+	if filter.Sport != nil && strings.TrimSpace(*filter.Sport) != "" {
+		where = append(where, fmt.Sprintf("v.sport = $%d", argCounter))
+		args = append(args, strings.TrimSpace(*filter.Sport))
+		argCounter++
+	}
+
+	whereSQL := " WHERE " + strings.Join(where, " AND ")
+
+	// ---- 1) total count ----
+	countQ := `SELECT COUNT(*) FROM venues v` + whereSQL
+
+	var total int
+	if err := r.db.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
+		return nil, fmt.Errorf("count venues: %w", err)
+	}
+
+	// ---- 2) list data ----
+	limitPos := argCounter
+	offsetPos := argCounter + 1
+
+	dataQ := fmt.Sprintf(`
+		WITH venue_stats AS (
+			SELECT venue_id, COUNT(*) AS total_reviews, AVG(rating) AS average_rating
+			FROM reviews
+			GROUP BY venue_id
+		)
+		SELECT
+			v.id,
+			v.name,
+			v.address,
+			ST_X(v.location::geometry) AS longitude,
+			ST_Y(v.location::geometry) AS latitude,
+			v.image_urls,
+			v.open_time,
+			v.phone_number,
+			v.sport,
+			COALESCE(vs.total_reviews, 0) AS total_reviews,
+			COALESCE(vs.average_rating, 0) AS average_rating
+		FROM venues v
+		LEFT JOIN venue_stats vs ON v.id = vs.venue_id
+		%s
+		ORDER BY v.created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, whereSQL, limitPos, offsetPos)
+
+	args2 := append([]interface{}{}, args...)
+	args2 = append(args2, filter.Pagination.Limit, filter.Pagination.Offset)
+
+	rows, err := r.db.Query(ctx, dataQ, args2...)
+	if err != nil {
+		return nil, fmt.Errorf("list venues: %w", err)
+	}
+	defer rows.Close()
+
+	var out []VenueListing
+	for rows.Next() {
+		var v VenueListing
+		var openTime sql.NullString
+
+		if err := rows.Scan(
+			&v.ID,
+			&v.Name,
+			&v.Address,
+			&v.Longitude,
+			&v.Latitude,
+			&v.ImageURLs,
+			&openTime,
+			&v.PhoneNumber,
+			&v.Sport,
+			&v.TotalReviews,
+			&v.AverageRating,
+		); err != nil {
+			return nil, fmt.Errorf("scan venue row: %w", err)
+		}
+
+		if openTime.Valid {
+			v.OpenTime = &openTime.String
+		}
+		out = append(out, v)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows venues: %w", err)
+	}
+
+	return &AdminVenueListResult{Venues: out, Total: total}, nil
+}
+
 func (r *Repository) GetImageURLs(ctx context.Context, venueID int64) ([]string, error) {
 	query := `SELECT image_urls FROM venues WHERE id = $1`
 
@@ -767,4 +873,49 @@ func (r *Repository) FullTextSearchVenues(ctx context.Context, query string) ([]
 	}
 
 	return out, nil
+}
+
+func (r *Repository) UpdateVenueStatusOwner(
+	ctx context.Context,
+	venueID int64,
+	ownerID int64,
+	nextStatus string,
+) error {
+	nextStatus = strings.TrimSpace(nextStatus)
+
+	// ✅ Owner is only allowed requested <-> active
+	if nextStatus != string(VenueStatusRequested) && nextStatus != string(VenueStatusActive) {
+		return fmt.Errorf("invalid status transition")
+	}
+
+	/**
+	 * ✅ Enforce transitions at SQL level:
+	 * - requested -> active
+	 * - active -> requested
+	 * ✅ Ensure owner_id matches (only the owner can mutate).
+	 * ✅ CAST: text -> venue_status
+	 */
+	q := `
+		UPDATE venues
+		SET status = $1::venue_status,
+		    updated_at = NOW()
+		WHERE id = $2
+		  AND owner_id = $3
+		  AND (
+				($1::venue_status = 'active'::venue_status     AND status = 'requested'::venue_status)
+			OR  ($1::venue_status = 'requested'::venue_status  AND status = 'active'::venue_status)
+		  )
+	`
+
+	ct, err := r.db.Exec(ctx, q, nextStatus, venueID, ownerID)
+	if err != nil {
+		return fmt.Errorf("update venue status: %w", err)
+	}
+
+	if ct.RowsAffected() == 0 {
+		// Could be: venue not found, not owner, or invalid transition
+		return fmt.Errorf("status change not allowed")
+	}
+
+	return nil
 }
