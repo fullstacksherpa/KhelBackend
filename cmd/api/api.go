@@ -153,7 +153,6 @@ func (app *application) mount() http.Handler {
 		r.Route("/app-reviews", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
 			r.Post("/", app.submitReviewHandler)
-			r.Get("/", app.getAllAppReviewsHandler)
 		})
 
 		// Public ads routes
@@ -402,6 +401,8 @@ func (app *application) mount() http.Handler {
 			r.Post("/venue-requests/{id}/reject", app.adminRejectVenueRequestHandler)
 
 			r.Get("/overview", app.adminOverviewHandler)
+
+			r.Get("/app-reviews", app.getAllAppReviewsHandler)
 
 		})
 

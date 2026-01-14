@@ -83,14 +83,14 @@ func (app *application) adminRemoveUserRoleHandler(w http.ResponseWriter, r *htt
 	userIDStr := chi.URLParam(r, "userID")
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil || userID <= 0 {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid userID"))
+		app.badRequestResponse(w, r, fmt.Errorf("invalid userid"))
 		return
 	}
 
 	roleIDStr := chi.URLParam(r, "roleID")
 	roleID, err := strconv.ParseInt(roleIDStr, 10, 64)
 	if err != nil || roleID <= 0 {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid roleID"))
+		app.badRequestResponse(w, r, fmt.Errorf("invalid roleid"))
 		return
 	}
 
@@ -128,7 +128,7 @@ func (app *application) adminGetUserRolesHandler(w http.ResponseWriter, r *http.
 	userIDStr := chi.URLParam(r, "userID")
 	userID, err := strconv.ParseInt(userIDStr, 10, 64)
 	if err != nil || userID <= 0 {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid userID"))
+		app.badRequestResponse(w, r, fmt.Errorf("invalid userid"))
 		return
 	}
 

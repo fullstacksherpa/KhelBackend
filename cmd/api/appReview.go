@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // for swagger only
@@ -65,16 +67,13 @@ func (app *application) submitReviewHandler(w http.ResponseWriter, r *http.Reque
 //	@Failure		401	{object}	error					"unauthorized route"
 //	@Failure		500	{object}	error					"Internal Server Error"
 //	@Security		ApiKeyAuth
-//	@Router			/app-reviews [get]
+//	@Router			/superadmin/app-reviews [get]
 func (app *application) getAllAppReviewsHandler(w http.ResponseWriter, r *http.Request) {
-	user := getUserFromContext(r)
 
-	if user == nil {
-		app.unauthorizedErrorResponse(w, r, errors.New("please logout and login again"))
-		return
-	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
 
-	reviews, err := app.store.AppReviews.GetAllReviews(r.Context())
+	reviews, err := app.store.AppReviews.GetAllReviews(ctx)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
