@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"khel/internal/domain/accesscontrol"
+	"khel/internal/domain/admindashboard"
 	"khel/internal/domain/ads"
 	"khel/internal/domain/appreviews"
 	"khel/internal/domain/bookings"
@@ -32,39 +33,41 @@ type Sales struct {
 }
 
 type Container struct {
-	pool          *pgxpool.Pool // IMPORTANT: set the pool so WithSalesTx works
-	Users         users.Store
-	VenueRequests venuerequest.RequestStore
-	Venues        venues.Store
-	VenuesReviews venuereviews.Store
-	Followers     followers.Store
-	Games         games.Store
-	Bookings      bookings.Store
-	GameQA        gameqa.Store
-	AppReviews    appreviews.Store
-	PushTokens    pushtokens.Store
-	Ads           ads.Store
-	AccessControl accesscontrol.Store
-	Products      products.Store
-	Sales         Sales
+	pool           *pgxpool.Pool // IMPORTANT: set the pool so WithSalesTx works
+	Users          users.Store
+	VenueRequests  venuerequest.RequestStore
+	Venues         venues.Store
+	VenuesReviews  venuereviews.Store
+	Followers      followers.Store
+	Games          games.Store
+	Bookings       bookings.Store
+	GameQA         gameqa.Store
+	AppReviews     appreviews.Store
+	PushTokens     pushtokens.Store
+	Ads            ads.Store
+	AdminDashboard admindashboard.Store
+	AccessControl  accesscontrol.Store
+	Products       products.Store
+	Sales          Sales
 }
 
 func NewContainer(db *pgxpool.Pool) *Container {
 	return &Container{
-		pool:          db,
-		Users:         users.NewRepository(db),
-		VenueRequests: venuerequest.NewRepository(db),
-		Venues:        venues.NewRepository(db),
-		VenuesReviews: venuereviews.NewRepository(db),
-		Followers:     followers.NewRepository(db),
-		Games:         games.NewRepository(db),
-		Bookings:      bookings.NewRepository(db),
-		GameQA:        gameqa.NewRepository(db),
-		AppReviews:    appreviews.NewRepository(db),
-		PushTokens:    pushtokens.NewRepository(db),
-		Ads:           ads.NewRepository(db),
-		AccessControl: accesscontrol.NewRepository(db),
-		Products:      products.NewRepository(db),
+		pool:           db,
+		Users:          users.NewRepository(db),
+		VenueRequests:  venuerequest.NewRepository(db),
+		Venues:         venues.NewRepository(db),
+		VenuesReviews:  venuereviews.NewRepository(db),
+		Followers:      followers.NewRepository(db),
+		Games:          games.NewRepository(db),
+		Bookings:       bookings.NewRepository(db),
+		GameQA:         gameqa.NewRepository(db),
+		AppReviews:     appreviews.NewRepository(db),
+		PushTokens:     pushtokens.NewRepository(db),
+		Ads:            ads.NewRepository(db),
+		AdminDashboard: admindashboard.NewRepository(db),
+		AccessControl:  accesscontrol.NewRepository(db),
+		Products:       products.NewRepository(db),
 		Sales: Sales{
 			Carts:    carts.NewRepository(db),
 			Orders:   orders.NewRepository(db),

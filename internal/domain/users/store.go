@@ -36,6 +36,7 @@ type Store interface {
 	UpdateAndUpload(ctx context.Context, userID int64, updates map[string]interface{}, profilePictureURL string) error
 	ListAdminUsers(ctx context.Context, filters AdminListUsersFilters, limit, offset int) ([]AdminUserRow, int, error)
 	GetAdminUserStats(ctx context.Context, userID int64) (*AdminUserStatsRow, error)
+	AdminCreateUser(ctx context.Context, user *User) (*User, error)
 }
 
 type Repository struct {
@@ -667,4 +668,62 @@ func (r *Repository) ListAdminUsers(ctx context.Context, filters AdminListUsersF
 	}
 
 	return out, total, nil
+}
+
+func (r *Repository) AdminCreateUser(ctx context.Context, user *User) (*User, error) {
+	// Admin-created users are active by default
+	user.IsActive = true
+
+	query := `
+		INSERT INTO users (
+			first_name,
+			last_name,
+			email,
+			phone,
+			password,
+			profile_picture_url,
+			skill_level,
+			no_of_games,
+			is_active
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		RETURNING
+			id,
+			created_at,
+			updated_at
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	err := r.db.QueryRow(
+		ctx,
+		query,
+		user.FirstName,
+		user.LastName,
+		user.Email,
+		user.Phone,
+		user.Password.hash,
+		user.ProfilePictureURL,
+		user.SkillLevel,
+		user.NoOfGames,
+		user.IsActive,
+	).Scan(
+		&user.ID,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		switch {
+		case strings.Contains(err.Error(), "users_email_key"):
+			return nil, ErrDuplicateEmail
+		case strings.Contains(err.Error(), "users_phone_key"):
+			return nil, ErrDuplicatePhoneNumber
+		default:
+			return nil, fmt.Errorf("admin create user: %w", err)
+		}
+	}
+
+	return user, nil
 }

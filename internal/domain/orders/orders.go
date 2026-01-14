@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"khel/internal/infra/dbx"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 )
 
 type Repository struct{ q dbx.Querier }
@@ -126,10 +124,10 @@ SELECT id,user_id,order_number,status,payment_status,payment_method,paid_at,
        COUNT(*) OVER() AS total_count
 FROM orders
 WHERE user_id = $1
-  AND ($2 = '' OR status = $2)
+  AND ($2 = '' OR status::text = $2)
 ORDER BY created_at DESC
 LIMIT $3 OFFSET $4`,
-		userID, status, limit, offset, pgx.QueryExecModeSimpleProtocol,
+		userID, status, limit, offset,
 	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list orders: %w", err)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -520,6 +521,87 @@ func (app *application) resetPasswordHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := app.jsonResponse(w, http.StatusOK, map[string]string{"message": "Password reset successful"}); err != nil {
+		app.internalServerError(w, r, err)
+	}
+}
+
+// AdminCreateUserPayload is the request body for admin user creation.
+type AdminCreateUserPayload struct {
+	FirstName         string  `json:"first_name" validate:"required,min=1,max=50"`
+	LastName          string  `json:"last_name" validate:"required,min=1,max=50"`
+	Email             string  `json:"email" validate:"required,email"`
+	Phone             string  `json:"phone" validate:"required"` // use `nepaliphone` if you want: validate:"required,nepaliphone"`
+	Password          string  `json:"password" validate:"required,min=4,max=72"`
+	SkillLevel        *string `json:"skill_level,omitempty" validate:"omitempty,oneof=beginner intermediate advanced"`
+	ProfilePictureURL *string `json:"profile_picture_url,omitempty" validate:"omitempty,url"`
+	NoOfGames         *int    `json:"no_of_games,omitempty" validate:"omitempty,gte=0,lte=32767"`
+}
+
+// adminCreateUserHandler godoc
+//
+//	@Summary		Admin creates a user
+//	@Description	Creates a user directly from Admin Panel (no invitation/activation email). User is active by default.
+//	@Tags			superadmin-role
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body		AdminCreateUserPayload		true	"User details"
+//	@Success		201		{object}	users.User					"User created"
+//	@Failure		400		{object}	ErrorBadRequestResponse		"Bad request"
+//	@Failure		500		{object}	ErrorInternalServerResponse	"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/superadmin/users [post]
+func (app *application) adminCreateUserHandler(w http.ResponseWriter, r *http.Request) {
+	var payload AdminCreateUserPayload
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	if err := Validate.Struct(payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	user := &users.User{
+		FirstName: payload.FirstName,
+		LastName:  payload.LastName,
+		Email:     payload.Email,
+		Phone:     payload.Phone,
+	}
+
+	// Optional fields
+	if payload.SkillLevel != nil {
+		user.SkillLevel = sql.NullString{String: *payload.SkillLevel, Valid: true}
+	}
+	if payload.ProfilePictureURL != nil {
+		user.ProfilePictureURL = sql.NullString{String: *payload.ProfilePictureURL, Valid: true}
+	}
+	if payload.NoOfGames != nil {
+		user.NoOfGames = sql.NullInt16{Int16: int16(*payload.NoOfGames), Valid: true}
+	}
+
+	// hash password
+	if err := user.Password.Set(payload.Password); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	ctx := r.Context()
+
+	created, err := app.store.Users.AdminCreateUser(ctx, user)
+	if err != nil {
+		switch err {
+		case users.ErrDuplicateEmail:
+			app.badRequestResponse(w, r, err)
+		case users.ErrDuplicatePhoneNumber:
+			app.badRequestResponse(w, r, err)
+		default:
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	if err := app.jsonResponse(w, http.StatusCreated, created); err != nil {
 		app.internalServerError(w, r, err)
 	}
 }

@@ -150,15 +150,6 @@ func (app *application) mount() http.Handler {
 			r.With(app.StrictLimiterMiddleware(app.venueRequestLimiter)).Post("/", app.createVenueRequestHandler)
 		})
 
-		r.Route("/admin/venue-requests", func(r chi.Router) {
-			r.Use(app.AuthTokenMiddleware)
-			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
-
-			r.Get("/", app.adminListVenueRequestsHandler)
-			r.Post("/{id}/approve", app.adminApproveVenueRequestHandler)
-			r.Post("/{id}/reject", app.adminRejectVenueRequestHandler)
-		})
-
 		r.Route("/app-reviews", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
 			r.Post("/", app.submitReviewHandler)
@@ -172,7 +163,7 @@ func (app *application) mount() http.Handler {
 			r.Post("/{adID}/click", app.trackClickHandler)
 		})
 
-		// Admin ads routes
+		// Admin: => Merchant:  ads routes
 		r.Route("/admin/ads", func(r chi.Router) {
 			r.Use(app.AuthTokenMiddleware)
 			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleMerchant))
@@ -185,14 +176,6 @@ func (app *application) mount() http.Handler {
 			r.Post("/{adID}/toggle", app.toggleAdStatusHandler)
 			r.Get("/analytics", app.getAdsAnalyticsHandler)
 			r.Post("/bulk-update-order", app.bulkUpdateDisplayOrderHandler)
-		})
-		r.Route("/admin/users", func(r chi.Router) {
-			r.Use(app.AuthTokenMiddleware)
-			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
-
-			r.Get("/{userID}/roles", app.adminGetUserRolesHandler)
-			r.Post("/{userID}/roles", app.adminAssignUserRoleHandler)
-			r.Delete("/{userID}/roles/{roleID}", app.adminRemoveUserRoleHandler)
 		})
 
 		r.With(app.optionalAuth).Get("/venues/list-venues", app.listVenuesHandler)
@@ -409,6 +392,16 @@ func (app *application) mount() http.Handler {
 			r.Use(app.RequireRoleMiddleware(accesscontrol.RoleAdmin))
 			r.Get("/users", app.adminListUsersHandler)
 			r.Get("/users/{userID}", app.AdminUserOverviewHandler)
+			r.Get("/{userID}/roles", app.adminGetUserRolesHandler)
+			r.Post("/{userID}/roles", app.adminAssignUserRoleHandler)
+			r.Delete("/{userID}/roles/{roleID}", app.adminRemoveUserRoleHandler)
+			r.Post("/users", app.adminCreateUserHandler)
+
+			r.Get("/venue-requests", app.adminListVenueRequestsHandler)
+			r.Post("/venue-requests/{id}/approve", app.adminApproveVenueRequestHandler)
+			r.Post("/venue-requests/{id}/reject", app.adminRejectVenueRequestHandler)
+
+			r.Get("/overview", app.adminOverviewHandler)
 
 		})
 

@@ -423,6 +423,44 @@ definitions:
         description: Visibility (public or private)
         type: string
     type: object
+  main.AdminCreateUserPayload:
+    properties:
+      email:
+        type: string
+      first_name:
+        maxLength: 50
+        minLength: 1
+        type: string
+      last_name:
+        maxLength: 50
+        minLength: 1
+        type: string
+      no_of_games:
+        maximum: 32767
+        minimum: 0
+        type: integer
+      password:
+        maxLength: 72
+        minLength: 4
+        type: string
+      phone:
+        description: 'use `nepaliphone` if you want: validate:"required,nepaliphone"`'
+        type: string
+      profile_picture_url:
+        type: string
+      skill_level:
+        enum:
+        - beginner
+        - intermediate
+        - advanced
+        type: string
+    required:
+    - email
+    - first_name
+    - last_name
+    - password
+    - phone
+    type: object
   main.AdminOrderDetailResponse:
     properties:
       items:
@@ -1715,108 +1753,6 @@ paths:
       summary: Bulk update display order (Admin)
       tags:
       - Admin
-  /admin/users/{userID}/roles:
-    get:
-      description: Returns all roles assigned to the given user.
-      parameters:
-      - description: User ID
-        in: path
-        name: userID
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/accesscontrol.Role'
-            type: array
-        "400":
-          description: Bad Request
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: List roles for a user
-      tags:
-      - Admin-Roles
-    post:
-      consumes:
-      - application/json
-      description: Assigns a role (by role_id) to the specified user.
-      parameters:
-      - description: User ID
-        in: path
-        name: userID
-        required: true
-        type: integer
-      - description: Role assignment payload
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/main.assignRoleRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Role assigned successfully
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Assign a role to a user
-      tags:
-      - Admin-Roles
-  /admin/users/{userID}/roles/{roleID}:
-    delete:
-      description: Removes a specific role from a user by role_id.
-      parameters:
-      - description: User ID
-        in: path
-        name: userID
-        required: true
-        type: integer
-      - description: Role ID
-        in: path
-        name: roleID
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Role removed successfully
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema: {}
-        "404":
-          description: Role not found for user
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Remove a role from a user
-      tags:
-      - Admin-Roles
   /admin/venue-requests:
     get:
       description: Admin route. List venue requests by status with pagination.
@@ -3969,6 +3905,141 @@ paths:
       summary: Get product detail by slug
       tags:
       - Store-Products
+  /superadmin/{userID}/roles:
+    get:
+      description: Returns all roles assigned to the given user.
+      parameters:
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/accesscontrol.Role'
+            type: array
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List roles for a user
+      tags:
+      - superadmin-role
+    post:
+      consumes:
+      - application/json
+      description: Assigns a role (by role_id) to the specified user.
+      parameters:
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: Role assignment payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/main.assignRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role assigned successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Assign a role to a user
+      tags:
+      - superadmin-role
+  /superadmin/{userID}/roles/{roleID}:
+    delete:
+      description: Removes a specific role from a user by role_id.
+      parameters:
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: Role ID
+        in: path
+        name: roleID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role removed successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Role not found for user
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Remove a role from a user
+      tags:
+      - superadmin-role
+  /superadmin/users:
+    post:
+      consumes:
+      - application/json
+      description: Creates a user directly from Admin Panel (no invitation/activation
+        email). User is active by default.
+      parameters:
+      - description: User details
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.AdminCreateUserPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created
+          schema:
+            $ref: '#/definitions/users.User'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorBadRequestResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorInternalServerResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Admin creates a user
+      tags:
+      - superadmin-role
   /users:
     put:
       consumes:

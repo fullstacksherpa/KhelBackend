@@ -2,6 +2,8 @@ package adminview
 
 import "time"
 
+//this is for types only to prevent from circular import
+
 type UserDTO struct {
 	ID                int64     `json:"id"`
 	FirstName         string    `json:"first_name"`
