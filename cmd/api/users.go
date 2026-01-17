@@ -414,7 +414,6 @@ func (app *application) editProfileHandler(w http.ResponseWriter, r *http.Reques
 //	@Security		ApiKeyAuth
 //	@Router			/users/me [get]
 func (app *application) getCurrentUserHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. Extract *store.User from context
 	userCtx := getUserFromContext(r)
 	if userCtx == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)

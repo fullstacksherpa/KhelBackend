@@ -15,7 +15,7 @@ import (
 //	@Description	Returns totals for admin dashboard: users, games, venue requests, venues.
 //	@Tags			superadmin-overview
 //	@Produce		json
-//	@Success		200	{object}	adminoverview.Overview
+//	@Success		200	{object}	admindashboard.Overview
 //	@Failure		401	{object}	error
 //	@Failure		403	{object}	error
 //	@Failure		500	{object}	error
@@ -47,17 +47,17 @@ type VenueListWithMetaResponse struct {
 	Filters    AdminVenueListFilters `json:"filters"`
 }
 
-// @Summary      List venues (admin)
-// @Description  Paginated list of venues with optional filters (sport, status).
-// @Tags         superadmin-venue
-// @Produce      json
-// @Param        sport   query   string false "Filter by sport type"
-// @Param        status  query   string false "Filter by venue status (active|requested|inactive)"
-// @Param        page    query   int    false "Page number" default(1)
-// @Param        limit   query   int    false "Items per page" default(15)
-// @Success      200     {object} VenueListWithMetaResponse
-// @Security     ApiKeyAuth
-// @Router       /superadmin/venues/ [get]
+// @Summary		List venues (admin)
+// @Description	Paginated list of venues with optional filters (sport, status).
+// @Tags			superadmin-venue
+// @Produce		json
+// @Param			sport	query		string	false	"Filter by sport type"
+// @Param			status	query		string	false	"Filter by venue status (active|requested|inactive)"
+// @Param			page	query		int		false	"Page number"		default(1)
+// @Param			limit	query		int		false	"Items per page"	default(15)
+// @Success		200		{object}	VenueListWithMetaResponse
+// @Security		ApiKeyAuth
+// @Router			/superadmin/venues/ [get]
 func (app *application) AdminlistVenuesHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()

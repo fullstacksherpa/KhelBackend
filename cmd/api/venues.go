@@ -241,22 +241,22 @@ type VenueListResponse struct {
 	IsFavorite    bool      `json:"is_favorite,omitempty"`
 }
 
-// @Summary		List venues
-// @Description	Get paginated list of venues with filters
-// @Tags			Venue
-// @Accept			json
-// @Produce		json
-// @Param			sport		query	string	false	"Filter by sport type"
-// @Param			lat			query	number	false	"Latitude for location filter"
-// @Param			lng			query	number	false	"Longitude for location filter"
-// @Param			distance	query	number	false	"Distance in meters from location"
-// @Param			page		query	int		false	"Page number"		default(1)
-// @Param			limit		query	int		false	"Items per page"	default(7)
-// @Success		200			{array}	VenueListResponse
+//	@Summary		List venues
+//	@Description	Get paginated list of venues with filters
+//	@Tags			Venue
+//	@Accept			json
+//	@Produce		json
+//	@Param			sport		query	string	false	"Filter by sport type"
+//	@Param			lat			query	number	false	"Latitude for location filter"
+//	@Param			lng			query	number	false	"Longitude for location filter"
+//	@Param			distance	query	number	false	"Distance in meters from location"
+//	@Param			page		query	int		false	"Page number"		default(1)
+//	@Param			limit		query	int		false	"Items per page"	default(7)
+//	@Success		200			{array}	VenueListResponse
 //
-// @Security		ApiKeyAuth
+//	@Security		ApiKeyAuth
 //
-// @Router			/venues/list-venues [get]
+//	@Router			/venues/list-venues [get]
 func (app *application) listVenuesHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	q := r.URL.Query()
@@ -744,7 +744,7 @@ type updateVenueStatusPayload struct {
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID	path		int64					true	"Venue ID"
+//	@Param			venueID	path		int64						true	"Venue ID"
 //	@Param			payload	body		updateVenueStatusPayload	true	"New status (requested|active)"
 //	@Success		200		{object}	map[string]string
 //	@Failure		400		{object}	error

@@ -13,6 +13,46 @@ definitions:
       updated_at:
         type: string
     type: object
+  admindashboard.Overview:
+    properties:
+      total_active_users:
+        type: integer
+      total_active_venues:
+        type: integer
+      total_badminton_games:
+        type: integer
+      total_basketball_games:
+        type: integer
+      total_bookings:
+        description: Bookings
+        type: integer
+      total_completed_bookings:
+        type: integer
+      total_confirmed_bookings:
+        type: integer
+      total_futsal_games:
+        description: Games
+        type: integer
+      total_inactive_users:
+        type: integer
+      total_pending_bookings:
+        type: integer
+      total_pending_venue_requests:
+        type: integer
+      total_pending_venues:
+        type: integer
+      total_rejected_bookings:
+        type: integer
+      total_users:
+        description: Users
+        type: integer
+      total_venue_requests:
+        description: Venue Requests
+        type: integer
+      total_venues:
+        description: Venues
+        type: integer
+    type: object
   ads.Ad:
     properties:
       active:
@@ -498,6 +538,15 @@ definitions:
         type: string
       status:
         example: shipped
+        type: string
+    type: object
+  main.AdminVenueListFilters:
+    properties:
+      sport:
+        description: '"" when not filtered'
+        type: string
+      status:
+        description: '"" when not filtered'
         type: string
     type: object
   main.AppReviewPayload:
@@ -1012,6 +1061,17 @@ definitions:
       total_reviews:
         type: integer
     type: object
+  main.VenueListWithMetaResponse:
+    properties:
+      filters:
+        $ref: '#/definitions/main.AdminVenueListFilters'
+      pagination:
+        $ref: '#/definitions/params.Pagination'
+      venues:
+        items:
+          $ref: '#/definitions/main.VenueListResponse'
+        type: array
+    type: object
   main.VenueSearchFTSResponse:
     properties:
       data:
@@ -1123,6 +1183,12 @@ definitions:
         items:
           type: integer
         type: array
+    type: object
+  main.updateVenueStatusPayload:
+    properties:
+      status:
+        description: '"requested" or "active"'
+        type: string
     type: object
   orders.Order:
     properties:
@@ -1965,30 +2031,6 @@ paths:
       tags:
       - Ads
   /app-reviews:
-    get:
-      consumes:
-      - application/json
-      description: Returns all app reviews from all users.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: List of all reviews
-          schema:
-            items:
-              $ref: '#/definitions/appreviews.AppReview'
-            type: array
-        "401":
-          description: unauthorized route
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: List All App Reviews
-      tags:
-      - App_Reviews
     post:
       consumes:
       - application/json
@@ -4007,6 +4049,56 @@ paths:
       summary: Remove a role from a user
       tags:
       - superadmin-role
+  /superadmin/app-reviews:
+    get:
+      consumes:
+      - application/json
+      description: Returns all app reviews from all users.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of all reviews
+          schema:
+            items:
+              $ref: '#/definitions/appreviews.AppReview'
+            type: array
+        "401":
+          description: unauthorized route
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List All App Reviews
+      tags:
+      - App_Reviews
+  /superadmin/overview:
+    get:
+      description: 'Returns totals for admin dashboard: users, games, venue requests,
+        venues.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/admindashboard.Overview'
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Admin overview totals
+      tags:
+      - superadmin-overview
   /superadmin/users:
     post:
       consumes:
@@ -4040,6 +4132,40 @@ paths:
       summary: Admin creates a user
       tags:
       - superadmin-role
+  /superadmin/venues/:
+    get:
+      description: Paginated list of venues with optional filters (sport, status).
+      parameters:
+      - description: Filter by sport type
+        in: query
+        name: sport
+        type: string
+      - description: Filter by venue status (active|requested|inactive)
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 15
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.VenueListWithMetaResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List venues (admin)
+      tags:
+      - superadmin-venue
   /users:
     put:
       consumes:
@@ -5417,6 +5543,53 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List Scheduled booking requests for a venue
+      tags:
+      - Venue-Owner
+  /venues/{venueID}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Allows venue owner to change status only between requested and
+        active.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: New status (requested|active)
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.updateVenueStatusPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Owner updates venue status
       tags:
       - Venue-Owner
   /venues/{venueID}/venue-info:
