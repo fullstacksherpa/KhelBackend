@@ -51,7 +51,12 @@ type OrderDetail struct {
 
 type Store interface {
 	// Checkout
-	CreateFromCart(ctx context.Context, userID int64, ship ShippingInfo, method *string) (*Order, error)
+	CreateFromCart(
+		ctx context.Context,
+		userID int64,
+		ship ShippingInfo,
+		method string, // normalized before calling: "khalti" | "esewa" | "cash_on_delivery"
+	) (*Order, int64 /*cartID*/, error)
 
 	// Basic
 	GetByID(ctx context.Context, id int64) (*Order, error)
@@ -63,5 +68,5 @@ type Store interface {
 	// ADMIN-facing
 	ListAll(ctx context.Context, status string, limit, offset int) ([]Order, int, error)
 	GetDetail(ctx context.Context, orderID int64) (*OrderDetail, error)
-	UpdateStatus(ctx context.Context, orderID int64, status string, cancelledReason *string) error
+	UpdateStatus(ctx context.Context, orderID int64, status string, opts UpdateStatusOpts) error
 }

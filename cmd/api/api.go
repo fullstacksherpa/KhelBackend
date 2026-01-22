@@ -110,7 +110,8 @@ type esewaConfig struct {
 
 type khaltiConfig struct {
 	SecretKey  string
-	SuccessURL string
+	ReturnURL  string
+	WebsiteURL string
 }
 
 func (app *application) mount() http.Handler {
@@ -348,6 +349,9 @@ func (app *application) mount() http.Handler {
 
 		// ---------- PUBLIC E-COMMERCE ROUTES ----------
 		r.Route("/store", func(r chi.Router) {
+			r.Get("/payments/esewa/start", app.esewaStartHandler)
+			r.Get("/payments/khalti", app.khaltiReturnHandler)
+			r.Get("/payments/esewa/return", app.esewaReturnHandler)
 			// ---------- PUBLIC CATALOG ----------
 			r.Get("/brands", app.getAllBrandsHandler)
 			r.Get("/categories", app.listCategoriesHandler)

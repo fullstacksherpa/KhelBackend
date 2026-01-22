@@ -215,8 +215,6 @@ func (r *Repository) SetProviderRef(ctx context.Context, paymentID int64, ref st
 
 func (r *Repository) GetByProviderRef(ctx context.Context, provider, ref string) (*Payment, error) {
 	var p Payment
-	var providerRef *string
-	var gatewayResp any
 
 	err := r.q.QueryRow(ctx, `
 		SELECT id, order_id, provider, provider_ref, amount_cents, currency, status,
@@ -228,11 +226,11 @@ func (r *Repository) GetByProviderRef(ctx context.Context, provider, ref string)
 		&p.ID,
 		&p.OrderID,
 		&p.Provider,
-		&providerRef,
+		&p.ProviderRef,
 		&p.AmountCents,
 		&p.Currency,
 		&p.Status,
-		&gatewayResp,
+		&p.GatewayResp, // Scan directly into json.RawMessage
 		&p.CreatedAt,
 		&p.UpdatedAt,
 	)
@@ -242,9 +240,6 @@ func (r *Repository) GetByProviderRef(ctx context.Context, provider, ref string)
 		}
 		return nil, fmt.Errorf("get payment by provider_ref: %w", err)
 	}
-
-	p.ProviderRef = providerRef
-	p.GatewayResp = gatewayResp
 
 	return &p, nil
 }

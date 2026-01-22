@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"khel/internal/auth"
 	"khel/internal/db"
+	"khel/internal/domain/orders"
 	"khel/internal/domain/storage"
 	"khel/internal/mailer"
 	"khel/internal/notifications"
@@ -164,7 +165,8 @@ func main() {
 			},
 			Khalti: khaltiConfig{
 				SecretKey:  os.Getenv("KHALTI_SECRET_KEY"),
-				SuccessURL: os.Getenv("KHALTI_SUCCESS_URL"),
+				ReturnURL:  os.Getenv("KHALTI_RETURN_URL"),
+				WebsiteURL: os.Getenv("KHALTI_WEBSITE_URL"),
 			},
 		},
 		turnstile: turnstileConfig{
@@ -182,6 +184,14 @@ func main() {
 	}
 	defer logger.Sync()
 
+	//Unique Order Number Generator with userid embedded
+	orderSecret := os.Getenv("ORDER_NUMBER_SECRET")
+	if orderSecret == "" {
+		logger.Fatal("ORDER_NUMBER_SECRET is required")
+	}
+
+	orderGen := orders.NewOrderNumberGenerator(orderSecret)
+
 	// Database
 	dbpool, err := db.New(
 		cfg.db.addr,
@@ -198,7 +208,7 @@ func main() {
 
 	//storage
 
-	storeContainer := storage.NewContainer(dbpool)
+	storeContainer := storage.NewContainer(dbpool, orderGen)
 
 	//cloudinary
 	cloudinaryUrl := os.Getenv("CLOUDINARY_URL")
@@ -246,6 +256,8 @@ func main() {
 		cfg.auth.token.iss,
 	)
 
+	isProd := os.Getenv("APP_ENV") == "prod"
+
 	// Payments
 	pm := payments.NewPaymentManager()
 
@@ -255,13 +267,16 @@ func main() {
 			cfg.payment.Esewa.SecretKey,
 			cfg.payment.Esewa.SuccessURL,
 			cfg.payment.Esewa.FailureURL,
+			isProd,
 		),
 	)
 
 	pm.RegisterGateway("khalti",
 		payments.NewKhaltiAdapter(
 			cfg.payment.Khalti.SecretKey,
-			cfg.payment.Khalti.SuccessURL,
+			cfg.payment.Khalti.ReturnURL,
+			cfg.payment.Khalti.WebsiteURL,
+			isProd,
 		),
 	)
 

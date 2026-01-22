@@ -33,7 +33,8 @@ type Sales struct {
 }
 
 type Container struct {
-	pool           *pgxpool.Pool // IMPORTANT: set the pool so WithSalesTx works
+	pool           *pgxpool.Pool                // IMPORTANT: set the pool so WithSalesTx works
+	orderGen       *orders.OrderNumberGenerator //unexported intentionally
 	Users          users.Store
 	VenueRequests  venuerequest.RequestStore
 	Venues         venues.Store
@@ -51,10 +52,11 @@ type Container struct {
 	Sales          Sales
 }
 
-func NewContainer(db *pgxpool.Pool) *Container {
+func NewContainer(db *pgxpool.Pool, orderGen *orders.OrderNumberGenerator) *Container {
 	return &Container{
 		pool:           db,
 		Users:          users.NewRepository(db),
+		orderGen:       orderGen,
 		VenueRequests:  venuerequest.NewRepository(db),
 		Venues:         venues.NewRepository(db),
 		VenuesReviews:  venuereviews.NewRepository(db),
@@ -70,7 +72,7 @@ func NewContainer(db *pgxpool.Pool) *Container {
 		Products:       products.NewRepository(db),
 		Sales: Sales{
 			Carts:    carts.NewRepository(db),
-			Orders:   orders.NewRepository(db),
+			Orders:   orders.NewRepository(db, orderGen),
 			Payments: paymentsrepo.NewRepository(db),
 			PayLogs:  paymentsrepo.NewLogsRepository(db),
 		},
@@ -102,7 +104,7 @@ func (c *Container) WithSalesTx(ctx context.Context, fn func(s *SalesTx) error) 
 
 	s := &SalesTx{
 		Carts:    carts.NewRepository(tx),
-		Orders:   orders.NewRepository(tx),
+		Orders:   orders.NewRepository(tx, c.orderGen),
 		Payments: paymentsrepo.NewRepository(tx),
 		PayLogs:  paymentsrepo.NewLogsRepository(tx),
 	}

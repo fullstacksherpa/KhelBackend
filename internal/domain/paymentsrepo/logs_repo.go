@@ -14,6 +14,7 @@ func NewLogsRepository(q dbx.Querier) *LogsRepository {
 	return &LogsRepository{q: q}
 }
 
+// (log_type IN ('request','response','webhook','error')),
 func (r *LogsRepository) InsertPaymentLog(ctx context.Context, paymentID int64, logType string, payload any) error {
 	var jb []byte
 	if payload != nil {

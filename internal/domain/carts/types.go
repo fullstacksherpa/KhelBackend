@@ -59,4 +59,7 @@ type Store interface {
 	GetViewByCartID(ctx context.Context, cartID int64) (*CartView, error)
 	List(ctx context.Context, status string, includeExpired bool, limit, offset int) ([]Cart, int, error)
 	MarkExpiredAsAbandoned(ctx context.Context) (int64, error)
+
+	UnlockCheckoutCart(ctx context.Context, orderID int64) error
+	ConvertCheckoutCart(ctx context.Context, orderID int64) error
 }

@@ -77,7 +77,7 @@ func (app *application) AdminlistVenuesHandler(w http.ResponseWriter, r *http.Re
 	var statusPtr *string
 	if s := strings.TrimSpace(q.Get("status")); s != "" {
 		switch s {
-		case "active", "requested", "inactive":
+		case "requested", "active", "rejected", "hold":
 			statusPtr = &s
 		default:
 			app.badRequestResponse(w, r, errInvalidRequest("invalid status"))

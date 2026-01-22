@@ -1,0 +1,14 @@
+-- Down migration intentionally left as NO-OP.
+--
+-- Postgres enums do not support safely removing individual enum values
+-- without recreating the enum type and rewriting dependent columns.
+-- In production, enum additions are typically treated as irreversible.
+--
+-- If you *must* fully reverse, you would need to:
+-- 1) Update all rows to remove usage of the new labels
+-- 2) ALTER columns to TEXT
+-- 3) DROP and recreate the enum types without the new labels
+-- 4) ALTER columns back to enum
+--
+-- This is too risky for a standard down migration, so we no-op here.
+SELECT 1;

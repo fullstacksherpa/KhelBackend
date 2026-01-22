@@ -155,6 +155,7 @@ func (app *application) adminUpdateOrderStatusHandler(w http.ResponseWriter, r *
 	var in struct {
 		Status          string  `json:"status"`
 		CancelledReason *string `json:"cancelled_reason"`
+		// Note *string `json:"note"` // optional future: used for status history notes
 	}
 	if err := readJSON(w, r, &in); err != nil {
 		app.badRequestResponse(w, r, err)
@@ -167,17 +168,43 @@ func (app *application) adminUpdateOrderStatusHandler(w http.ResponseWriter, r *
 		return
 	}
 
+	// Keep the allowed admin transitions explicit.
+	// Add new statuses here when you expand your order_status enum.
 	valid := map[string]bool{
-		"pending": true, "processing": true, "shipped": true,
-		"delivered": true, "cancelled": true, "refunded": true,
+		"pending":          true,
+		"awaiting_payment": true, // optional: if you added this enum value
+		"processing":       true,
+		"shipped":          true,
+		"delivered":        true,
+		"cancelled":        true,
+		"refunded":         true,
+		"payment_failed":   true, // optional: if you added this enum value
 	}
+
 	if !valid[newStatus] {
 		app.badRequestResponse(w, r, fmt.Errorf("invalid status %q", newStatus))
 		return
 	}
 
-	if err := app.store.Sales.Orders.UpdateStatus(ctx, orderID, newStatus, in.CancelledReason); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+	// cancelled_reason should only be provided/used when cancelling.
+	// This prevents accidentally storing a reason for non-cancel states.
+	if newStatus != "cancelled" && in.CancelledReason != nil && strings.TrimSpace(*in.CancelledReason) != "" {
+		app.badRequestResponse(w, r, fmt.Errorf("cancelled_reason is only valid when status='cancelled'"))
+		return
+	}
+
+	opts := orders.UpdateStatusOpts{
+		CancelledReason: nil,
+		// Note: nil, // future: hook this up to request payload and store in status history
+	}
+	if newStatus == "cancelled" {
+		opts.CancelledReason = in.CancelledReason
+	}
+
+	// Use the new repository signature with opts.
+	if err := app.store.Sales.Orders.UpdateStatus(ctx, orderID, newStatus, opts); err != nil {
+		// If you have a typed NotFound error, use that instead of string matching.
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
 			app.notFoundResponse(w, r, err)
 			return
 		}

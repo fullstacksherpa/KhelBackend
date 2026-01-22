@@ -205,6 +205,31 @@ WHERE cart_id = (
 	return err
 }
 
+// UnlockCheckoutCart re-opens a cart when online payment fails/cancels.
+// Safe to call multiple times (idempotent).
+func (r *Repository) UnlockCheckoutCart(ctx context.Context, orderID int64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE carts
+		   SET status='active', checkout_order_id=NULL, updated_at=now()
+		 WHERE checkout_order_id=$1 AND status='checkout_pending'
+	`, orderID)
+	return err
+}
+
+// ConvertCheckoutCart finalizes the cart used for checkout AFTER payment is confirmed.
+//
+// We only convert carts that are explicitly linked to the order via checkout_order_id
+// AND currently in 'checkout_pending'. This prevents converting a wrong cart due to bugs
+// or race conditions.
+func (r *Repository) ConvertCheckoutCart(ctx context.Context, orderID int64) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE carts
+		   SET status='converted', updated_at=now()
+		 WHERE checkout_order_id=$1 AND status='checkout_pending'
+	`, orderID)
+	return err
+}
+
 // Get active cart view by user
 func (r *Repository) GetView(ctx context.Context, userID int64) (*CartView, error) {
 	var v CartView
@@ -230,13 +255,7 @@ LIMIT 1
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("get cart: %w", err)
 		}
-		// no active cart → empty shell (handlers may call EnsureActive if needed)
-		return &CartView{
-			Cart: Cart{
-				UserID: &userID,
-				Status: "active",
-			},
-		}, nil
+		return nil, nil
 	}
 
 	return r.fillLines(ctx, &v, v.Cart.ID)

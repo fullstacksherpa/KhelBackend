@@ -7,12 +7,22 @@ import (
 	"errors"
 	"fmt"
 	"khel/internal/infra/dbx"
-	"time"
 )
 
-type Repository struct{ q dbx.Querier }
+type Repository struct {
+	q   dbx.Querier
+	gen *OrderNumberGenerator
+}
 
-func NewRepository(q dbx.Querier) *Repository { return &Repository{q: q} }
+func NewRepository(q dbx.Querier, gen *OrderNumberGenerator) *Repository {
+	if gen == nil {
+		panic("orders: OrderNumberGenerator is nil")
+	}
+	return &Repository{
+		q:   q,
+		gen: gen,
+	}
+}
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (*Order, error) {
 	var o Order
@@ -28,80 +38,145 @@ FROM orders WHERE id=$1`, id).
 	return &o, nil
 }
 
-// CreateFromCart copies items from user's active cart into order+order_items,
-// marks cart converted. Assumes this is called INSIDE a transaction.
-func (r *Repository) CreateFromCart(ctx context.Context, userID int64, ship ShippingInfo, method *string) (*Order, error) {
-	// compute totals from cart_items
+// CreateFromCart creates an order snapshot from the user's ACTIVE cart.
+// IMPORTANT:
+//   - For online payments: cart is NOT converted here. It's moved to `checkout_pending` (locked)
+//     so the user can't mutate cart items while payment is in-flight.
+//   - For COD: cart is converted immediately.
+//
+// Assumes this is called INSIDE a transaction.
+func (r *Repository) CreateFromCart(
+	ctx context.Context,
+	userID int64,
+	ship ShippingInfo,
+	method string, // normalized before calling: "khalti" | "esewa" | "cash_on_delivery"
+) (*Order, int64 /*cartID*/, error) {
+
+	// 1) Lock the active cart row (prevents two concurrent checkouts creating two orders).
+	//    If you allow only one active cart per user, this becomes your checkout mutex.
+	var cartID int64
+	err := r.q.QueryRow(ctx, `
+		SELECT id
+		FROM carts
+		WHERE user_id=$1 AND status='active'
+		ORDER BY id DESC
+		LIMIT 1
+		FOR UPDATE
+	`, userID).Scan(&cartID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("no active cart: %w", err)
+	}
+
+	// 2) Compute totals from cart_items (still inside tx, cart locked).
 	var subtotal int64
 	if err := r.q.QueryRow(ctx, `
-SELECT COALESCE(SUM(ci.quantity * ci.price_cents),0)
-FROM cart_items ci
-JOIN carts c ON c.id=ci.cart_id
-WHERE c.user_id=$1 AND c.status='active'`, userID).Scan(&subtotal); err != nil {
-		return nil, fmt.Errorf("subtotal from cart: %w", err)
+		SELECT COALESCE(SUM(ci.quantity * ci.price_cents),0)
+		FROM cart_items ci
+		WHERE ci.cart_id=$1
+	`, cartID).Scan(&subtotal); err != nil {
+		return nil, 0, fmt.Errorf("subtotal from cart: %w", err)
 	}
 	if subtotal <= 0 {
-		return nil, fmt.Errorf("cart is empty")
+		return nil, 0, fmt.Errorf("cart is empty")
 	}
 
-	var cartID int64
-	if err := r.q.QueryRow(ctx, `SELECT id FROM carts WHERE user_id=$1 AND status='active' LIMIT 1`, userID).Scan(&cartID); err != nil {
-		return nil, fmt.Errorf("no active cart: %w", err)
+	// 3) Build the order snapshot values.
+	//    (Later you can add tax/shipping/discount, but keep the snapshot immutable.)
+	o := &Order{
+		UserID:        userID,
+		OrderNumber:   r.gen.Generate(userID),
+		SubtotalCents: subtotal,
+		DiscountCents: 0,
+		TaxCents:      0,
+		ShippingCents: 0,
+		TotalCents:    subtotal,
+		// status/payment_status set in SQL based on method
 	}
 
-	// create order
-	var o Order
-	o.UserID = userID
-	o.OrderNumber = fmt.Sprintf("KHEL-%d-%d", userID, time.Now().Unix())
-	o.SubtotalCents = subtotal
-	o.DiscountCents = 0
-	o.TaxCents = 0
-	o.ShippingCents = 0
-	o.TotalCents = subtotal
+	// Choose order status based on payment method.
+	// - COD: order can move to 'processing' (or 'pending' if you want manual confirm)
+	// - Online: order should be 'awaiting_payment' / payment_status 'pending'
+	orderStatus := "processing"
+	paymentStatus := "pending"
+	if method != "cash_on_delivery" {
+		orderStatus = "awaiting_payment"
+		paymentStatus = "pending"
+	}
 
-	err := r.q.QueryRow(ctx, `
-INSERT INTO orders (
-  user_id, order_number, cart_id, status, payment_status, payment_method,
-  shipping_name, shipping_phone, shipping_address, shipping_city, shipping_postal_code, shipping_country,
-  subtotal_cents, discount_cents, tax_cents, shipping_cents, total_cents
-) VALUES (
-  $1, $2, $3, 'pending', 'pending', $4,
-  $5, $6, $7, $8, $9, COALESCE($10,'Nepal'),
-  $11, $12, $13, $14, $15
-) RETURNING id, created_at`,
-		userID, o.OrderNumber, cartID, method,
+	// 4) Create order row.
+	if err := r.q.QueryRow(ctx, `
+		INSERT INTO orders (
+		  user_id, order_number, cart_id, status, payment_status, payment_method,
+		  shipping_name, shipping_phone, shipping_address, shipping_city, shipping_postal_code, shipping_country,
+		  subtotal_cents, discount_cents, tax_cents, shipping_cents, total_cents
+		) VALUES (
+		  $1, $2, $3, $4::order_status, $5::payment_status, $6,
+		  $7, $8, $9, $10, $11, COALESCE($12,'Nepal'),
+		  $13, $14, $15, $16, $17
+		)
+		RETURNING id, created_at
+	`,
+		userID, o.OrderNumber, cartID, orderStatus, paymentStatus, method,
 		ship.Name, ship.Phone, ship.Address, ship.City, ship.PostalCode, ship.Country,
-		o.SubtotalCents, o.DiscountCents, o.TaxCents, o.ShippingCents, o.TotalCents).
-		Scan(&o.ID, &o.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("create order: %w", err)
+		o.SubtotalCents, o.DiscountCents, o.TaxCents, o.ShippingCents, o.TotalCents,
+	).Scan(&o.ID, &o.CreatedAt); err != nil {
+		return nil, 0, fmt.Errorf("create order: %w", err)
 	}
 
-	// copy order_items from cart_items snapshot
-	_, err = r.q.Exec(ctx, `
-INSERT INTO order_items (
-  order_id, product_id, product_variant_id, product_name, variant_attributes,
-  quantity, unit_price_cents, total_price_cents
-)
-SELECT
-  $1,
-  p.id, pv.id, p.name, pv.attributes,
-  ci.quantity, ci.price_cents, ci.quantity*ci.price_cents
-FROM cart_items ci
-JOIN product_variants pv ON pv.id = ci.product_variant_id
-JOIN products p ON p.id = pv.product_id
-WHERE ci.cart_id = $2
-`, o.ID, cartID)
-	if err != nil {
-		return nil, fmt.Errorf("copy order_items: %w", err)
+	// 5) Copy order_items snapshot.
+	//    This snapshot must remain stable even if product price changes later.
+	if _, err := r.q.Exec(ctx, `
+		INSERT INTO order_items (
+		  order_id, product_id, product_variant_id, product_name, variant_attributes,
+		  quantity, unit_price_cents, total_price_cents
+		)
+		SELECT
+		  $1,
+		  p.id, pv.id, p.name, pv.attributes,
+		  ci.quantity, ci.price_cents, ci.quantity*ci.price_cents
+		FROM cart_items ci
+		JOIN product_variants pv ON pv.id = ci.product_variant_id
+		JOIN products p ON p.id = pv.product_id
+		WHERE ci.cart_id = $2
+	`, o.ID, cartID); err != nil {
+		return nil, 0, fmt.Errorf("copy order_items: %w", err)
 	}
 
-	// mark cart converted
-	if _, err := r.q.Exec(ctx, `UPDATE carts SET status='converted', updated_at=now() WHERE id=$1`, cartID); err != nil {
-		return nil, fmt.Errorf("convert cart: %w", err)
+	// 6) Cart state transition:
+	//    - Online payment: lock cart (checkout_pending) so items can't be mutated mid-payment.
+	//    - COD: convert immediately (cart is now finalized).
+	if method != "cash_on_delivery" {
+		cmd, err := r.q.Exec(ctx, `
+	UPDATE carts
+	   SET status='checkout_pending',
+	       checkout_order_id=$2,
+	       updated_at=now()
+	 WHERE id=$1
+	   AND status='active'::cart_status
+`, cartID, o.ID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("lock cart for payment: %w", err)
+		}
+		if cmd.RowsAffected() == 0 {
+			return nil, 0, fmt.Errorf("cart not active (cannot lock)")
+		}
+	} else {
+		cmd, err := r.q.Exec(ctx, `
+	UPDATE carts
+	   SET status='converted',
+	       updated_at=now()
+	 WHERE id=$1
+	   AND status='active'::cart_status
+`, cartID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("change carts status: %w", err)
+		}
+		if cmd.RowsAffected() == 0 {
+			return nil, 0, fmt.Errorf("cart not active (cannot lock)")
+		}
 	}
 
-	return &o, nil
+	return o, cartID, nil
 }
 
 func (r *Repository) ListByUser(
@@ -335,17 +410,20 @@ WHERE id=$1
 	return &OrderDetail{Order: o, Items: items}, nil
 }
 
-func (r *Repository) UpdateStatus(ctx context.Context, orderID int64, status string, cancelledReason *string) error {
-	// You can validate status here or let DB enum reject invalid values.
+type UpdateStatusOpts struct {
+	CancelledReason *string
+	Note            *string // optional future: status history note
+}
 
+func (r *Repository) UpdateStatus(ctx context.Context, orderID int64, status string, opts UpdateStatusOpts) error {
 	_, err := r.q.Exec(ctx, `
 UPDATE orders
-SET status = $2,
+SET status = $2::order_status,
     cancelled_reason = CASE WHEN $2 = 'cancelled' THEN $3 ELSE NULL END,
     cancelled_at     = CASE WHEN $2 = 'cancelled' THEN now() ELSE NULL END,
     updated_at       = now()
 WHERE id = $1`,
-		orderID, status, cancelledReason,
+		orderID, status, opts.CancelledReason,
 	)
 	if err != nil {
 		return fmt.Errorf("update order status: %w", err)

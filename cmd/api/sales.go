@@ -328,27 +328,36 @@ func (app *application) getMyOrderHandler(w http.ResponseWriter, r *http.Request
 }
 
 // POST /v1/store/payments/webhook
+//
+// Webhook responsibilities:
+//   - Parse payload (GET query params or POST JSON/form)
+//   - Extract provider + provider_ref (pidx/transaction_uuid/refId)
+//   - Verify with gateway (never trust webhook payload directly)
+//   - Map provider_ref -> internal payment row
+//   - Apply idempotent state transition:
+//     If verified paid -> (TX) MarkPaid + ConvertCheckoutCart
+//     Else -> optionally mark failed + UnlockCheckoutCart (depends on provider semantics)
+//   - Always ACK 200 for unknown provider_ref to avoid retry spam
 func (app *application) paymentWebhookHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
 
-	// 1) Determine provider: from query or header or payload field
+	// 1) Determine provider
 	provider := strings.TrimSpace(r.URL.Query().Get("provider"))
 
-	// Collect payload as key-value map[string]string
+	// 2) Collect payload into map[string]string (gateway-specific)
 	payload := make(map[string]string)
 
 	switch r.Method {
 	case http.MethodGet:
-		// e.g., redirect-back-style webhooks
 		for k, vals := range r.URL.Query() {
 			if len(vals) > 0 {
 				payload[k] = vals[0]
 			}
 		}
 	default:
-		// Try JSON first
+		// Try JSON body first, fallback to form-encoded.
 		if err := readJSON(w, r, &payload); err != nil {
-			// Fallback to form-encoded
 			if err2 := r.ParseForm(); err2 == nil {
 				for k, vals := range r.PostForm {
 					if len(vals) > 0 {
@@ -363,26 +372,29 @@ func (app *application) paymentWebhookHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// Maybe provider is inside payload
+	// Provider may be in payload
 	if provider == "" {
 		if p, ok := payload["provider"]; ok {
-			provider = p
+			provider = strings.TrimSpace(p)
 		}
 	}
 	if provider == "" {
 		app.badRequestResponse(w, r, fmt.Errorf("missing provider"))
 		return
 	}
+	provider = strings.ToLower(provider)
 
-	// 2) Extract gateway-specific reference (provider_ref)
+	// 3) Extract provider_ref (gateway transaction identifier)
 	var providerRef string
-	switch strings.ToLower(provider) {
+	switch provider {
 	case "khalti":
+		// Khalti commonly uses pidx
 		providerRef = payload["pidx"]
 		if providerRef == "" {
 			providerRef = payload["txnId"]
 		}
 	case "esewa":
+		// eSewa commonly uses transaction_uuid or refId depending on flow
 		providerRef = payload["transaction_uuid"]
 		if providerRef == "" {
 			providerRef = payload["refId"]
@@ -391,71 +403,99 @@ func (app *application) paymentWebhookHandler(w http.ResponseWriter, r *http.Req
 		app.badRequestResponse(w, r, fmt.Errorf("unsupported provider: %s", provider))
 		return
 	}
-
 	if providerRef == "" {
-		app.badRequestResponse(w, r,
-			fmt.Errorf("missing provider identifier (pidx/transaction_uuid)"))
+		app.badRequestResponse(w, r, fmt.Errorf("missing provider identifier (pidx/transaction_uuid/refId)"))
 		return
 	}
 
-	// 3) Ask gateway to verify (never trust webhook payload directly)
+	// 4) Verify with gateway (do not trust webhook data)
 	ver, err := app.payments.VerifyPayment(ctx, provider, payments.PaymentVerifyRequest{
-		TransactionID: providerRef, // your Khalti/Esewa adapters handle this
+		TransactionID: providerRef, // adapter should interpret this as provider_ref
 		Data:          payload,
 	})
 	if err != nil {
 		app.logger.Errorw("verify payment failed", "provider", provider, "ref", providerRef, "err", err)
-		// Return 5xx so gateway might retry
+		// Return 5xx so gateway retries (typical webhook behavior)
 		http.Error(w, "verification error", http.StatusInternalServerError)
 		return
 	}
 
-	// 4) If not successful → ACK but don't mark paid
-	if !ver.Success {
-		// optional: log as failed
-		app.logger.Infow("webhook verification not successful",
-			"provider", provider, "ref", providerRef)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-		return
-	}
-
-	// 5) Map provider_ref -> internal payment row
-	// You need a repo method like:
-	//   GetByProviderRef(ctx, provider, providerRef) (*Payment, error)
+	// 5) Map provider_ref -> internal payment
 	pay, err := app.store.Sales.Payments.GetByProviderRef(ctx, provider, providerRef)
 	if err != nil {
-		app.logger.Errorw("get payment by provider_ref failed",
-			"provider", provider, "ref", providerRef, "err", err)
+		app.logger.Errorw("get payment by provider_ref failed", "provider", provider, "ref", providerRef, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	// Unknown providerRef: ACK 200 to prevent retries.
 	if pay == nil {
-		// unknown payment, but ACK so gateway doesn't spam retries
-		app.logger.Warnw("webhook for unknown provider_ref",
-			"provider", provider, "ref", providerRef)
+		app.logger.Warnw("webhook for unknown provider_ref", "provider", provider, "ref", providerRef)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 		return
 	}
 
-	// 6) Idempotency: if already paid, do nothing
-	if strings.EqualFold(pay.Status, "paid") {
+	// Optional: persist raw webhook payload (best-effort, never block success)
+	_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, pay.ID, "webhook", payload)
+
+	// 6) If verification says NOT paid:
+	// Depending on provider semantics, "not successful" could mean:
+	// - user cancelled
+	// - pending (some providers are async)
+	// - failed
+	//
+	// If your provider guarantees webhook is only sent for terminal states, you can mark failed here.
+	// Otherwise, safest is: ACK and do nothing.
+	if !ver.Success {
+		app.logger.Infow("webhook verification not successful", "provider", provider, "ref", providerRef, "payment_id", pay.ID)
+
+		// Optionally mark failed + unlock cart (only if you are sure it's terminal failure):
+		// _ = app.store.WithSalesTx(ctx, func(s *storage.SalesTx) error {
+		//   p, _ := s.Payments.GetByID(ctx, pay.ID)
+		//   if p == nil || strings.EqualFold(p.Status, "paid") { return nil }
+		//   _ = s.Payments.SetStatus(ctx, pay.ID, "failed")
+		//   _ = s.Orders.UpdateStatus(ctx, p.OrderID, "payment_failed", ordersrepo.UpdateStatusOpts{})
+		//   _ = s.Carts.UnlockCheckoutCart(ctx, p.OrderID)
+		//   return nil
+		// })
+
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 		return
 	}
 
-	// 7) Mark paid (this also updates orders via MarkPaid logic)
-	if err := app.store.Sales.Payments.MarkPaid(ctx, pay.ID); err != nil {
-		app.logger.Errorw("MarkPaid failed",
-			"payment_id", pay.ID, "provider", provider, "ref", providerRef, "err", err)
+	// 7) Apply PAID transition atomically:
+	// MarkPaid updates payments + order, ConvertCheckoutCart finalizes cart only for the order linked checkout.
+	if err := app.store.WithSalesTx(ctx, func(s *storage.SalesTx) error {
+		// Re-check inside TX for true idempotency (webhooks can be duplicated / concurrent)
+		p, err := s.Payments.GetByID(ctx, pay.ID)
+		if err != nil {
+			return err
+		}
+		if p == nil {
+			return fmt.Errorf("payment not found")
+		}
+		if strings.EqualFold(p.Status, "paid") {
+			return nil
+		}
+
+		// Mark payment + order as paid/processing
+		if err := s.Payments.MarkPaid(ctx, pay.ID); err != nil {
+			return err
+		}
+
+		// Convert cart locked for this order (no-op if none)
+		if err := s.Carts.ConvertCheckoutCart(ctx, p.OrderID); err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		app.logger.Errorw("paid transition failed", "payment_id", pay.ID, "provider", provider, "ref", providerRef, "err", err)
 		http.Error(w, "failed to update payment", http.StatusInternalServerError)
 		return
 	}
-
-	// 8) Optional: store raw webhook payload in payment_logs
-	// _ = app.store.Sales.Payments.InsertLog(ctx, pay.ID, "webhook", payload)
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
@@ -475,51 +515,39 @@ func (app *application) checkoutHandler(w http.ResponseWriter, r *http.Request) 
 			PostalCode                 *string
 			Country                    *string
 		} `json:"shipping"`
-		PaymentMethod *string `json:"payment_method"` // "khalti" | "esewa" | "cash_on_delivery"
+		PaymentMethod *string `json:"payment_method"`
 	}
 	if err := readJSON(w, r, &in); err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
+
+	method := "cash_on_delivery"
+	if in.PaymentMethod != nil && strings.TrimSpace(*in.PaymentMethod) != "" {
+		method = *in.PaymentMethod
+	}
+
 	ship := orders.ShippingInfo{
 		Name: in.Shipping.Name, Phone: in.Shipping.Phone, Address: in.Shipping.Address,
 		City: in.Shipping.City, PostalCode: in.Shipping.PostalCode, Country: in.Shipping.Country,
 	}
 
-	// Optional: validate shipping fields here…
-
-	// 1) Load cart and ensure not empty
-	cartView, err := app.store.Sales.Carts.GetView(ctx, userID)
-	if err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
-	if len(cartView.Items) == 0 {
-		app.badRequestResponse(w, r, fmt.Errorf("cart is empty"))
-		return
-	}
-
-	// 2) Create order (+ order items) and a pending payment (if online) in a single tx
 	var (
-		orderID int64
-		payID   *int64
-		method  string
+		order   *orders.Order
+		cartID  int64
+		payment *paymentsrepo.Payment
 	)
-	if in.PaymentMethod != nil {
-		method = *in.PaymentMethod
-	} else {
-		method = "cash_on_delivery"
-	}
 
-	err = app.store.WithSalesTx(ctx, func(s *storage.SalesTx) error {
-		order, err := s.Orders.CreateFromCart(ctx, userID, ship, &method)
+	// A) Transaction: create order snapshot + create payment row (if online) + lock cart (if online)
+	err := app.store.WithSalesTx(ctx, func(s *storage.SalesTx) error {
+		var err error
+		order, cartID, err = s.Orders.CreateFromCart(ctx, userID, ship, method)
 		if err != nil {
 			return err
 		}
-		orderID = order.ID
 
 		if method != "cash_on_delivery" {
-			p, err := s.Payments.Create(ctx, &paymentsrepo.Payment{
+			payment, err = s.Payments.Create(ctx, &paymentsrepo.Payment{
 				OrderID:     order.ID,
 				Provider:    method,
 				AmountCents: order.TotalCents,
@@ -529,13 +557,13 @@ func (app *application) checkoutHandler(w http.ResponseWriter, r *http.Request) 
 			if err != nil {
 				return err
 			}
-			payID = &p.ID
 
-			//in the order table migration primary_payment_id is added later so its sure it exist
-			if err := s.Payments.SetPrimaryToOrder(ctx, order.ID, p.ID); err != nil {
+			// Keep a direct pointer from order -> primary_payment_id for quick access
+			if err := s.Payments.SetPrimaryToOrder(ctx, order.ID, payment.ID); err != nil {
 				return err
 			}
 		}
+
 		return nil
 	})
 	if err != nil {
@@ -543,56 +571,90 @@ func (app *application) checkoutHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 3) (Outside tx) If online payment, call gateway now
+	// B) Outside tx: initiate gateway (only for online)
 	var paymentURL string
 	var paymentData map[string]string
 
-	if payID != nil {
+	if payment != nil {
 		resp, gerr := app.payments.InitiatePayment(ctx, method, payments.PaymentRequest{
-			Amount:        float64(cartView.TotalCents) / 100.0,
-			TransactionID: fmt.Sprintf("%d", *payID), // your internal payment id
-			ProductName:   fmt.Sprintf("Order #2K8H4E6L%d", orderID),
+			Amount:        float64(order.TotalCents) / 100.0, // NOTE: order snapshot amount
+			TransactionID: fmt.Sprintf("%d", payment.ID),
+			ProductName:   fmt.Sprintf("%s", order.OrderNumber),
 			CustomerName:  ship.Name,
 			CustomerPhone: ship.Phone,
 		})
-		_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, *payID, "response", resp.Data)
+
+		_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, payment.ID, "response", resp.Data)
+
 		if gerr != nil {
-			_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, *payID, "error", map[string]any{
+			_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, payment.ID, "error", map[string]any{
 				"stage": "initiate",
 				"error": gerr.Error(),
 			})
+
+			// IMPORTANT: unlock cart so user can retry checkout immediately.
+			// Also mark payment failed for support visibility.
+			_ = app.store.Sales.Payments.SetStatus(ctx, payment.ID, "failed")
+			_ = app.store.Sales.Carts.UnlockCheckoutCart(ctx, cartID) // implement: set status='active', checkout_order_id=NULL
+
 			app.internalServerError(w, r, fmt.Errorf("payment init: %w", gerr))
 			return
 		}
+
 		paymentURL = resp.PaymentURL
 		paymentData = map[string]string{}
 		for k, v := range resp.Data {
 			paymentData[k] = fmt.Sprint(v)
 		}
 
-		// 4) Save provider_ref (e.g., pidx) after gateway returns (tiny update)
-		if ref, ok := paymentData["pidx"]; ok {
-			if err := app.store.Sales.Payments.SetProviderRef(ctx, *payID, ref, resp.Data); err != nil {
-				app.internalServerError(w, r, err)
-				return
+		switch method {
+		case "khalti":
+			if ref, ok := paymentData["pidx"]; ok && ref != "" {
+				_ = app.store.Sales.Payments.SetProviderRef(ctx, payment.ID, ref, resp.Data)
+			}
+		case "esewa":
+			if ref, ok := paymentData["transaction_uuid"]; ok && ref != "" {
+				_ = app.store.Sales.Payments.SetProviderRef(ctx, payment.ID, ref, resp.Data)
 			}
 		}
 	}
 
 	app.jsonResponse(w, http.StatusCreated, map[string]any{
-		"order_id": orderID,
+		"order_id":     order.ID,
+		"order_number": order.OrderNumber,
 		"payment_id": func() any {
-			if payID == nil {
+			if payment == nil {
 				return nil
 			}
-			return *payID
+			return payment.ID
 		}(),
 		"payment_url":  paymentURL,
-		"payment_data": paymentData, // eSewa form fields, etc.
+		"payment_data": paymentData,
 	})
 }
 
-// POST /v1/store/payments/verify  {payment_id, method, data:{...}}
+// POST /v1/store/payments/verify
+//
+// Client-driven payment verification endpoint.
+// Used after the user returns from a gateway (WebView redirect / app callback).
+//
+// Design goals (industry-standard):
+//  1. Never trust client payload alone → always re-verify with gateway (lookup/status-check).
+//  2. Do network calls OUTSIDE DB transactions → avoid holding locks while waiting on gateway.
+//  3. Make DB transitions ATOMIC + IDEMPOTENT:
+//     - If verified paid => (TX) MarkPaid + ConvertCheckoutCart
+//     - If terminal failure => (TX) SetStatus=failed (+ optional order status) + UnlockCheckoutCart
+//     - If non-terminal (pending/ambiguous) => keep payment pending, keep cart locked
+//
+// Assumptions:
+//   - carts has status: active | checkout_pending | converted | abandoned
+//   - carts has checkout_order_id pointing to the order created at checkout
+//   - Carts.ConvertCheckoutCart(orderID) converts ONLY carts where status=checkout_pending AND checkout_order_id=orderID
+//   - Carts.UnlockCheckoutCart(orderID) unlocks cart back to active for retry
+//   - payments.VerifyPayment normalizes gateway statuses into PaymentVerifyResponse:
+//     Success=true only when completed/captured
+//     Terminal=true only when final (expired/canceled/not_found/etc)
+//     Terminal=false for pending/ambiguous
 func (app *application) verifyPaymentHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
@@ -600,18 +662,23 @@ func (app *application) verifyPaymentHandler(w http.ResponseWriter, r *http.Requ
 	var in struct {
 		PaymentID int64             `json:"payment_id"`
 		Method    string            `json:"method"` // "khalti" | "esewa" | ...
-		Data      map[string]string `json:"data"`   // gateway-specific
+		Data      map[string]string `json:"data"`   // gateway-specific fields (pidx, transaction_uuid, etc.)
 	}
 	if err := readJSON(w, r, &in); err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	if in.PaymentID <= 0 || strings.TrimSpace(in.Method) == "" {
+
+	in.Method = strings.TrimSpace(in.Method)
+	if in.PaymentID <= 0 || in.Method == "" {
 		app.badRequestResponse(w, r, fmt.Errorf("payment_id and method are required"))
 		return
 	}
+	if in.Data == nil {
+		in.Data = map[string]string{}
+	}
 
-	// 1) Load payment
+	// 1) Load payment (fast validation / early idempotency)
 	pay, err := app.store.Sales.Payments.GetByID(ctx, in.PaymentID)
 	if err != nil {
 		app.internalServerError(w, r, err)
@@ -622,48 +689,172 @@ func (app *application) verifyPaymentHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// 2) Enforce provider consistency
+	// 2) Enforce provider consistency (prevents verifying with wrong adapter)
 	if !strings.EqualFold(pay.Provider, in.Method) {
 		app.badRequestResponse(w, r, fmt.Errorf("payment method mismatch: expected %s", pay.Provider))
 		return
 	}
 
-	// 3) Idempotency: if already paid, short-circuit success
+	// 3) Early idempotency: if already paid, short-circuit.
+	// NOTE: We also re-check inside the transaction to handle races (duplicate callbacks/webhooks).
 	if strings.EqualFold(pay.Status, "paid") {
-		app.jsonResponse(w, http.StatusOK, map[string]any{"success": true, "idempotent": true})
+		app.jsonResponse(w, http.StatusOK, map[string]any{
+			"success":    true,
+			"idempotent": true,
+		})
 		return
 	}
 
-	_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, in.PaymentID, "webhook", in.Data)
+	// 4) Persist raw inbound callback data for support/debug (best-effort).
+	_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, in.PaymentID, "request", in.Data)
 
-	ver, err := app.payments.VerifyPayment(ctx, in.Method, payments.PaymentVerifyRequest{
-		TransactionID: fmt.Sprintf("%d", in.PaymentID), // your adapters use this or Data["pidx"]
+	// Fill missing provider-specific fields using stored provider_ref (most reliable).
+	switch strings.ToLower(in.Method) {
+	case "khalti":
+		if in.Data["pidx"] == "" && pay.ProviderRef != nil {
+			in.Data["pidx"] = *pay.ProviderRef
+		}
+	case "esewa":
+		if in.Data["transaction_uuid"] == "" && pay.ProviderRef != nil {
+			in.Data["transaction_uuid"] = *pay.ProviderRef
+		}
+		// eSewa also needs total_amount and product_code for status check
+		if in.Data["total_amount"] == "" {
+			in.Data["total_amount"] = fmt.Sprintf("%.2f", float64(pay.AmountCents)/100.0)
+		}
+		// product_code ideally injected from config; if missing you can set it here too:
+		// in.Data["product_code"] = app.config.Payments.EsewaMerchantCode
+	}
+
+	txid := ""
+	if pay.ProviderRef != nil {
+		txid = *pay.ProviderRef
+	}
+
+	// 5) Verify with gateway OUTSIDE tx (do not hold DB locks during network calls).
+	//
+	// TransactionID strategy:
+	// - For Khalti you typically verify using pidx in in.Data["pidx"] (adapter handles it).
+	// - For eSewa you verify using transaction_uuid in in.Data["transaction_uuid"] (adapter handles it).
+	// - We still pass TransactionID as a fallback.
+	ver, verify_err := app.payments.VerifyPayment(ctx, in.Method, payments.PaymentVerifyRequest{
+		TransactionID: txid,
 		Data:          in.Data,
 	})
-	if err != nil {
+
+	// If gateway verification API fails (timeout/500/bad payload), do NOT guess success.
+	// We keep things safe: mark failed (or keep pending if you prefer) and unlock cart so user can retry.
+	//
+	// NOTE: If you want "safer but less annoying" UX, you can choose to NOT mark failed on verify errors
+	// and instead keep pending + show "We are confirming your payment. Try again." That's a product choice.
+	if verify_err != nil {
 		_ = app.store.Sales.PayLogs.InsertPaymentLog(ctx, in.PaymentID, "error", map[string]any{
 			"stage":  "verify",
 			"method": in.Method,
-			"error":  err.Error(),
+			"error":  verify_err.Error(),
 			"data":   in.Data,
 		})
-		_ = app.store.Sales.Payments.SetStatus(ctx, in.PaymentID, "failed")
-		app.badRequestResponse(w, r, err)
+
+		_ = app.store.WithSalesTx(ctx, func(s *storage.SalesTx) error {
+			// Re-read payment inside tx for concurrency safety.
+			p, err := s.Payments.GetByID(ctx, in.PaymentID)
+			if err != nil {
+				return err
+			}
+			if p == nil {
+				return fmt.Errorf("payment not found")
+			}
+			if strings.EqualFold(p.Status, "paid") {
+				// Another process already completed it. Don't override.
+				return nil
+			}
+
+			// Mark failed for visibility (support can see "failed" instead of "pending forever").
+			// If you prefer to keep pending on verify errors, change this to: no-op.
+			_ = s.Payments.SetStatus(ctx, in.PaymentID, "pending")
+
+			// Optional: If you added order_status=payment_failed, you can mirror it here.
+			// This is optional; many systems keep order.status as "awaiting_payment" and rely on payment.status only.
+			_ = s.Orders.UpdateStatus(ctx, p.OrderID, "payment_failed", orders.UpdateStatusOpts{})
+
+			// Unlock cart so user can attempt checkout again.
+			_ = s.Carts.UnlockCheckoutCart(ctx, p.OrderID)
+
+			return nil
+		})
+
+		app.badRequestResponse(w, r, verify_err)
 		return
 	}
 
-	// 6) Transition status
-	if ver.Success {
-		if err := app.store.Sales.Payments.MarkPaid(ctx, in.PaymentID); err != nil {
-			app.internalServerError(w, r, err)
-			return
+	// 6) Apply final state transition ATOMICALLY (single tx).
+	// This prevents:
+	// - payment marked paid but cart not converted
+	// - cart converted without payment actually being paid
+	err = app.store.WithSalesTx(ctx, func(s *storage.SalesTx) error {
+		// True idempotency under concurrency: re-check inside tx.
+		p, err := s.Payments.GetByID(ctx, in.PaymentID)
+		if err != nil {
+			return err
 		}
-	} else {
-		// optional: set failed to help support visibility
-		_ = app.store.Sales.Payments.SetStatus(ctx, in.PaymentID, "failed")
+		if p == nil {
+			return fmt.Errorf("payment not found")
+		}
+
+		// If already paid, no-op.
+		if strings.EqualFold(p.Status, "paid") {
+			return nil
+		}
+
+		if ver.Success {
+			// ✅ Paid transition:
+			// MarkPaid should update:
+			// - payments.status = paid
+			// - orders.payment_status = paid
+			// - orders.status = processing
+			// - orders.paid_at = now()
+			if err := s.Payments.MarkPaid(ctx, in.PaymentID); err != nil {
+				return err
+			}
+
+			// Convert cart ONLY if it is the one locked for this order.
+			// ConvertCheckoutCart should be strict:
+			//   UPDATE carts SET status='converted'
+			//   WHERE status='checkout_pending' AND checkout_order_id=$orderID;
+			// If 0 rows affected, that’s OK (already converted or no cart).
+			if err := s.Carts.ConvertCheckoutCart(ctx, p.OrderID); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
+		// Not successful. Decide using Terminal:
+		//
+		// - Terminal=false => gateway says "pending/ambiguous": keep pending + keep cart locked.
+		// - Terminal=true  => gateway says "expired/canceled/not_found/etc": fail + unlock cart.
+		if !ver.Terminal {
+			// ⏳ Still pending / unknown: keep payment pending, do not unlock cart.
+			// This is important for eSewa PENDING/AMBIGUOUS and Khalti Pending/Initiated.
+			return nil
+		}
+
+		// ❌ Terminal failure: mark failed + unlock cart for retry.
+		_ = s.Payments.SetStatus(ctx, in.PaymentID, "failed")
+		_ = s.Orders.UpdateStatus(ctx, p.OrderID, "payment_failed", orders.UpdateStatusOpts{})
+		_ = s.Carts.UnlockCheckoutCart(ctx, p.OrderID)
+
+		return nil
+	})
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
 	}
 
+	// 7) Respond with normalized state so the app can show correct UI (success/pending/failure).
 	app.jsonResponse(w, http.StatusOK, map[string]any{
-		"success": ver.Success,
+		"success":  ver.Success,
+		"terminal": ver.Terminal,
+		"state":    ver.State,
 	})
 }

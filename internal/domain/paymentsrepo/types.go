@@ -2,20 +2,21 @@ package paymentsrepo
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
 type Payment struct {
-	ID          int64     `json:"id"`
-	OrderID     int64     `json:"order_id"`
-	Provider    string    `json:"provider"`     // khalti, esewa, ...
-	ProviderRef *string   `json:"provider_ref"` // pidx, etc
-	AmountCents int64     `json:"amount_cents"`
-	Currency    string    `json:"currency"`
-	Status      string    `json:"status"` // pending, paid, failed, refunded...
-	GatewayResp any       `json:"gateway_response,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int64           `json:"id"`
+	OrderID     int64           `json:"order_id"`
+	Provider    string          `json:"provider"`     // khalti, esewa, ...
+	ProviderRef *string         `json:"provider_ref"` // pidx, etc
+	AmountCents int64           `json:"amount_cents"`
+	Currency    string          `json:"currency"`
+	Status      string          `json:"status"` // pending, paid, failed, refunded...
+	GatewayResp json.RawMessage `json:"gateway_response,omitempty"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 type Store interface {
