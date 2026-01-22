@@ -579,7 +579,7 @@ func (app *application) checkoutHandler(w http.ResponseWriter, r *http.Request) 
 		resp, gerr := app.payments.InitiatePayment(ctx, method, payments.PaymentRequest{
 			Amount:        float64(order.TotalCents) / 100.0, // NOTE: order snapshot amount
 			TransactionID: fmt.Sprintf("%d", payment.ID),
-			ProductName:   fmt.Sprintf("%s", order.OrderNumber),
+			ProductName:   order.OrderNumber,
 			CustomerName:  ship.Name,
 			CustomerPhone: ship.Phone,
 		})
