@@ -6,13 +6,14 @@ import (
 )
 
 type Cart struct {
-	ID         int64      `json:"id"`
-	UserID     *int64     `json:"user_id,omitempty"`
-	GuestToken *string    `json:"guest_token,omitempty"`
-	Status     string     `json:"status"` // active, converted, abandoned
-	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID              int64      `json:"id"`
+	UserID          *int64     `json:"user_id,omitempty"`
+	GuestToken      *string    `json:"guest_token,omitempty"`
+	Status          string     `json:"status"` // active, converted, abandoned, checkout_pending
+	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	CheckoutOrderID *int64     `json:"checkout_order_id,omitempty"`
 }
 
 type CartItem struct {
@@ -45,6 +46,7 @@ type CartLine struct {
 
 type Store interface {
 	// --- User-level operations ---
+	GetOrCreateCart(ctx context.Context, userID int64) (int64, error)
 	EnsureActive(ctx context.Context, userID int64) (int64, error)
 	AddItem(ctx context.Context, userID, variantID int64, qty int) error
 	UpdateItemQty(ctx context.Context, userID, itemID int64, qty int) error

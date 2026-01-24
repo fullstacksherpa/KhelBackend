@@ -17,6 +17,12 @@ import (
 	"time"
 )
 
+// Flow:
+// 1. User completes payment on Esewa/Khalti
+// 2. Gateway redirects to your Go endpoint
+// 3. Go endpoint tries Khel://payment/return which open mobile app
+//    if app is not installed then fallback to webpage /payments/return
+
 // redirectToAppReturn serves an HTML page that:
 // 1) tries to open your app via deep link: khel://payments/return?...params...
 // 2) falls back to a web URL if the app is not installed
@@ -295,7 +301,7 @@ func (app *application) verifyEsewaResponseSignature(totalAmount, transactionUUI
 // /v1/store/payments/esewa/return?result=success|failure&data=<base64_json>
 //
 // This is the *canonical* completion endpoint for eSewa.
-// eSewa redirects the user's browser/webview here after payment.
+// eSewa hit this endpoint after payment.
 // We do NOT trust the redirect payload alone; we:
 // 1) decode base64 payload
 // 2) verify signature (integrity check)
@@ -308,9 +314,34 @@ func (app *application) esewaReturnHandler(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
+	// --------------------------------------------------------------------
+	// Defensive query normalization:
+	//
+	// eSewa (or misconfigured URLs) can sometimes produce a malformed query string like:
+	//   ?payment_id=9&result=success?data=BASE64
+	//                           ^ second "?"
+	//
+	// In that case, Go's URL parser will treat everything after the second "?" as part of
+	// the previous param value, and r.URL.Query().Get("data") will be empty.
+	//
+	// We recover by rewriting "?data=" into "&data=" inside RawQuery.
+	// This is safe because "data=" is supposed to be another query parameter.
+	// --------------------------------------------------------------------
+
+	raw := r.URL.RawQuery
+	if !strings.Contains(raw, "data=") && strings.Contains(raw, "?data=") {
+		parts := strings.SplitN(raw, "?data=", 2)
+		if len(parts) == 2 {
+			r.URL.RawQuery = parts[0] + "&data=" + parts[1]
+		}
+	}
+
+	// Now it's safe to read query params.
 	result := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("result")))
 	dataB64 := strings.TrimSpace(r.URL.Query().Get("data"))
+
 	if dataB64 == "" {
+		// No base64 payload => can't verify. Return to app as failed.
 		app.redirectToAppReturn(w, "failed", 0, 0, "esewa", "", "", "missing_data")
 		return
 	}

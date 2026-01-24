@@ -75,8 +75,8 @@ func (app *application) uploadProfilePictureHandler(w http.ResponseWriter, r *ht
 		PublicID:  fmt.Sprintf("/%d", userID), // Save with userID as filename
 		Overwrite: overwrite,
 		// Replace old profile pic
-		Folder:         "profile_pictures",          // Organized storage
-		Transformation: "w_300,h_300,c_fill,q_auto", // Resize to 300x300, auto quality
+		Folder:         "profile_pictures", // Organized storage
+		Transformation: "w_128,h_128,c_fill,q_auto,f_auto",
 	}
 	uploadResult, err := app.cld.Upload.Upload(ctx, file, uploadParams)
 	if err != nil {
@@ -130,9 +130,9 @@ func (app *application) updateProfilePictureHandler(w http.ResponseWriter, r *ht
 	// Upload the new file to Cloudinary with specific PublicID to ensure replacement
 	uploadParams := uploader.UploadParams{
 		Folder:         "profile_pictures",
-		Overwrite:      boolPtr(true),               // Ensure overwrite of the existing file
-		Transformation: "w_300,h_300,c_fill,q_auto", // Optional transformations (e.g., resizing)
-		PublicID:       fmt.Sprintf("/%d", userID),  // Use userID as the PublicID to replace the old image
+		Overwrite:      boolPtr(true),                      // Ensure overwrite of the existing file
+		Transformation: "w_128,h_128,c_fill,q_auto,f_auto", // Optional transformations (e.g., resizing)
+		PublicID:       fmt.Sprintf("/%d", userID),         // Use userID as the PublicID to replace the old image
 	}
 
 	uploadResult, err := app.cld.Upload.Upload(r.Context(), file, uploadParams)
@@ -359,7 +359,7 @@ func (app *application) editProfileHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Handle optional image upload
-	var newURL string
+	var newURL *string
 	file, header, err := r.FormFile("profile_picture")
 	if err == nil {
 		defer file.Close()
@@ -372,24 +372,15 @@ func (app *application) editProfileHandler(w http.ResponseWriter, r *http.Reques
 			PublicID:       fmt.Sprintf("/%d", userID),
 			Overwrite:      boolPtr(true),
 			Folder:         "profile_pictures",
-			Transformation: "w_300,h_300,c_fill,q_auto",
+			Transformation: "w_128,h_128,c_fill,q_auto,f_auto",
 		}
 		res, err := app.cld.Upload.Upload(r.Context(), file, uploadParams)
 		if err != nil {
 			http.Error(w, "upload failed", http.StatusInternalServerError)
 			return
 		}
-		newURL = res.SecureURL
-	}
-
-	// If no image was provided, keep existing URL:
-	if newURL == "" {
-		old, err := app.store.Users.GetProfileUrl(r.Context(), userID)
-		if err != nil {
-			app.internalServerError(w, r, err)
-			return
-		}
-		newURL = old
+		u := res.SecureURL
+		newURL = &u
 	}
 
 	// 4) Call our new UpdateAndUpload

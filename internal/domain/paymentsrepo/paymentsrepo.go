@@ -90,19 +90,35 @@ func (r *Repository) SetPrimaryToOrder(ctx context.Context, orderID, paymentID i
 }
 
 func (r *Repository) MarkPaid(ctx context.Context, paymentID int64) error {
+	// 1️⃣ Mark payment as paid
 	_, err := r.q.Exec(ctx, `
 		UPDATE payments
-		   SET status='paid'::payment_status, updated_at=now()
-		 WHERE id=$1;
+		   SET status='paid'::payment_status,
+		       updated_at=now()
+		 WHERE id=$1
+	`, paymentID)
+	if err != nil {
+		return fmt.Errorf("mark payment paid: %w", err)
+	}
 
+	// 2️⃣ Mark order as paid + processing
+	_, err = r.q.Exec(ctx, `
 		UPDATE orders
 		   SET payment_status='paid'::payment_status,
 		       status='processing'::order_status,
 		       paid_at=now(),
 		       updated_at=now()
-		 WHERE id=(SELECT order_id FROM payments WHERE id=$1);
+		 WHERE id = (
+		   SELECT order_id
+		     FROM payments
+		    WHERE id=$1
+		 )
 	`, paymentID)
-	return err
+	if err != nil {
+		return fmt.Errorf("mark order paid: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Repository) SetStatus(ctx context.Context, paymentID int64, status string) error {

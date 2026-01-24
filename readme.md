@@ -1256,3 +1256,16 @@ payment callback handler
 - eSewa start: re-initiate with a fresh transaction_uuid ✅
 - eSewa return: decode base64 → verify signature → call status-check API (source of truth) ✅
 - Khalti return: lookup by pidx → call lookup API → apply DB tx atomically ✅
+
+Quick mental model
+
+Order table constraint, only these states are allowed:
+
+✅ active + checkout_order_id NULL
+✅ checkout_pending + checkout_order_id SET
+✅ checkout_pending + checkout_order_id NULL (not typical but allowed)
+✅ converted + checkout_order_id NULL
+✅ abandoned + checkout_order_id NULL
+
+❌ converted + checkout_order_id SET (your current convert does this)
+❌ active + checkout_order_id SET (if you set order id before status)

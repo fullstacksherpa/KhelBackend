@@ -164,6 +164,7 @@ func (r *Repository) CreateFromCart(
 		cmd, err := r.q.Exec(ctx, `
 	UPDATE carts
 	   SET status='converted',
+	     checkout_order_id=NULL,
 	       updated_at=now()
 	 WHERE id=$1
 	   AND status='active'::cart_status

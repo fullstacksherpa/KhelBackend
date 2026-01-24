@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -25,7 +26,7 @@ type Store interface {
 	Activate(context.Context, string) error
 	Delete(context.Context, int64) error
 	SetProfile(context.Context, string, int64) error
-	GetProfileUrl(context.Context, int64) (string, error)
+	GetProfileUrl(context.Context, int64) (*string, error)
 	UpdateUser(context.Context, int64, map[string]interface{}) error
 	SaveRefreshToken(ctx context.Context, userID int64, refreshToken string) error
 	DeleteRefreshToken(ctx context.Context, userID int64) error
@@ -33,7 +34,7 @@ type Store interface {
 	UpdateResetToken(ctx context.Context, email, resetToken string, resetTokenExpires time.Time) error
 	GetByResetToken(ctx context.Context, resetToken string) (*User, error)
 	Update(ctx context.Context, user *User) error
-	UpdateAndUpload(ctx context.Context, userID int64, updates map[string]interface{}, profilePictureURL string) error
+	UpdateAndUpload(ctx context.Context, userID int64, updates map[string]interface{}, profilePictureURL *string) error
 	ListAdminUsers(ctx context.Context, filters AdminListUsersFilters, limit, offset int) ([]AdminUserRow, int, error)
 	GetAdminUserStats(ctx context.Context, userID int64) (*AdminUserStatsRow, error)
 	AdminCreateUser(ctx context.Context, user *User) (*User, error)
@@ -121,19 +122,23 @@ func (r *Repository) SetProfile(ctx context.Context, url string, userID int64) e
 	return nil
 }
 
-func (r *Repository) GetProfileUrl(ctx context.Context, userID int64) (string, error) {
-	var oldProfilePictureURL string
+func (r *Repository) GetProfileUrl(ctx context.Context, userID int64) (*string, error) {
+	var old pgtype.Text
 	query := `SELECT profile_picture_url FROM users WHERE id = $1`
-	err := r.db.QueryRow(ctx, query, userID).Scan(&oldProfilePictureURL)
+
+	err := r.db.QueryRow(ctx, query, userID).Scan(&old)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			// Handle the case where no rows are returned (user not found)
-			return "", fmt.Errorf("user not found")
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("user not found")
 		}
-		// Handle other database errors
-		return "", fmt.Errorf("failed to retrieve profile picture URL: %v", err)
+		return nil, fmt.Errorf("failed to retrieve profile picture URL: %w", err)
 	}
-	return oldProfilePictureURL, nil
+
+	if !old.Valid {
+		return nil, nil // keep NULL
+	}
+	v := old.String
+	return &v, nil
 }
 
 func (r *Repository) UpdateUser(ctx context.Context, userID int64, updates map[string]interface{}) error {
@@ -527,11 +532,15 @@ func (r *Repository) Update(ctx context.Context, user *User) error {
 }
 
 // UpdateAndUpload updates arbitrary user fields + profile_picture_url in one TX.
-func (r *Repository) UpdateAndUpload(ctx context.Context, userID int64, updates map[string]interface{}, profilePictureURL string) error {
+func (r *Repository) UpdateAndUpload(
+	ctx context.Context,
+	userID int64,
+	updates map[string]interface{},
+	profilePictureURL *string, // <-- pointer: nil means "leave as-is"
+) error {
 	return database.WithTx(r.db, ctx, func(tx pgx.Tx) error {
-		// 1) If there are other fields to update, do them first
+		// 1) update other fields
 		if len(updates) > 0 {
-			// validate skill_level
 			if lvl, ok := updates["skill_level"]; ok {
 				valid := map[string]bool{"beginner": true, "intermediate": true, "advanced": true}
 				if !valid[lvl.(string)] {
@@ -550,7 +559,7 @@ func (r *Repository) UpdateAndUpload(ctx context.Context, userID int64, updates 
 				args = append(args, val)
 				i++
 			}
-			// append updated_at and WHERE
+
 			args = append(args, userID)
 			query := fmt.Sprintf(
 				"UPDATE users SET %s, updated_at = NOW() WHERE id = $%d",
@@ -562,10 +571,12 @@ func (r *Repository) UpdateAndUpload(ctx context.Context, userID int64, updates 
 			}
 		}
 
-		// 2) Always update profile_picture_url (even if empty string => clear it)
-		q2 := `UPDATE users SET profile_picture_url = $1, updated_at = NOW() WHERE id = $2`
-		if _, err := tx.Exec(ctx, q2, profilePictureURL, userID); err != nil {
-			return fmt.Errorf("update profile picture failed: %w", err)
+		// 2) update picture only if caller provided it
+		if profilePictureURL != nil {
+			q2 := `UPDATE users SET profile_picture_url = $1, updated_at = NOW() WHERE id = $2`
+			if _, err := tx.Exec(ctx, q2, *profilePictureURL, userID); err != nil {
+				return fmt.Errorf("update profile picture failed: %w", err)
+			}
 		}
 
 		return nil

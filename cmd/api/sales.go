@@ -17,9 +17,18 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// ============ CART ============
-
-// GET /v1/store/cart
+// GetCart godoc
+//
+// @Summary		Get user's cart
+// @Description	Retrieves the current user's active or checkout_pending shopping cart
+// @Tags			User-Cart
+// @Accept		json
+// @Produce		json
+// @Success		200	{object}	CartView	"Cart retrieved successfully"
+// @Failure		401	{object}	error		"Unauthorized"
+// @Failure		500	{object}	error		"Internal Server Error"
+// @Security		ApiKeyAuth
+// @Router		/store/cart [get]
 func (app *application) getCartHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -27,16 +36,26 @@ func (app *application) getCartHandler(w http.ResponseWriter, r *http.Request) {
 	user := getUserFromContext(r)
 	userID := user.ID
 
-	// optional: ensure cart exists
-	if _, err := app.store.Sales.Carts.EnsureActive(ctx, userID); err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
-
 	view, err := app.store.Sales.Carts.GetView(ctx, userID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
+	}
+
+	if view == nil {
+		// Create a new cart
+		cartID, err := app.store.Sales.Carts.GetOrCreateCart(ctx, userID)
+		if err != nil {
+			app.internalServerError(w, r, err)
+			return
+		}
+
+		// Get the newly created cart view
+		view, err = app.store.Sales.Carts.GetViewByCartID(ctx, cartID)
+		if err != nil {
+			app.internalServerError(w, r, err)
+			return
+		}
 	}
 
 	app.jsonResponse(w, http.StatusOK, view)
@@ -722,8 +741,10 @@ func (app *application) verifyPaymentHandler(w http.ResponseWriter, r *http.Requ
 		if in.Data["total_amount"] == "" {
 			in.Data["total_amount"] = fmt.Sprintf("%.2f", float64(pay.AmountCents)/100.0)
 		}
-		// product_code ideally injected from config; if missing you can set it here too:
-		// in.Data["product_code"] = app.config.Payments.EsewaMerchantCode
+		// ✅ REQUIRED for eSewa verify
+		if in.Data["product_code"] == "" {
+			in.Data["product_code"] = app.config.payment.Esewa.MerchantID
+		}
 	}
 
 	txid := ""

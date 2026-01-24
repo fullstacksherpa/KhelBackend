@@ -50,10 +50,56 @@ WHERE user_id = $1
 	return err
 }
 
+// GetOrCreateCart returns the user's current cart (active or checkout_pending)
+// or creates a new active cart if none exists
+func (r *Repository) GetOrCreateCart(ctx context.Context, userID int64) (int64, error) {
+	var id int64
+	var status string
+
+	// First, try to get ANY current cart (active or checkout_pending)
+	err := r.db.QueryRow(ctx, `
+SELECT id, status
+FROM carts
+WHERE user_id = $1
+  AND (status = 'active' OR status = 'checkout_pending')
+  AND (expires_at IS NULL OR expires_at > now())
+ORDER BY 
+    CASE status 
+        WHEN 'checkout_pending' THEN 1 
+        WHEN 'active' THEN 2 
+    END,
+    updated_at DESC
+LIMIT 1
+`, userID).Scan(&id, &status)
+
+	if err == nil {
+		// Found an existing cart
+		return id, nil
+	}
+
+	if !errors.Is(err, pgx.ErrNoRows) {
+		// Real DB error
+		return 0, fmt.Errorf("get cart: %w", err)
+	}
+
+	// No cart exists → create new active cart
+	exp := time.Now().Add(r.ttl)
+	if err := r.db.QueryRow(ctx, `
+INSERT INTO carts (user_id, guest_token, status, expires_at)
+VALUES ($1, NULL, 'active', $2)
+RETURNING id
+`, userID, exp).Scan(&id); err != nil {
+		return 0, fmt.Errorf("create cart: %w", err)
+	}
+
+	return id, nil
+}
+
 // --- User flows ---
 
 // EnsureActive returns an existing active cart id or creates a new one with TTL.
 // It only sets expires_at when creating a cart; it does NOT bump TTL for existing carts.
+// if you want checkout_pending state too use GetOrCreateCart method
 func (r *Repository) EnsureActive(ctx context.Context, userID int64) (int64, error) {
 	var id int64
 
@@ -220,26 +266,36 @@ func (r *Repository) UnlockCheckoutCart(ctx context.Context, orderID int64) erro
 //
 // We only convert carts that are explicitly linked to the order via checkout_order_id
 // AND currently in 'checkout_pending'. This prevents converting a wrong cart due to bugs
-// or race conditions.
+// or race conditions. remember db constraint if converted then checkout_order_id=null
 func (r *Repository) ConvertCheckoutCart(ctx context.Context, orderID int64) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE carts
-		   SET status='converted', updated_at=now()
-		 WHERE checkout_order_id=$1 AND status='checkout_pending'
+		   SET status='converted',
+		       checkout_order_id=NULL,
+		       updated_at=now()
+		 WHERE checkout_order_id=$1
+		   AND status='checkout_pending'
 	`, orderID)
 	return err
 }
 
-// Get active cart view by user
+// Get active cart or checkout_pending view by user
 func (r *Repository) GetView(ctx context.Context, userID int64) (*CartView, error) {
 	var v CartView
 
 	err := r.db.QueryRow(ctx, `
-SELECT id, user_id, guest_token, status, expires_at, created_at, updated_at
+SELECT id, user_id, guest_token, status, expires_at, created_at, updated_at, checkout_order_id
 FROM carts
 WHERE user_id = $1
-  AND status = 'active'
+  AND (status = 'active' OR status = 'checkout_pending')
   AND (expires_at IS NULL OR expires_at > now())
+ORDER BY 
+    CASE status 
+        WHEN 'checkout_pending' THEN 1 
+        WHEN 'active' THEN 2 
+        ELSE 3 
+    END,
+    updated_at DESC
 LIMIT 1
 `, userID).Scan(
 		&v.Cart.ID,
@@ -249,6 +305,7 @@ LIMIT 1
 		&v.Cart.ExpiresAt,
 		&v.Cart.CreatedAt,
 		&v.Cart.UpdatedAt,
+		&v.Cart.CheckoutOrderID,
 	)
 
 	if err != nil {
@@ -266,7 +323,7 @@ func (r *Repository) GetViewByCartID(ctx context.Context, cartID int64) (*CartVi
 	var v CartView
 
 	if err := r.db.QueryRow(ctx, `
-SELECT id, user_id, guest_token, status, expires_at, created_at, updated_at
+SELECT id, user_id, guest_token, status, expires_at, created_at, updated_at, checkout_order_id
 FROM carts
 WHERE id = $1
 `, cartID).Scan(
@@ -277,6 +334,7 @@ WHERE id = $1
 		&v.Cart.ExpiresAt,
 		&v.Cart.CreatedAt,
 		&v.Cart.UpdatedAt,
+		&v.Cart.CheckoutOrderID,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("cart not found")
@@ -287,6 +345,7 @@ WHERE id = $1
 	return r.fillLines(ctx, &v, cartID)
 }
 
+// fillLines fetches cart items for any cartID, calculates totals directly and return the CartView structure
 func (r *Repository) fillLines(ctx context.Context, v *CartView, cartID int64) (*CartView, error) {
 	rows, err := r.db.Query(ctx, `
 SELECT 
