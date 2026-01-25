@@ -31,7 +31,7 @@ services:
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$2y$05$2hQXRr9Rpo8aJs0ERvDMauAwYEHPh7eSvTY.CTzLyBYKr.mkGInKO"
     restart: always
     env_file:
-      - /opt/khel/.env.prod # Production environment variables
+      - .env.prod # Production environment variables
     volumes:
       - /opt/khel/letsencrypt:/letsencrypt # Persistent cert storage
       - /var/run/docker.sock:/var/run/docker.sock:ro # Read-only Docker socket
@@ -45,9 +45,9 @@ services:
     container_name: khel-prod
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     env_file:
-      - /opt/khel/.env.prod # Production environment variables
+      - .env.prod # Production environment variables
     deploy:
       update_config:
         failure_action: rollback
@@ -81,9 +81,9 @@ services:
     container_name: khel-staging
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     env_file:
-      - /opt/khel/.env.staging # Staging environment variables
+      - .env.staging # Staging environment variables
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.khel-staging.rule=Host(`api.staging.gocloudnepal.com`)"
