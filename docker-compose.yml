@@ -1,116 +1,188 @@
 services:
-  # ================================
+  # ============================================================
   # Traefik Reverse Proxy
-  # ================================
+  # ============================================================
+  # Purpose:
+  # - Terminates HTTPS (Let's Encrypt)
+  # - Routes requests based on hostname to the correct container
+  # - Auto-discovers routes from Docker labels
+  #
+  # You will access:
+  # - API (prod):    https://api.gocloudnepal.com
+  # - API (staging): https://api.staging.gocloudnepal.com
+  # - Traefik UI:    https://traefik.gocloudnepal.com (Basic Auth protected)
   reverse-proxy:
-    image: traefik:v3.4
+    image: traefik:v3.6.7
+    container_name: traefik
     command:
-      - "--providers.docker" # Enable Docker provider i.e --providers.docker lets Traefik read labels from Docker containers and auto-configure routes.
-      - "--providers.docker.exposedbydefault=false" # Only expose labeled containers
-      - "--entryPoints.web.address=:80" # HTTP entry point
-      - "--entryPoints.websecure.address=:443" # HTTPS entry point
+      # Logging level: INFO is good for production + debugging routing/ACME
+      - "--log.level=INFO"
+
+      # Enable Docker provider so Traefik reads labels from containers
+      - "--providers.docker=true"
+      # Security: Only expose containers that explicitly set traefik.enable=true
+      - "--providers.docker.exposedbydefault=false"
+      # (Optional but nice) Tell Traefik which Docker network to use for routing
+      - "--providers.docker.network=khel-net"
+
+      # HTTP and HTTPS entrypoints
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+
+      # Redirect all HTTP -> HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+
+      # Enable Traefik dashboard API (we will route it via labels)
+      - "--api.dashboard=true"
+
+      # ------------------------------------------------------------
+      # Let's Encrypt (ACME) with DNS Challenge using DigitalOcean
+      # ------------------------------------------------------------
+      # This issues/renews certs by creating TXT records in DigitalOcean DNS.
+      # REQUIREMENT: Your domain must use DigitalOcean nameservers.
       - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
       - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=digitalocean"
       - "--certificatesresolvers.myresolver.acme.dnschallenge.delaybeforecheck=10"
-      - "--certificatesresolvers.myresolver.acme.email=ongchen10sherpa@gmail.com" # Let's Encrypt email
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json" # Cert storage
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure" # HTTP→HTTPS redirect
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https" # Force HTTPS
-      - "--api.dashboard=true" # Enable dashboard
+      - "--certificatesresolvers.myresolver.acme.email=ongchen10sherpa@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+
     ports:
-      - "80:80" # HTTP port
-      - "443:443" # HTTPS port
+      # Expose ports on the droplet
+      - "80:80"
+      - "443:443"
+
+    # Reads secrets like DO_AUTH_TOKEN (DigitalOcean API token) from this file.
+    # Keep this file ONLY on the server (never commit to git).
+    env_file:
+      - .env.prod
+
+    environment:
+      # Workaround / safety: ensure Traefik uses a modern Docker API version.
+      # Helps prevent "client version too old" provider errors.
+      - DOCKER_API_VERSION=1.44
+
+    volumes:
+      # Persist Let's Encrypt certs on the host so certs survive container restarts/rebuilds
+      - /opt/khel/letsencrypt:/letsencrypt
+      # Allow Traefik to read Docker labels & discover containers (read-only is safer)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
     labels:
-      # Traefik Dashboard Configuration
+      # Enable Traefik routing to itself (dashboard)
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`traefik.gocloudnepal.com`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls.certresolver=myresolver"
       - "traefik.http.routers.traefik.service=api@internal"
+
+      # Protect the dashboard with basic auth
       - "traefik.http.routers.traefik.middlewares=dashboard-auth"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$2y$05$2hQXRr9Rpo8aJs0ERvDMauAwYEHPh7eSvTY.CTzLyBYKr.mkGInKO"
-    restart: always
-    env_file:
-      - .env.prod # Production environment variables
-    volumes:
-      - /opt/khel/letsencrypt:/letsencrypt # Persistent cert storage
-      - /var/run/docker.sock:/var/run/docker.sock:ro # Read-only Docker socket
 
-  # ================================
-  # Production API Service
-  # ================================
+    networks:
+      - khel-net
+
+    restart: always
+
+  # ============================================================
+  # Khel API - Production
+  # ============================================================
   khel-prod:
     image: khel:prod
-    user: "nonroot:nonroot" # Run as non-root for security
     container_name: khel-prod
+
+    # Build on the droplet from the repo directory (simple early-stage approach).
+    # Later, you can replace this with a registry image (GHCR/Docker Hub).
     build:
       context: .
       dockerfile: dockerfile
+
+    # Run as non-root user created in your Dockerfile for security
+    user: "nonroot"
+
+    # Load app secrets/config (DB, JWT secrets, etc.)
     env_file:
-      - .env.prod # Production environment variables
-    deploy:
-      update_config:
-        failure_action: rollback
-        monitor: 5m
-        parallelism: 1 # Update one container at a time
-        delay: 10s # Wait 10s between updates
-        order: stop-first # Stop old container before starting new one
-      restart_policy:
-        condition: on-failure # Only restart on failure
-        max_attempts: 3 # Max restart attempts before giving up
+      - .env.prod
+
+    # Prevent your Go app from loading local .env files in Docker.
+    # Your Go code checks DOCKER and APP_ENV.
+    environment:
+      - DOCKER=1
+      - APP_ENV=prod
+
     labels:
+      # Route production API traffic to this container via Traefik
       - "traefik.enable=true"
       - "traefik.http.routers.khel-prod.rule=Host(`api.gocloudnepal.com`)"
       - "traefik.http.routers.khel-prod.entrypoints=websecure"
       - "traefik.http.routers.khel-prod.tls.certresolver=myresolver"
+      # The Go server listens on port 8080 in the container
       - "traefik.http.services.khel-prod.loadbalancer.server.port=8080"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"] # Health endpoint
-      interval: 120s # Check every 30 seconds
-      timeout: 5s # Timeout after 5 seconds
-      retries: 3 # Retry 3 times before marking unhealthy
-      start_period: 20s # Wait 20s before first check
 
-  # ================================
-  # Staging API Service
-  # ================================
+    # Healthcheck: Docker marks container unhealthy if this fails.
+    # If you want faster detection, use interval: 30s (your call).
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 120s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    depends_on:
+      - reverse-proxy
+
+    networks:
+      - khel-net
+
+    restart: unless-stopped
+
+  # ============================================================
+  # Khel API - Staging
+  # ============================================================
   khel-staging:
     image: khel:staging
-    user: "nonroot:nonroot" # Run as non-root for security
     container_name: khel-staging
+
     build:
       context: .
       dockerfile: dockerfile
+
+    user: "nonroot"
+
     env_file:
-      - .env.staging # Staging environment variables
+      - .env.staging
+
+    environment:
+      - DOCKER=1
+      - APP_ENV=staging
+
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.khel-staging.rule=Host(`api.staging.gocloudnepal.com`)"
       - "traefik.http.routers.khel-staging.entrypoints=websecure"
       - "traefik.http.routers.khel-staging.tls.certresolver=myresolver"
       - "traefik.http.services.khel-staging.loadbalancer.server.port=8080"
-      - "com.centurylinklabs.watchtower.enable=true" # Enable auto-updates
-    restart: unless-stopped
+
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"] # Health endpoint
-      interval: 120s # Check every 30 seconds
-      timeout: 5s # Timeout after 5 seconds
-      retries: 3 # Retry 3 times before marking unhealthy
-      start_period: 20s # Wait 20s before first check
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 120s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
-  # ================================
-  # Watchtower: Auto-update Service
-  # ================================
-  watchtower:
-    image: containrrr/watchtower
-    command:
-      - "--label-enable"
-      - "--interval=30"
-      - "--rolling-restart"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    restart: on-failure
+    depends_on:
+      - reverse-proxy
 
-volumes:
-  letsencrypt: # Persistent volume for SSL certificates
+    networks:
+      - khel-net
+
+    restart: unless-stopped
+
+# ============================================================
+# Networks
+# ============================================================
+# Explicit network = clearer debugging and lets us pin Traefik routing network.
+networks:
+  khel-net:
+    driver: bridge

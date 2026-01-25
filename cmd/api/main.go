@@ -106,8 +106,10 @@ func main() {
 	if env == "" {
 		env = "development"
 	}
-	envFile := fmt.Sprintf(".env.%s", env)
-	godotenv.Load(envFile)
+
+	if os.Getenv("DOCKER") == "" && env == "development" {
+		_ = godotenv.Load(".env.development")
+	}
 
 	hashSalt := os.Getenv("HASHIDS_SALT")
 	hd := hashids.NewData()
