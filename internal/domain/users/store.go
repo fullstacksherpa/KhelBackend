@@ -270,25 +270,33 @@ func (r *Repository) createUserInvitation(ctx context.Context, tx pgx.Tx, token 
 
 func (r *Repository) Activate(ctx context.Context, token string) error {
 	return database.WithTx(r.db, ctx, func(tx pgx.Tx) error {
-		// 1. find the user that this token belongs to
 		user, err := r.getUserFromInvitation(ctx, tx, token)
 		if err != nil {
 			return err
 		}
 
-		// 2. update the user
+		// ✅ idempotent: already active => success
+		if user.IsActive {
+			return nil
+		}
+
+		// activate
 		user.IsActive = true
-		if err := r.update(ctx, tx, user); err != nil {
+		if err := r.updateActiveOnly(ctx, tx, user.ID); err != nil {
 			return err
 		}
 
-		// 3. clean the invitations
-		if err := r.deleteUserInvitations(ctx, tx, user.ID); err != nil {
-			return err
-		}
-
+		// ❌ do NOT delete invitations here
 		return nil
 	})
+}
+
+func (r *Repository) updateActiveOnly(ctx context.Context, tx pgx.Tx, userID int64) error {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	_, err := tx.Exec(ctx, `UPDATE users SET is_active = TRUE WHERE id = $1`, userID)
+	return err
 }
 
 func (r *Repository) getUserFromInvitation(ctx context.Context, tx pgx.Tx, token string) (*User, error) {

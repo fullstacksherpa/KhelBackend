@@ -46,7 +46,7 @@ type application struct {
 }
 
 type config struct {
-	addr        string
+	addr        string //for swagger doc fetching
 	db          dbConfig
 	env         string
 	apiURL      string
@@ -125,7 +125,7 @@ func (app *application) mount() http.Handler {
 	r.Use(app.RateLimiterMiddleware)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://web.gocloudnepal.com", "http://localhost:3000", "https://admin.gocloudnepal.com"},
+		AllowedOrigins:   []string{"https://khel.gocloudnepal.com", "http://localhost:3000"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},

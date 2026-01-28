@@ -37,11 +37,11 @@ type ErrorInternalServerResponse struct {
 }
 
 type RegisterUserPayload struct {
-	FirstName string `json:"first_name" validate:"required,max=50"`
-	LastName  string `json:"last_name" validate:"required,max=50"`
+	FirstName string `json:"first_name" validate:"required,max=40"`
+	LastName  string `json:"last_name" validate:"required,max=40"`
 	Email     string `json:"email" validate:"required,email,max=255"`
 	Phone     string `json:"phone" validate:"required,len=10,numeric"`
-	Password  string `json:"password" validate:"required,min=3,max=72"`
+	Password  string `json:"password" validate:"required,min=3,max=30"`
 }
 
 // TODO: remove Token from response

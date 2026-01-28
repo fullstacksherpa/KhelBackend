@@ -29,7 +29,16 @@ func init() {
 
 func writeJSON(w http.ResponseWriter, status int, data any) error {
 	w.Header().Set("Content-Type", "application/json")
+
+	// ✅ 204 must not include a body
+	if status == http.StatusNoContent {
+		w.WriteHeader(status)
+		return nil
+	}
+
 	w.WriteHeader(status)
+
+	// Optional: if data is nil, still write "null" (valid JSON)
 	return json.NewEncoder(w).Encode(data)
 }
 

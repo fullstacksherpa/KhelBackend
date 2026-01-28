@@ -138,7 +138,7 @@ func main() {
 			maxIdleTime:  os.Getenv("DB_MAX_IDLE_TIME"),
 		},
 		mail: mailConfig{
-			exp:       time.Hour * 24 * 3, //3 days
+			exp:       time.Hour * 24 * 1, //1 days
 			fromEmail: os.Getenv("SENDGRID_FROM_EMAIL"),
 			mailtrap: mailTrapConfig{
 				apiKey: os.Getenv("MAILTRAP_API_KEY"),
@@ -152,8 +152,8 @@ func main() {
 			token: tokenConfig{
 				refreshSecret:   os.Getenv("AUTH_TOKEN_REFRESH_SECRET"),
 				secret:          os.Getenv("AUTH_TOKEN_SECRET"),
-				accessTokenExp:  time.Hour * 24 * 3, // 3 days
-				refreshTokenExp: time.Hour * 24 * 9, // 9 days
+				accessTokenExp:  time.Hour * 24 * 1, // 1 days
+				refreshTokenExp: time.Hour * 24 * 2, // 2 days
 				iss:             "Khel",
 			},
 		},

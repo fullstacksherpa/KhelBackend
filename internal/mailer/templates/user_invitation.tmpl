@@ -1,4 +1,4 @@
-{{define "subject"}} Finish Registration with Khel {{end}}
+{{define "subject"}}Welcome to Khel — Confirm your email{{end}}
 
 {{define "body"}}
 <!doctype html>
@@ -6,17 +6,127 @@
   <head>
     <meta name="viewport" content="width=device-width" />
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="color-scheme" content="light only" />
+    <title>Khel Email Confirmation</title>
   </head>
-  <body> <p>Hi {{.Username}},</p>
-    <p>Thanks for signing up for Khel. We're excited to have you on board!</p></p>
-    <p>Before you can start using Khel, you need to confirm your email address. Click the link below to confirm your email address:</p>
-    <p><a href="{{.ActivationURL}}">{{.ActivationURL}}</a></p>
-    <p>If you want to activate your account manually copy and paste the code from the link above</p>
-    <p>If you didn't sign up for Khel, you can safely ignore this email.</p>
 
-    <p>Thanks,</p>
-    <p>The Khel Team</p>
+  <body style="margin:0;padding:0;background:#F6F8F7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0B1215;">
+    <!-- Preheader (hidden in body, shown in inbox previews) -->
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      Confirm your email to finish setting up Khel and start booking games.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F6F8F7;padding:24px 0;">
+      <tr>
+        <td align="center" style="padding:0 12px;">
+          <!-- Container -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #E6EEF0;border-radius:18px;overflow:hidden;">
+            <!-- Header -->
+            <tr>
+              <td style="padding:18px 18px 16px 18px;background:linear-gradient(135deg,#16A34A,#166534);">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" style="color:#FFFFFF;">
+                      <div style="font-size:18px;font-weight:900;letter-spacing:0.4px;">
+                        Khel
+                      </div>
+                      <div style="margin-top:4px;font-size:12px;font-weight:700;opacity:0.92;">
+                        Play • Book • Connect
+                      </div>
+                    </td>
+                    <td align="right" style="color:#FFFFFF;">
+                      <div style="display:inline-block;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.25);padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800;">
+                        Email Verification
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+              <td style="padding:18px;">
+                <p style="margin:0 0 10px 0;font-size:16px;font-weight:900;">
+                  Hi {{.Username}},
+                </p>
+
+                <p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;color:#334155;font-weight:700;">
+                  Thanks for signing up for <span style="color:#0B1215;font-weight:900;">Khel</span> 🎉
+                  You’re one step away from joining games, booking venues, and playing with people near you.
+                </p>
+
+                <div style="margin:14px 0 14px 0;padding:12px;border-radius:14px;background:#F0FDF4;border:1px solid #BBF7D0;">
+                  <p style="margin:0;font-size:13px;line-height:1.45;color:#14532D;font-weight:800;">
+                    ✅ Please confirm your email address to activate your account.
+                  </p>
+                </div>
+
+                <!-- CTA Button -->
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px 0 10px 0;">
+                  <tr>
+                    <td align="center" style="background:#16A34A;border-radius:14px;">
+                      <a href="{{.ActivationURL}}"
+                         style="display:inline-block;padding:12px 16px;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:900;letter-spacing:0.4px;">
+                        Confirm Email
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 10px 0;font-size:12px;line-height:1.5;color:#64748B;font-weight:700;">
+                  If the button doesn’t work, copy and paste this link into your browser:
+                </p>
+
+                <p style="margin:0 0 16px 0;font-size:12px;line-height:1.5;">
+                  <a href="{{.ActivationURL}}" style="color:#166534;font-weight:900;word-break:break-all;text-decoration:underline;">
+                    {{.ActivationURL}}
+                  </a>
+                </p>
+
+                <!-- Small "what you can do" section -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #E6EEF0;padding-top:14px;">
+                  <tr>
+                    <td style="padding-top:10px;">
+                      <p style="margin:0 0 8px 0;font-size:13px;font-weight:900;color:#0B1215;">
+                        Once you’re in, you can:
+                      </p>
+
+                      <ul style="margin:0;padding-left:18px;color:#334155;font-size:13px;line-height:1.6;font-weight:700;">
+                        <li>Find and join upcoming games fast</li>
+                        <li>Host your own match and invite players</li>
+                        <li>Book venues hourly (no stress)</li>
+                      </ul>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:16px 0 0 0;font-size:12px;color:#94A3B8;line-height:1.5;font-weight:700;">
+                  If you didn’t sign up for Khel, you can safely ignore this email.
+                </p>
+
+                <p style="margin:14px 0 0 0;font-size:14px;font-weight:900;color:#0B1215;">
+                  See you on the field,<br />
+                  <span style="color:#166534;">The Khel Team</span>
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="padding:14px 18px;background:#F8FAFC;border-top:1px solid #E6EEF0;">
+                <p style="margin:0;font-size:12px;color:#64748B;line-height:1.5;font-weight:700;">
+                  Need help? Reply to this email and we’ll get you sorted.
+                </p>
+              </td>
+            </tr>
+          </table>
+
+          <!-- tiny spacing -->
+          <div style="height:14px;"></div>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>
-
 {{end}}
