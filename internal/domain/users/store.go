@@ -334,20 +334,6 @@ func (r *Repository) getUserFromInvitation(ctx context.Context, tx pgx.Tx, token
 	return user, nil
 }
 
-func (r *Repository) update(ctx context.Context, tx pgx.Tx, user *User) error {
-	query := `UPDATE users SET  email = $1, is_active = $2 WHERE id = $3`
-
-	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
-	defer cancel()
-
-	_, err := tx.Exec(ctx, query, user.Email, user.IsActive, user.ID)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (r *Repository) deleteUserInvitations(ctx context.Context, tx pgx.Tx, userID int64) error {
 	query := `DELETE FROM user_invitations WHERE user_id = $1`
 
