@@ -38,7 +38,7 @@ type application struct {
 	authenticator auth.Authenticator
 	rateLimiter   ratelimiter.Limiter
 
-	// strict limiter for public venue request endpoint
+	// strict limiter for public venue request endpoint and password reset endpoint 5 req/min per IP
 	venueRequestLimiter ratelimiter.Limiter
 	push                *notifications.ExpoAdapter
 	hashID              *hashids.HashID
@@ -293,7 +293,9 @@ func (app *application) mount() http.Handler {
 		//for web
 		r.Post("/authentication/refresh/cookie", app.refreshTokenCookieHandler)
 		r.Post("/authentication/logout/cookie", app.logoutCookieHandler)
-		r.Post("/authentication/reset-password", app.requestResetPasswordHandler)
+		// strict limiter ONLY for this endpoint 5 req/min per IP
+		r.With(app.StrictLimiterMiddleware(app.venueRequestLimiter)).Post("/authentication/reset-password", app.requestResetPasswordHandler)
+
 		r.Patch("/authentication/reset-password", app.resetPasswordHandler)
 
 		r.Route("/authentication", func(r chi.Router) {

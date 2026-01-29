@@ -252,7 +252,7 @@ func normalizeOrderStatusFilter(raw string) (string, error) {
 	}
 
 	switch s {
-	case "pending", "processing", "shipped", "delivered", "cancelled", "refunded":
+	case "pending", "processing", "shipped", "delivered", "cancelled", "refunded", "awaiting_payment", "payment_failed":
 		return s, nil
 	default:
 		return "", fmt.Errorf("invalid status")

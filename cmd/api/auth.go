@@ -363,6 +363,9 @@ func (app *application) refreshTokenHandler(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// RequestResetPasswordPayload is the request body for initiating a password reset.
+// ✅ Validate tags ensure basic input hygiene before doing any work.
+// ⚠️ NOTE: Even with validation, we should NEVER reveal whether an email exists.
 type RequestResetPasswordPayload struct {
 	Email string `json:"email" validate:"required,email,max=255"`
 }
@@ -370,16 +373,19 @@ type RequestResetPasswordPayload struct {
 // requestResetPasswordHandler godoc
 //
 //	@Summary		Request password reset
-//	@Description	Request password reset
+//	@Description	Sends a password-reset email if the account exists. Always returns 200 to prevent email enumeration.
 //	@Tags			authentication
 //	@Accept			json
 //	@Produce		json
 //	@Param			payload	body		RequestResetPasswordPayload	true	"User email"
-//	@Success		200		{object}	map[string]string			"Reset token sent"
+//	@Success		200		{object}	map[string]string			"If the email exists, a reset link was sent"
 //	@Failure		400		{object}	error
 //	@Failure		500		{object}	error
 //	@Router			/authentication/reset-password [post]
 func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	// -------------------------------------------------------------------------
+	// 1) Parse + validate request body
+	// -------------------------------------------------------------------------
 	var payload RequestResetPasswordPayload
 	if err := readJSON(w, r, &payload); err != nil {
 		app.badRequestResponse(w, r, err)
@@ -393,31 +399,68 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 
 	ctx := r.Context()
 
-	// Generate a reset token
-	resetToken := uuid.New().String()
-	hash := sha256.Sum256([]byte(resetToken))
-	hashToken := hex.EncodeToString(hash[:])
+	// -------------------------------------------------------------------------
+	// 2) SECURITY: Prevent "email enumeration"
+	//
+	// We DO NOT want attackers to discover whether an email exists by comparing
+	// responses (404 vs 200). So we always return 200 with a generic message.
+	//
+	// We still do the work ONLY if the user exists.
+	// -------------------------------------------------------------------------
 
-	resetTokenExpires := time.Now().UTC().Add(3 * time.Hour)
-
+	// Try to find the user by email
 	user, err := app.store.Users.GetByEmail(ctx, payload.Email)
 	if err != nil {
-		app.notFoundResponse(w, r, err)
-		return
-	}
-
-	// Update user with reset token and expiration time
-	err = app.store.Users.UpdateResetToken(ctx, payload.Email, hashToken, resetTokenExpires)
-	if err != nil {
+		// ✅ If user doesn't exist: return generic success (do nothing else)
 		if err == users.ErrNotFound {
-			app.badRequestResponse(w, r, errors.New("email not found"))
+			_ = app.jsonResponse(w, http.StatusOK, map[string]string{
+				"message": "If an account with that email exists, a reset link has been sent.",
+			})
 			return
 		}
+
+		// ✅ Any other error is a real server error
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	// Send reset email
+	// -------------------------------------------------------------------------
+	// 3) Generate reset token (unhashed for URL) + hash for DB storage
+	//
+	// ✅ Store ONLY the hashed token in DB so even if DB leaks, attackers
+	// can’t use the token directly.
+	// -------------------------------------------------------------------------
+	resetToken := uuid.New().String()
+
+	hash := sha256.Sum256([]byte(resetToken))
+	hashToken := hex.EncodeToString(hash[:])
+
+	// Token lifetime: adjust based on your security needs (common: 15–60 min)
+	resetTokenExpires := time.Now().UTC().Add(3 * time.Hour)
+
+	// -------------------------------------------------------------------------
+	// 4) Save token in DB
+	//
+	// NOTE: UpdateResetToken should return users.ErrNotFound if RowsAffected == 0,
+	// but since we already fetched the user above, that should never happen unless
+	// the user got deleted between calls (race condition).
+	// -------------------------------------------------------------------------
+	if err := app.store.Users.UpdateResetToken(ctx, payload.Email, hashToken, resetTokenExpires); err != nil {
+		// ✅ Still return generic 200 for not-found to avoid enumeration
+		if err == users.ErrNotFound {
+			_ = app.jsonResponse(w, http.StatusOK, map[string]string{
+				"message": "If an account with that email exists, a reset link has been sent.",
+			})
+			return
+		}
+
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	// -------------------------------------------------------------------------
+	// 5) Build reset URL for frontend + send email
+	// -------------------------------------------------------------------------
 	resetURL := fmt.Sprintf("%s/reset-password/?token=%s", app.config.frontendURL, resetToken)
 
 	vars := struct {
@@ -428,18 +471,28 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 		ResetURL: resetURL,
 	}
 
-	status, err := app.mailer.Send(mailer.ResetPasswordTemplate, payload.Email, payload.Email, vars)
+	status, err := app.mailer.Send(
+		mailer.ResetPasswordTemplate,
+		payload.Email, // toEmail
+		payload.Email, // toName (you can change if you store full name)
+		vars,
+	)
 	if err != nil {
+		// ⚠️ This is a server problem (SMTP, provider issues, etc)
+		// Some teams still return 200 here to avoid leaking delivery status.
+		// But returning 500 is also acceptable for your own app UX.
 		app.logger.Errorw("error sending reset password email", "error", err)
 		app.internalServerError(w, r, err)
 		return
 	}
 
-	app.logger.Infow("Reset password email sent", "status code", status)
+	app.logger.Infow("reset password email sent", "status_code", status, "email", payload.Email)
 
+	// -------------------------------------------------------------------------
+	// 6) Always return a generic success message
+	// -------------------------------------------------------------------------
 	if err := app.jsonResponse(w, http.StatusOK, map[string]string{
-		"message":    "Reset token sent",
-		"resetToken": resetToken, // unhashed token
+		"message": "If an account with that email exists, a reset link has been sent.",
 	}); err != nil {
 		app.internalServerError(w, r, err)
 	}

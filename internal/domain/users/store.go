@@ -447,16 +447,16 @@ func (r *Repository) GetRefreshToken(ctx context.Context, userID int64) (string,
 
 func (r *Repository) UpdateResetToken(ctx context.Context, email, resetToken string, resetTokenExpires time.Time) error {
 	query := `
-        UPDATE users
-        SET reset_password_token = $1, reset_password_expires = $2
-        WHERE email = $3
-    `
-	_, err := r.db.Exec(ctx, query, resetToken, resetTokenExpires, email)
+    UPDATE users
+    SET reset_password_token = $1, reset_password_expires = $2
+    WHERE email = $3
+  `
+	ct, err := r.db.Exec(ctx, query, resetToken, resetTokenExpires, email)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return err
-		}
 		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotFound
 	}
 	return nil
 }
