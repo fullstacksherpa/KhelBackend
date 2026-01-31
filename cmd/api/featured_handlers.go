@@ -159,11 +159,11 @@ type adminUpdateFeaturedItemPayload struct {
 //	@Tags			Merchant
 //	@Accept			json
 //	@Produce		json
-//	@Param			limit	query		int		false	"Limit results (default: 10, max: 100)"
-//	@Param			offset	query		int		false	"Offset results (default: 0)"
-//	@Param			search	query		string	false	"Search by key/title"
-//	@Param			type	query		string	false	"Filter by type"
-//	@Param			active	query		bool	false	"Filter by active status"
+//	@Param			limit	query		int						false	"Limit results (default: 10, max: 100)"
+//	@Param			offset	query		int						false	"Offset results (default: 0)"
+//	@Param			search	query		string					false	"Search by key/title"
+//	@Param			type	query		string					false	"Filter by type"
+//	@Param			active	query		bool					false	"Filter by active status"
 //	@Success		200		{object}	map[string]interface{}	"Collections + pagination"
 //	@Failure		400		{object}	error					"Bad Request"
 //	@Failure		500		{object}	error					"Internal Server Error"
@@ -212,7 +212,7 @@ func (app *application) adminListFeaturedCollectionsHandler(w http.ResponseWrite
 //	@Tags			Merchant
 //	@Accept			json
 //	@Produce		json
-//	@Param			collectionID	path		int		true	"Collection ID"
+//	@Param			collectionID	path		int	true	"Collection ID"
 //	@Success		200				{object}	featured.FeaturedCollection
 //	@Failure		400				{object}	error	"Bad Request"
 //	@Failure		404				{object}	error	"Not Found"
@@ -251,10 +251,10 @@ func (app *application) adminGetFeaturedCollectionHandler(w http.ResponseWriter,
 //	@Accept			json
 //	@Produce		json
 //	@Param			payload	body		adminCreateFeaturedCollectionPayload	true	"Create collection payload"
-//	@Success		201		{object}	map[string]interface{}	"Created collection + cache_refreshed"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		409		{object}	error					"Conflict (duplicate key)"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Success		201		{object}	map[string]interface{}					"Created collection + cache_refreshed"
+//	@Failure		400		{object}	error									"Bad Request"
+//	@Failure		409		{object}	error									"Conflict (duplicate key)"
+//	@Failure		500		{object}	error									"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/store/admin/featured/collections [post]
 func (app *application) adminCreateFeaturedCollectionHandler(w http.ResponseWriter, r *http.Request) {
@@ -307,13 +307,13 @@ func (app *application) adminCreateFeaturedCollectionHandler(w http.ResponseWrit
 //	@Tags			Merchant
 //	@Accept			json
 //	@Produce		json
-//	@Param			collectionID	path		int		true	"Collection ID"
+//	@Param			collectionID	path		int										true	"Collection ID"
 //	@Param			payload			body		adminUpdateFeaturedCollectionPayload	true	"Update collection payload"
-//	@Success		200		{object}	map[string]interface{}	"Updated collection + cache_refreshed"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		404		{object}	error					"Not Found"
-//	@Failure		409		{object}	error					"Conflict"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Success		200				{object}	map[string]interface{}					"Updated collection + cache_refreshed"
+//	@Failure		400				{object}	error									"Bad Request"
+//	@Failure		404				{object}	error									"Not Found"
+//	@Failure		409				{object}	error									"Conflict"
+//	@Failure		500				{object}	error									"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/store/admin/featured/collections/{collectionID} [patch]
 func (app *application) adminUpdateFeaturedCollectionHandler(w http.ResponseWriter, r *http.Request) {
@@ -381,11 +381,11 @@ func (app *application) adminUpdateFeaturedCollectionHandler(w http.ResponseWrit
 //	@Tags			Merchant
 //	@Accept			json
 //	@Produce		json
-//	@Param			collectionID	path		int		true	"Collection ID"
-//	@Success		200		{object}	map[string]interface{}	"Deleted + cache_refreshed"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		404		{object}	error					"Not Found"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Param			collectionID	path		int						true	"Collection ID"
+//	@Success		200				{object}	map[string]interface{}	"Deleted + cache_refreshed"
+//	@Failure		400				{object}	error					"Bad Request"
+//	@Failure		404				{object}	error					"Not Found"
+//	@Failure		500				{object}	error					"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/store/admin/featured/collections/{collectionID} [delete]
 func (app *application) adminDeleteFeaturedCollectionHandler(w http.ResponseWriter, r *http.Request) {
@@ -427,9 +427,9 @@ func (app *application) adminDeleteFeaturedCollectionHandler(w http.ResponseWrit
 //	@Param			limit			query		int		false	"Limit results (default: 10, max: 100)"
 //	@Param			offset			query		int		false	"Offset results (default: 0)"
 //	@Param			active			query		bool	false	"Filter by item active status"
-//	@Success		200		{object}	featured.ItemList
-//	@Failure		400		{object}	error	"Bad Request"
-//	@Failure		500		{object}	error	"Internal Server Error"
+//	@Success		200				{object}	featured.ItemList
+//	@Failure		400				{object}	error	"Bad Request"
+//	@Failure		500				{object}	error	"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/store/admin/featured/collections/{collectionID}/items [get]
 func (app *application) adminListFeaturedItemsHandler(w http.ResponseWriter, r *http.Request) {
@@ -475,12 +475,12 @@ func (app *application) adminListFeaturedItemsHandler(w http.ResponseWriter, r *
 //	@Tags			Merchant
 //	@Accept			json
 //	@Produce		json
-//	@Param			collectionID	path		int		true	"Collection ID"
+//	@Param			collectionID	path		int								true	"Collection ID"
 //	@Param			payload			body		adminCreateFeaturedItemPayload	true	"Create item payload"
-//	@Success		201		{object}	map[string]interface{}	"Created item + cache_refreshed"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		409		{object}	error					"Conflict (duplicate position)"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Success		201				{object}	map[string]interface{}			"Created item + cache_refreshed"
+//	@Failure		400				{object}	error							"Bad Request"
+//	@Failure		409				{object}	error							"Conflict (duplicate position)"
+//	@Failure		500				{object}	error							"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/store/admin/featured/collections/{collectionID}/items [post]
 func (app *application) adminCreateFeaturedItemHandler(w http.ResponseWriter, r *http.Request) {
@@ -547,13 +547,13 @@ func (app *application) adminCreateFeaturedItemHandler(w http.ResponseWriter, r 
 //	@Tags			Merchant
 //	@Accept			json
 //	@Produce		json
-//	@Param			itemID	path		int		true	"Item ID"
+//	@Param			itemID	path		int								true	"Item ID"
 //	@Param			payload	body		adminUpdateFeaturedItemPayload	true	"Update item payload"
-//	@Success		200		{object}	map[string]interface{}	"Updated item + cache_refreshed"
-//	@Failure		400		{object}	error					"Bad Request"
-//	@Failure		404		{object}	error					"Not Found"
-//	@Failure		409		{object}	error					"Conflict"
-//	@Failure		500		{object}	error					"Internal Server Error"
+//	@Success		200		{object}	map[string]interface{}			"Updated item + cache_refreshed"
+//	@Failure		400		{object}	error							"Bad Request"
+//	@Failure		404		{object}	error							"Not Found"
+//	@Failure		409		{object}	error							"Conflict"
+//	@Failure		500		{object}	error							"Internal Server Error"
 //	@Security		ApiKeyAuth
 //	@Router			/store/admin/featured/items/{itemID} [patch]
 func (app *application) adminUpdateFeaturedItemHandler(w http.ResponseWriter, r *http.Request) {
@@ -623,7 +623,7 @@ func (app *application) adminUpdateFeaturedItemHandler(w http.ResponseWriter, r 
 //	@Tags			Merchant
 //	@Accept			json
 //	@Produce		json
-//	@Param			itemID	path		int		true	"Item ID"
+//	@Param			itemID	path		int						true	"Item ID"
 //	@Success		200		{object}	map[string]interface{}	"Deleted + cache_refreshed"
 //	@Failure		400		{object}	error					"Bad Request"
 //	@Failure		404		{object}	error					"Not Found"
@@ -718,10 +718,10 @@ func (app *application) getHomeFeaturedCollectionsHandler(w http.ResponseWriter,
 //	@Param			collectionKey	path		string	true	"Collection key"
 //	@Param			page			query		int		false	"Page number (default: 1)"
 //	@Param			limit			query		int		false	"Limit per page (default: 20, max: 100)"
-//	@Success		200	{object}	featured.CollectionDetail
-//	@Failure		400	{object}	error	"Bad Request"
-//	@Failure		404	{object}	error	"Not Found"
-//	@Failure		500	{object}	error	"Internal Server Error"
+//	@Success		200				{object}	featured.CollectionDetail
+//	@Failure		400				{object}	error	"Bad Request"
+//	@Failure		404				{object}	error	"Not Found"
+//	@Failure		500				{object}	error	"Internal Server Error"
 //	@Router			/store/featured/collections/{collectionKey} [get]
 func (app *application) getFeaturedCollectionItemsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)

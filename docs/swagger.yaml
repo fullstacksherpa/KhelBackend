@@ -165,6 +165,192 @@ definitions:
       user_number:
         type: string
     type: object
+  carts.Cart:
+    properties:
+      checkout_order_id:
+        type: integer
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      guest_token:
+        type: string
+      id:
+        type: integer
+      status:
+        description: active, converted, abandoned, checkout_pending
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  carts.CartLine:
+    properties:
+      item_id:
+        type: integer
+      line_total_cents:
+        type: integer
+      primary_image_url:
+        type: string
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      unit_price_cents:
+        type: integer
+      variant_attributes:
+        additionalProperties: {}
+        type: object
+      variant_id:
+        type: integer
+    type: object
+  carts.CartView:
+    properties:
+      cart:
+        $ref: '#/definitions/carts.Cart'
+      items:
+        items:
+          $ref: '#/definitions/carts.CartLine'
+        type: array
+      total_cents:
+        type: integer
+    type: object
+  featured.CollectionDetail:
+    properties:
+      cached_at:
+        type: string
+      collection:
+        $ref: '#/definitions/featured.CollectionInfo'
+      items:
+        items:
+          $ref: '#/definitions/featured.CollectionItem'
+        type: array
+      pagination:
+        $ref: '#/definitions/featured.PaginationInfo'
+    type: object
+  featured.CollectionInfo:
+    properties:
+      description:
+        type: string
+      key:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  featured.CollectionItem:
+    properties:
+      badge_text:
+        type: string
+      deal_percent:
+        type: integer
+      deal_price_cents:
+        type: integer
+      image_url:
+        type: string
+      item_id:
+        type: integer
+      position:
+        type: integer
+      price_cents:
+        type: integer
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      product_slug:
+        type: string
+      subtitle:
+        type: string
+      variant_id:
+        type: integer
+    type: object
+  featured.FeaturedCollection:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      ends_at:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      key:
+        type: string
+      starts_at:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  featured.FeaturedItem:
+    properties:
+      badge_text:
+        type: string
+      collection_id:
+        type: integer
+      created_at:
+        type: string
+      deal_percent:
+        type: integer
+      deal_price_cents:
+        type: integer
+      ends_at:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      position:
+        type: integer
+      product_id:
+        type: integer
+      product_variant_id:
+        type: integer
+      starts_at:
+        type: string
+      subtitle:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  featured.ItemList:
+    properties:
+      collection_id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/featured.FeaturedItem'
+        type: array
+      pagination:
+        $ref: '#/definitions/featured.PaginationInfo'
+    type: object
+  featured.PaginationInfo:
+    properties:
+      has_next:
+        type: boolean
+      has_prev:
+        type: boolean
+      limit:
+        type: integer
+      offset:
+        type: integer
+      page:
+        type: integer
+      total_items:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
   gameqa.Question:
     properties:
       created_at:
@@ -832,13 +1018,13 @@ definitions:
         maxLength: 255
         type: string
       first_name:
-        maxLength: 50
+        maxLength: 40
         type: string
       last_name:
-        maxLength: 50
+        maxLength: 40
         type: string
       password:
-        maxLength: 72
+        maxLength: 30
         minLength: 3
         type: string
       phone:
@@ -1107,9 +1293,113 @@ definitions:
       owner_id:
         type: integer
     type: object
+  main.adminCreateFeaturedCollectionPayload:
+    properties:
+      description:
+        maxLength: 1000
+        type: string
+      ends_at:
+        type: string
+      is_active:
+        type: boolean
+      key:
+        maxLength: 255
+        type: string
+      starts_at:
+        type: string
+      title:
+        maxLength: 255
+        type: string
+      type:
+        maxLength: 255
+        type: string
+    required:
+    - key
+    - title
+    - type
+    type: object
+  main.adminCreateFeaturedItemPayload:
+    properties:
+      badge_text:
+        maxLength: 255
+        type: string
+      deal_percent:
+        maximum: 100
+        minimum: 0
+        type: integer
+      deal_price_cents:
+        minimum: 0
+        type: integer
+      ends_at:
+        type: string
+      is_active:
+        type: boolean
+      position:
+        minimum: 0
+        type: integer
+      product_id:
+        type: integer
+      product_variant_id:
+        type: integer
+      starts_at:
+        type: string
+      subtitle:
+        maxLength: 255
+        type: string
+    type: object
   main.adminRejectVenueReqPayload:
     properties:
       admin_note:
+        type: string
+    type: object
+  main.adminUpdateFeaturedCollectionPayload:
+    properties:
+      description:
+        maxLength: 1000
+        type: string
+      ends_at:
+        type: string
+      is_active:
+        type: boolean
+      key:
+        maxLength: 255
+        type: string
+      starts_at:
+        type: string
+      title:
+        maxLength: 255
+        type: string
+      type:
+        maxLength: 255
+        type: string
+    type: object
+  main.adminUpdateFeaturedItemPayload:
+    properties:
+      badge_text:
+        maxLength: 255
+        type: string
+      deal_percent:
+        maximum: 100
+        minimum: 0
+        type: integer
+      deal_price_cents:
+        minimum: 0
+        type: integer
+      ends_at:
+        type: string
+      is_active:
+        type: boolean
+      position:
+        minimum: 0
+        type: integer
+      product_id:
+        type: integer
+      product_variant_id:
+        type: integer
+      starts_at:
+        type: string
+      subtitle:
+        maxLength: 255
         type: string
     type: object
   main.assignRoleRequest:
@@ -2126,7 +2416,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Request password reset
+      description: Sends a password-reset email if the account exists. Always returns
+        200 to prevent email enumeration.
       parameters:
       - description: User email
         in: body
@@ -2138,7 +2429,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Reset token sent
+          description: If the email exists, a reset link was sent
           schema:
             additionalProperties:
               type: string
@@ -3390,6 +3681,366 @@ paths:
       summary: List products (admin)
       tags:
       - Store-Admin-Products
+  /store/admin/featured/collections:
+    get:
+      consumes:
+      - application/json
+      description: List all featured collections with pagination and optional filters
+      parameters:
+      - description: 'Limit results (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset results (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      - description: Search by key/title
+        in: query
+        name: search
+        type: string
+      - description: Filter by type
+        in: query
+        name: type
+        type: string
+      - description: Filter by active status
+        in: query
+        name: active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Collections + pagination
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List featured collections (Merchant)
+      tags:
+      - Merchant
+    post:
+      consumes:
+      - application/json
+      description: Create a new featured collection (source of truth). Cache refresh
+        is best-effort.
+      parameters:
+      - description: Create collection payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.adminCreateFeaturedCollectionPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created collection + cache_refreshed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "409":
+          description: Conflict (duplicate key)
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create featured collection (Merchant)
+      tags:
+      - Merchant
+  /store/admin/featured/collections/{collectionID}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a featured collection (items will cascade). Cache refresh
+        is best-effort.
+      parameters:
+      - description: Collection ID
+        in: path
+        name: collectionID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Deleted + cache_refreshed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete featured collection (Merchant)
+      tags:
+      - Merchant
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a single featured collection by its ID
+      parameters:
+      - description: Collection ID
+        in: path
+        name: collectionID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/featured.FeaturedCollection'
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get featured collection by ID (Merchant)
+      tags:
+      - Merchant
+    patch:
+      consumes:
+      - application/json
+      description: Partially update a featured collection. Cache refresh is best-effort.
+      parameters:
+      - description: Collection ID
+        in: path
+        name: collectionID
+        required: true
+        type: integer
+      - description: Update collection payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.adminUpdateFeaturedCollectionPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated collection + cache_refreshed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "409":
+          description: Conflict
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update featured collection (Merchant)
+      tags:
+      - Merchant
+  /store/admin/featured/collections/{collectionID}/items:
+    get:
+      consumes:
+      - application/json
+      description: List items inside a collection ordered by position
+      parameters:
+      - description: Collection ID
+        in: path
+        name: collectionID
+        required: true
+        type: integer
+      - description: 'Limit results (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Offset results (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      - description: Filter by item active status
+        in: query
+        name: active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/featured.ItemList'
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List featured items in a collection (Merchant)
+      tags:
+      - Merchant
+    post:
+      consumes:
+      - application/json
+      description: Add a new item inside a collection. Cache refresh is best-effort.
+      parameters:
+      - description: Collection ID
+        in: path
+        name: collectionID
+        required: true
+        type: integer
+      - description: Create item payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.adminCreateFeaturedItemPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created item + cache_refreshed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "409":
+          description: Conflict (duplicate position)
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create featured item (Merchant)
+      tags:
+      - Merchant
+  /store/admin/featured/items/{itemID}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a featured item. Cache refresh is best-effort.
+      parameters:
+      - description: Item ID
+        in: path
+        name: itemID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Deleted + cache_refreshed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete featured item (Merchant)
+      tags:
+      - Merchant
+    patch:
+      consumes:
+      - application/json
+      description: Partially update a featured item. Cache refresh is best-effort.
+      parameters:
+      - description: Item ID
+        in: path
+        name: itemID
+        required: true
+        type: integer
+      - description: Update item payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.adminUpdateFeaturedItemPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated item + cache_refreshed
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "409":
+          description: Conflict
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update featured item (Merchant)
+      tags:
+      - Merchant
+  /store/admin/featured/refresh-cache:
+    post:
+      consumes:
+      - application/json
+      description: Refreshes the materialized view featured_collections_cache (CONCURRENTLY)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cache refreshed
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Refresh featured collections cache (Merchant)
+      tags:
+      - Merchant
   /store/admin/orders:
     get:
       description: List all orders for the admin dashboard. Supports optional status
@@ -3671,6 +4322,30 @@ paths:
       summary: List all brands
       tags:
       - Store
+  /store/cart:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the current user's active or checkout_pending shopping
+        cart
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cart retrieved successfully
+          schema:
+            $ref: '#/definitions/carts.CartView'
+        "401":
+          description: Unauthorized
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get user's cart
+      tags:
+      - User-Cart
   /store/categories:
     get:
       description: Returns a paginated list of categories.
@@ -3819,6 +4494,65 @@ paths:
       summary: Get category tree
       tags:
       - Store-Categories
+  /store/featured/collections/{collectionKey}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a featured collection by key and paginated items (from
+        cache/MV; may be slightly stale)
+      parameters:
+      - description: Collection key
+        in: path
+        name: collectionKey
+        required: true
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Limit per page (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/featured.CollectionDetail'
+        "400":
+          description: Bad Request
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get featured collection items
+      tags:
+      - Featured
+  /store/featured/home:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all active featured collections with up to 10 items each
+        (from cache table/MV; may be slightly stale)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Home rails collections
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Get home featured collections
+      tags:
+      - Featured
   /store/orders:
     get:
       description: Returns a paginated list of orders for the authenticated user.

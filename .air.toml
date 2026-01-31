@@ -12,7 +12,7 @@ tmp_dir = "bin"
   delay = 1000
 
   # Directories and files to ignore
-  exclude_dir = ["assets", "bin", "vendor", "testdata", "web", "docs", "scripts"]
+  exclude_dir = ["assets", "bin", "vendor", "testdata", "web", "scripts"]
   exclude_regex = ["_test.go"] # ignore test files
   exclude_unchanged = false
 

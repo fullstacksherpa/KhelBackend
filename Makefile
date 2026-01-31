@@ -69,6 +69,12 @@ migrate-down:
 	fi; \
 	migrate -path=$(MIGRATIONS_PATH) -database="$(DB_ADDR_NO_POOL)" down $$steps
 
+
+
+.PHONY: gen-docs
+gen-docs:
+	@swag init -g ./api/main.go -d cmd,internal && swag fmt
+
 # -------------------------------
 # Environment Shortcuts
 # -------------------------------

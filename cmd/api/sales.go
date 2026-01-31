@@ -19,16 +19,16 @@ import (
 
 // GetCart godoc
 //
-// @Summary		Get user's cart
-// @Description	Retrieves the current user's active or checkout_pending shopping cart
-// @Tags			User-Cart
-// @Accept		json
-// @Produce		json
-// @Success		200	{object}	CartView	"Cart retrieved successfully"
-// @Failure		401	{object}	error		"Unauthorized"
-// @Failure		500	{object}	error		"Internal Server Error"
-// @Security		ApiKeyAuth
-// @Router		/store/cart [get]
+//	@Summary		Get user's cart
+//	@Description	Retrieves the current user's active or checkout_pending shopping cart
+//	@Tags			User-Cart
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	carts.CartView	"Cart retrieved successfully"
+//	@Failure		401	{object}	error			"Unauthorized"
+//	@Failure		500	{object}	error			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/store/cart [get]
 func (app *application) getCartHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
