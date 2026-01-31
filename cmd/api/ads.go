@@ -597,7 +597,6 @@ func (app *application) trackClickHandler(w http.ResponseWriter, r *http.Request
 		app.badRequestResponse(w, r, errors.New("invalid ad ID"))
 		return
 	}
-
 	err = app.store.Ads.IncrementClicks(ctx, aID)
 	if err != nil {
 		if err.Error() == "ad not found" {

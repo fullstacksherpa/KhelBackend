@@ -347,6 +347,24 @@ func (app *application) mount() http.Handler {
 			r.Get("/orders/{orderID}", app.adminGetOrderHandler)
 			r.Patch("/orders/{orderID}/status", app.adminUpdateOrderStatusHandler)
 
+			r.Route("/featured", func(r chi.Router) {
+				// Collections CRUD
+				r.Get("/collections", app.adminListFeaturedCollectionsHandler)
+				r.Post("/collections", app.adminCreateFeaturedCollectionHandler)
+				r.Get("/collections/{collectionID}", app.adminGetFeaturedCollectionHandler)
+				r.Patch("/collections/{collectionID}", app.adminUpdateFeaturedCollectionHandler)
+				r.Delete("/collections/{collectionID}", app.adminDeleteFeaturedCollectionHandler)
+
+				// Items CRUD
+				r.Get("/collections/{collectionID}/items", app.adminListFeaturedItemsHandler)
+				r.Post("/collections/{collectionID}/items", app.adminCreateFeaturedItemHandler)
+				r.Patch("/items/{itemID}", app.adminUpdateFeaturedItemHandler)
+				r.Delete("/items/{itemID}", app.adminDeleteFeaturedItemHandler)
+
+				// Cache control
+				r.Post("/refresh-cache", app.adminRefreshFeaturedCacheHandler)
+			})
+
 		})
 
 		// ---------- PUBLIC E-COMMERCE ROUTES ----------
@@ -355,6 +373,9 @@ func (app *application) mount() http.Handler {
 			r.Get("/payments/khalti", app.khaltiReturnHandler)
 			r.Get("/payments/esewa/return", app.esewaReturnHandler)
 			// ---------- PUBLIC CATALOG ----------
+			r.Get("/featured/home", app.getHomeFeaturedCollectionsHandler)
+			r.Get("/featured/collections/{collectionKey}", app.getFeaturedCollectionItemsHandler)
+
 			r.Get("/brands", app.getAllBrandsHandler)
 			r.Get("/categories", app.listCategoriesHandler)
 			r.Get("/categories/{categoryID}", app.getCategoryByIDHandler)

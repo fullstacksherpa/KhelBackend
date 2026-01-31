@@ -9,6 +9,7 @@ import (
 	"khel/internal/domain/appreviews"
 	"khel/internal/domain/bookings"
 	"khel/internal/domain/carts"
+	"khel/internal/domain/featured"
 	"khel/internal/domain/followers"
 	"khel/internal/domain/gameqa"
 	"khel/internal/domain/games"
@@ -50,6 +51,7 @@ type Container struct {
 	AccessControl  accesscontrol.Store
 	Products       products.Store
 	Sales          Sales
+	Featured       featured.Store
 }
 
 func NewContainer(db *pgxpool.Pool, orderGen *orders.OrderNumberGenerator) *Container {
@@ -76,6 +78,7 @@ func NewContainer(db *pgxpool.Pool, orderGen *orders.OrderNumberGenerator) *Cont
 			Payments: paymentsrepo.NewRepository(db),
 			PayLogs:  paymentsrepo.NewLogsRepository(db),
 		},
+		Featured: featured.NewRepository(db),
 	}
 }
 
