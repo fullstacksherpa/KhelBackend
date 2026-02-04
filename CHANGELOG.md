@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.20.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.19.0...v1.20.0) (2026-02-04)
+
+
+### Features
+
+* add feature price on detail and list ([cb6d7ce](https://github.com/fullstacksherpa/KhelBackend/commit/cb6d7cea39354f773cb9928d4b3afd7f3afa05cd))
+* add feature_collections and featured_items admin crud with client view ([8bfe255](https://github.com/fullstacksherpa/KhelBackend/commit/8bfe2555605f339650ceeacce7ef3cc8bda7d37d))
+* added gen-doc in makefile ([2fa3164](https://github.com/fullstacksherpa/KhelBackend/commit/2fa316405fc5927b0cd0516fb962b3e184d18d87))
+
 ## [1.19.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.18.0...v1.19.0) (2026-01-29)
 
 
