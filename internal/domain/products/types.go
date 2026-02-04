@@ -92,6 +92,23 @@ type ProductCard struct {
 	IsActive        bool      `json:"is_active"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+
+	Offer *ProductOffer `json:"offer,omitempty"`
+}
+
+type ProductOffer struct {
+	CollectionKey   string `json:"collection_key"`
+	CollectionTitle string `json:"collection_title"`
+	CollectionType  string `json:"collection_type"`
+
+	FeaturedItemID int64   `json:"featured_item_id"`
+	BadgeText      *string `json:"badge_text,omitempty"`
+	Subtitle       *string `json:"subtitle,omitempty"`
+	DealPriceCents *int64  `json:"deal_price_cents,omitempty"`
+	DealPercent    *int32  `json:"deal_percent,omitempty"`
+
+	// optional: tells app which variant the deal applies to
+	ProductVariantID *int64 `json:"product_variant_id,omitempty"`
 }
 
 type ProductDetail struct {
@@ -100,6 +117,7 @@ type ProductDetail struct {
 	Category *Category         `json:"category,omitempty"`
 	Variants []*ProductVariant `json:"variants"`
 	Images   []*ProductImage   `json:"images"`
+	Offer    *ProductOffer     `json:"offer,omitempty"`
 }
 
 type ProductCardWithRank struct {

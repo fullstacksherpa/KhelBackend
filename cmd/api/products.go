@@ -1135,7 +1135,7 @@ func (app *application) getProductByIDHandler(w http.ResponseWriter, r *http.Req
 //
 //	@Summary		List products (admin)
 //	@Description	Returns a paginated list of product cards for the admin panel. Supports optional filtering by category slug.
-//	@Tags			Store-Admin-Products
+//	@Tags			Products
 //	@Produce		json
 //
 //	@Param			category_slug	query		string			false	"Filter products by category slug"
@@ -1146,7 +1146,7 @@ func (app *application) getProductByIDHandler(w http.ResponseWriter, r *http.Req
 //	@Failure		400				{object}	error			"Bad Request"
 //	@Failure		500				{object}	error			"Internal Server Error"
 //	@Security		ApiKeyAuth
-//	@Router			/store/admin/category/products [get]
+//	@Router			/store/products [get]
 func (app *application) listProductsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	pg := params.ParsePagination(r.URL.Query())
@@ -1180,12 +1180,12 @@ func (app *application) listProductsHandler(w http.ResponseWriter, r *http.Reque
 //	@Router			/store/products/slug/{slug} [get]
 func (app *application) getProductDetailHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
 	slug := chi.URLParam(r, "slug")
 	if strings.TrimSpace(slug) == "" {
 		app.badRequestResponse(w, r, fmt.Errorf("slug is required"))
 		return
 	}
-	fmt.Printf("got slug: %s", slug)
 
 	detail, err := app.store.Products.GetProductDetailBySlug(ctx, slug)
 	if err != nil {
@@ -1196,6 +1196,14 @@ func (app *application) getProductDetailHandler(w http.ResponseWriter, r *http.R
 		app.notFoundResponse(w, r, fmt.Errorf("product not found"))
 		return
 	}
+
+	offer, err := app.store.Products.GetBestOfferForProduct(ctx, detail.Product.ID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	detail.Offer = offer // ✅ attach
 
 	app.jsonResponse(w, http.StatusOK, detail)
 }

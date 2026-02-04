@@ -553,14 +553,13 @@ func (app *application) checkoutHandler(w http.ResponseWriter, r *http.Request) 
 
 	var (
 		order   *orders.Order
-		cartID  int64
 		payment *paymentsrepo.Payment
 	)
 
 	// A) Transaction: create order snapshot + create payment row (if online) + lock cart (if online)
 	err := app.store.WithSalesTx(ctx, func(s *storage.SalesTx) error {
 		var err error
-		order, cartID, err = s.Orders.CreateFromCart(ctx, userID, ship, method)
+		order, _, err = s.Orders.CreateFromCart(ctx, userID, ship, method)
 		if err != nil {
 			return err
 		}
@@ -614,7 +613,7 @@ func (app *application) checkoutHandler(w http.ResponseWriter, r *http.Request) 
 			// IMPORTANT: unlock cart so user can retry checkout immediately.
 			// Also mark payment failed for support visibility.
 			_ = app.store.Sales.Payments.SetStatus(ctx, payment.ID, "failed")
-			_ = app.store.Sales.Carts.UnlockCheckoutCart(ctx, cartID) // implement: set status='active', checkout_order_id=NULL
+			_ = app.store.Sales.Carts.UnlockCheckoutCart(ctx, order.ID) // implement: set status='active', checkout_order_id=NULL TODO: check again
 
 			app.internalServerError(w, r, fmt.Errorf("payment init: %w", gerr))
 			return

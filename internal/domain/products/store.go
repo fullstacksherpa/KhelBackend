@@ -74,6 +74,8 @@ type Store interface {
 	FullTextSearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductCardWithRank, int, error)
 	SearchProducts(ctx context.Context, query string, limit, offset int) ([]*ProductCard, int, error)
 
+	GetBestOfferForProduct(ctx context.Context, productID int64) (*ProductOffer, error)
+
 	// Variants
 	CreateVariant(ctx context.Context, v *ProductVariant) (*ProductVariant, error)
 	GetVariantByID(ctx context.Context, id int64) (*ProductVariant, error)
@@ -1306,15 +1308,26 @@ func (r *Repository) ReorderProductImages(ctx context.Context, productID int64, 
 	})
 }
 
-// ListProductCards returns a page of “product cards” with min active price and primary image.
+// ListProductCards returns a page of “product cards” with:
+// - min active price (from product_variants)
+// - primary image (from product_images)
+// - brand/category names
+// - ✅ best active offer (from featured_items + featured_collections)
+//
 // If categorySlug is non-empty, it includes the subtree of that category.
 // total is a true total; we run a separate COUNT(*) which is cheap & accurate.
+//
+// Why we do offer in SQL (LATERAL) instead of Go loop:
+// - avoids N+1 queries (one offer query per product)
+// - keeps latency stable as your catalog grows
+// - keeps “best offer” selection consistent with product detail
 func (r *Repository) ListProductCards(
 	ctx context.Context,
 	categorySlug string,
 	limit, offset int,
 ) ([]*ProductCard, int, error) {
 
+	// Guardrails (protect DB & keep predictable API)
 	if limit <= 0 || limit > 30 {
 		limit = 30
 	}
@@ -1323,45 +1336,151 @@ func (r *Repository) ListProductCards(
 	}
 
 	// Build category filter by slug (include descendants)
-	// If no slug provided, subtree is effectively all categories.
+	// If no slug provided, subtree becomes effectively “all categories”.
+	//
+	// NOTE: We keep it as a CTE so both the data query and count query
+	// reuse the exact same subtree logic.
 	catCTE := `
-      WITH RECURSIVE cat_subtree AS (
-        SELECT id, slug FROM categories WHERE ($1 = '' OR slug = $1)
-        UNION ALL
-        SELECT c.id, c.slug
-        FROM categories c
-        INNER JOIN cat_subtree cs ON c.parent_id = cs.id
-      )
-    `
+WITH RECURSIVE cat_subtree AS (
+  SELECT id, slug
+  FROM categories
+  WHERE ($1 = '' OR slug = $1)
 
-	// Data query: brand/category names, primary image via LATERAL, min active price
+  UNION ALL
+
+  SELECT c.id, c.slug
+  FROM categories c
+  INNER JOIN cat_subtree cs ON c.parent_id = cs.id
+)
+`
+
+	// Data query:
+	// - product core fields
+	// - brand/category names
+	// - min active variant price
+	// - primary image
+	// - ✅ best active offer (if any) via LEFT JOIN LATERAL
+	//
+	// "Best offer" rules:
+	// - featured_items + featured_collections must be active and within (starts_at/ends_at)
+	// - offer matches product either directly (fi.product_id) OR via variant (fi.product_variant_id -> variants.product_id)
+	// - ranking prefers:
+	//   1) variant-specific offers first
+	//   2) explicit deal_price_cents (when > 0) and lower price
+	//   3) higher deal_percent
+	//   4) merchandising position
 	dataSQL := catCTE + `
-      SELECT
-        p.id, p.name, COALESCE(p.slug, ''), p.description,
-        p.category_id, c.name AS category_name,
-        p.brand_id, b.name AS brand_name,
-        p.is_active, p.created_at, p.updated_at,
-        mp.min_price_cents,
-        img.url AS primary_image_url
-      FROM products p
-      LEFT JOIN brands b     ON b.id = p.brand_id
-      LEFT JOIN categories c ON c.id = p.category_id
-      LEFT JOIN LATERAL (
-          SELECT MIN(v.price_cents) AS min_price_cents
-          FROM product_variants v
-          WHERE v.product_id = p.id AND v.is_active = true
-      ) mp ON true
-      LEFT JOIN LATERAL (
-          SELECT i.url
-          FROM product_images i
-          WHERE i.product_id = p.id
-          ORDER BY i.is_primary DESC, i.sort_order ASC, i.id ASC
-          LIMIT 1
-      ) img ON true
-      WHERE ($1 = '' OR p.category_id IN (SELECT id FROM cat_subtree))
-      ORDER BY p.id DESC
-      LIMIT $2 OFFSET $3;
-    `
+SELECT
+  p.id,
+  p.name,
+  COALESCE(p.slug, ''),
+  p.description,
+
+  p.category_id,
+  c.name AS category_name,
+
+  p.brand_id,
+  b.name AS brand_name,
+
+  p.is_active,
+  p.created_at,
+  p.updated_at,
+
+  mp.min_price_cents,
+  img.url AS primary_image_url,
+
+  -- ✅ offer columns (nullable)
+  off.collection_key,
+  off.collection_title,
+  off.collection_type,
+  off.featured_item_id,
+  off.badge_text,
+  off.subtitle,
+  off.deal_price_cents,
+  off.deal_percent,
+  off.product_variant_id
+
+FROM products p
+LEFT JOIN brands b     ON b.id = p.brand_id
+LEFT JOIN categories c ON c.id = p.category_id
+
+-- Min active price across variants
+LEFT JOIN LATERAL (
+  SELECT MIN(v.price_cents) AS min_price_cents
+  FROM product_variants v
+  WHERE v.product_id = p.id AND v.is_active = TRUE
+) mp ON TRUE
+
+-- Primary image (best guess): is_primary desc, then sort_order, then id
+LEFT JOIN LATERAL (
+  SELECT i.url
+  FROM product_images i
+  WHERE i.product_id = p.id
+  ORDER BY i.is_primary DESC, i.sort_order ASC, i.id ASC
+  LIMIT 1
+) img ON TRUE
+
+-- ✅ Best active offer for this product (if any)
+LEFT JOIN LATERAL (
+  SELECT
+    fc.key   AS collection_key,
+    fc.title AS collection_title,
+    fc.type  AS collection_type,
+
+    fi.id AS featured_item_id,
+    fi.badge_text,
+    fi.subtitle,
+    fi.deal_price_cents,
+    fi.deal_percent,
+    fi.product_variant_id
+
+  FROM featured_items fi
+  JOIN featured_collections fc ON fc.id = fi.collection_id
+
+  -- If offer is variant-based, we need to know which product that variant belongs to.
+  LEFT JOIN product_variants pv ON pv.id = fi.product_variant_id
+
+  WHERE
+    -- item must be active + within window
+    fi.is_active = TRUE
+    AND (fi.starts_at IS NULL OR fi.starts_at <= now())
+    AND (fi.ends_at   IS NULL OR fi.ends_at   >  now())
+
+    -- collection must be active + within window
+    AND fc.is_active = TRUE
+    AND (fc.starts_at IS NULL OR fc.starts_at <= now())
+    AND (fc.ends_at   IS NULL OR fc.ends_at   >  now())
+
+    -- match by product OR by variant->product
+    AND (
+      fi.product_id = p.id
+      OR pv.product_id = p.id
+    )
+
+  ORDER BY
+    -- 1) variant-specific offer beats product-level
+    CASE WHEN fi.product_variant_id IS NOT NULL THEN 0 ELSE 1 END ASC,
+
+    -- 2) prefer explicit deal price (if present and >0), then cheapest deal price
+    CASE WHEN fi.deal_price_cents IS NOT NULL AND fi.deal_price_cents > 0 THEN 0 ELSE 1 END ASC,
+    fi.deal_price_cents ASC NULLS LAST,
+
+    -- 3) otherwise prefer higher percentage
+    fi.deal_percent DESC NULLS LAST,
+
+    -- 4) merchandising position
+    fi.position ASC,
+    fi.id ASC
+
+  LIMIT 1
+) off ON TRUE
+
+WHERE
+  ($1 = '' OR p.category_id IN (SELECT id FROM cat_subtree))
+ORDER BY p.id DESC
+LIMIT $2 OFFSET $3;
+`
+
 	rows, err := r.db.Query(ctx, dataSQL, categorySlug, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list product cards: %w", err)
@@ -1369,6 +1488,7 @@ func (r *Repository) ListProductCards(
 	defer rows.Close()
 
 	cards := make([]*ProductCard, 0, limit)
+
 	for rows.Next() {
 		var (
 			pc         ProductCard
@@ -1378,18 +1498,57 @@ func (r *Repository) ListProductCards(
 			primaryURL sql.NullString
 			minPrice   sql.NullInt64
 			slug       string
+
+			// ✅ offer scan targets (nullable)
+			offCollectionKey   sql.NullString
+			offCollectionTitle sql.NullString
+			offCollectionType  sql.NullString
+
+			offFeaturedItemID sql.NullInt64
+			offBadgeText      sql.NullString
+			offSubtitle       sql.NullString
+			offDealPriceCents sql.NullInt64
+			offDealPercent    sql.NullInt32
+			offVariantID      sql.NullInt64
 		)
+
 		if err := rows.Scan(
-			&pc.ID, &pc.Name, &slug, &desc,
-			&pc.CategoryID, &catName,
-			&pc.BrandID, &brandName,
-			&pc.IsActive, &pc.CreatedAt, &pc.UpdatedAt,
+			// product card
+			&pc.ID,
+			&pc.Name,
+			&slug,
+			&desc,
+
+			&pc.CategoryID,
+			&catName,
+
+			&pc.BrandID,
+			&brandName,
+
+			&pc.IsActive,
+			&pc.CreatedAt,
+			&pc.UpdatedAt,
+
 			&minPrice,
 			&primaryURL,
+
+			// offer (nullable)
+			&offCollectionKey,
+			&offCollectionTitle,
+			&offCollectionType,
+			&offFeaturedItemID,
+			&offBadgeText,
+			&offSubtitle,
+			&offDealPriceCents,
+			&offDealPercent,
+			&offVariantID,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan product card: %w", err)
 		}
+
+		// --- map base card fields ---
 		pc.Slug = slug
+
 		if desc.Valid {
 			s := desc.String
 			pc.Description = &s
@@ -1410,18 +1569,67 @@ func (r *Repository) ListProductCards(
 			v := minPrice.Int64
 			pc.MinPriceCents = &v
 		}
+
+		// --- map offer only if we actually have one ---
+		//
+		// We use featured_item_id as the "presence" signal:
+		// - if it’s NULL => no matching active offer
+		// - if it’s set  => build ProductOffer struct
+		if offFeaturedItemID.Valid {
+			offer := &ProductOffer{
+				CollectionKey:   offCollectionKey.String,
+				CollectionTitle: offCollectionTitle.String,
+				CollectionType:  offCollectionType.String,
+				FeaturedItemID:  offFeaturedItemID.Int64,
+			}
+
+			if offBadgeText.Valid {
+				s := offBadgeText.String
+				offer.BadgeText = &s
+			}
+			if offSubtitle.Valid {
+				s := offSubtitle.String
+				offer.Subtitle = &s
+			}
+
+			// Optional: avoid sending 0 unless you truly want “free”.
+			if offDealPriceCents.Valid {
+				v := offDealPriceCents.Int64
+				if v > 0 {
+					offer.DealPriceCents = &v
+				}
+			}
+
+			if offDealPercent.Valid {
+				v := offDealPercent.Int32
+				if v > 0 {
+					offer.DealPercent = &v
+				}
+			}
+
+			if offVariantID.Valid {
+				v := offVariantID.Int64
+				offer.ProductVariantID = &v
+			}
+
+			pc.Offer = offer
+		}
+
 		cards = append(cards, &pc)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, 0, fmt.Errorf("rows: %w", err)
 	}
 
-	// Count
+	// Count query:
+	// Keep it separate for accuracy and simplicity.
+	// Using the same catCTE ensures total count matches the filtered dataset.
 	countSQL := catCTE + `
-      SELECT COUNT(*)
-      FROM products p
-      WHERE ($1 = '' OR p.category_id IN (SELECT id FROM cat_subtree));
-    `
+SELECT COUNT(*)
+FROM products p
+WHERE ($1 = '' OR p.category_id IN (SELECT id FROM cat_subtree));
+`
 	var total int
 	if err := r.db.QueryRow(ctx, countSQL, categorySlug).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count products: %w", err)
@@ -1889,4 +2097,104 @@ LIMIT $2 OFFSET $3;
 	}
 
 	return out, total, nil
+}
+
+func (r *Repository) GetBestOfferForProduct(ctx context.Context, productID int64) (*ProductOffer, error) {
+	const q = `
+WITH active_items AS (
+  SELECT
+    fi.id AS featured_item_id,
+    fi.badge_text,
+    fi.subtitle,
+    fi.deal_price_cents,
+    fi.deal_percent,
+    fi.position,
+    fi.product_id,
+    fi.product_variant_id,
+
+    fc.key   AS collection_key,
+    fc.title AS collection_title,
+    fc.type  AS collection_type,
+
+    -- compute a score / priority:
+    CASE WHEN fi.product_variant_id IS NOT NULL THEN 0 ELSE 1 END AS variant_priority
+  FROM featured_items fi
+  JOIN featured_collections fc ON fc.id = fi.collection_id
+  WHERE
+    fi.is_active = TRUE
+    AND (fi.starts_at IS NULL OR fi.starts_at <= now())
+    AND (fi.ends_at   IS NULL OR fi.ends_at   >  now())
+    AND fc.is_active = TRUE
+    AND (fc.starts_at IS NULL OR fc.starts_at <= now())
+    AND (fc.ends_at   IS NULL OR fc.ends_at   >  now())
+    AND (
+      fi.product_id = $1
+      OR fi.product_variant_id IN (
+        SELECT pv.id FROM product_variants pv WHERE pv.product_id = $1
+      )
+    )
+)
+SELECT
+  featured_item_id,
+  collection_key, collection_title, collection_type,
+  badge_text, subtitle, deal_price_cents, deal_percent,
+  product_variant_id
+FROM active_items
+ORDER BY
+  variant_priority ASC,
+  -- prefer explicit deal price first (cheaper deal wins)
+  (CASE WHEN deal_price_cents IS NULL THEN 1 ELSE 0 END) ASC,
+  deal_price_cents ASC NULLS LAST,
+  deal_percent DESC NULLS LAST,
+  position ASC,
+  featured_item_id ASC
+LIMIT 1;
+`
+
+	var out ProductOffer
+
+	// nullable fields
+	var badge, subtitle sql.NullString
+	var dealPrice sql.NullInt64
+	var dealPercent sql.NullInt32
+	var variantID sql.NullInt64
+
+	err := r.db.QueryRow(ctx, q, productID).Scan(
+		&out.FeaturedItemID,
+		&out.CollectionKey,
+		&out.CollectionTitle,
+		&out.CollectionType,
+		&badge,
+		&subtitle,
+		&dealPrice,
+		&dealPercent,
+		&variantID,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil // ✅ no offer
+		}
+		return nil, fmt.Errorf("get best offer: %w", err)
+	}
+
+	if badge.Valid {
+		out.BadgeText = &badge.String
+	}
+	if subtitle.Valid {
+		out.Subtitle = &subtitle.String
+	}
+	if dealPrice.Valid {
+		v := dealPrice.Int64
+		out.DealPriceCents = &v
+	}
+	if dealPercent.Valid {
+		v := dealPercent.Int32
+		out.DealPercent = &v
+	}
+	if variantID.Valid {
+		v := variantID.Int64
+		out.ProductVariantID = &v
+	}
+
+	return &out, nil
 }

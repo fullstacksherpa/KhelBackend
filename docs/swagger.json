@@ -2747,60 +2747,6 @@
                 }
             }
         },
-        "/store/admin/category/products": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Returns a paginated list of product cards for the admin panel. Supports optional filtering by category slug.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Store-Admin-Products"
-                ],
-                "summary": "List products (admin)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Filter products by category slug",
-                        "name": "category_slug",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page number (default: 1)",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Items per page (default: 15)",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "products list with pagination and applied filters",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {}
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {}
-                    }
-                }
-            }
-        },
         "/store/admin/featured/collections": {
             "get": {
                 "security": [
@@ -4198,6 +4144,60 @@
                     },
                     "404": {
                         "description": "Order not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/store/products": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of product cards for the admin panel. Supports optional filtering by category slug.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "List products (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter products by category slug",
+                        "name": "category_slug",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 15)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "products list with pagination and applied filters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {}
                     },
                     "500": {
@@ -7298,10 +7298,22 @@
         "carts.CartLine": {
             "type": "object",
             "properties": {
+                "badge_text": {
+                    "type": "string"
+                },
+                "final_unit_price_cents": {
+                    "type": "integer"
+                },
                 "item_id": {
                     "type": "integer"
                 },
+                "line_discount_cents": {
+                    "type": "integer"
+                },
                 "line_total_cents": {
+                    "type": "integer"
+                },
+                "list_unit_price_cents": {
                     "type": "integer"
                 },
                 "primary_image_url": {
@@ -7316,10 +7328,7 @@
                 "quantity": {
                     "type": "integer"
                 },
-                "unit_price_cents": {
-                    "type": "integer"
-                },
-                "variant_attributes": {
+                "variant_attrs": {
                     "type": "object",
                     "additionalProperties": {}
                 },
@@ -7334,11 +7343,17 @@
                 "cart": {
                     "$ref": "#/definitions/carts.Cart"
                 },
+                "discount_cents": {
+                    "type": "integer"
+                },
                 "items": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/carts.CartLine"
                     }
+                },
+                "subtotal_cents": {
+                    "type": "integer"
                 },
                 "total_cents": {
                     "type": "integer"

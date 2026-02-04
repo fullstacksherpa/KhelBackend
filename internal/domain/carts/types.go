@@ -27,21 +27,30 @@ type CartItem struct {
 }
 
 type CartView struct {
-	Cart       Cart       `json:"cart"`
-	Items      []CartLine `json:"items"`
-	TotalCents int64      `json:"total_cents"`
+	Cart          Cart       `json:"cart"`
+	Items         []CartLine `json:"items"`
+	SubtotalCents int64      `json:"subtotal_cents"`
+	DiscountCents int64      `json:"discount_cents"`
+	TotalCents    int64      `json:"total_cents"`
 }
 
+// CartLine represents a priced line item shown to user.
 type CartLine struct {
-	ItemID          int64          `json:"item_id"`
-	ProductID       int64          `json:"product_id"`
-	VariantID       int64          `json:"variant_id"`
-	ProductName     string         `json:"product_name"`
-	VariantAttrs    map[string]any `json:"variant_attributes"`
-	Quantity        int            `json:"quantity"`
-	UnitPriceCents  int64          `json:"unit_price_cents"`
-	LineTotalCents  int64          `json:"line_total_cents"`
-	PrimaryImageURL *string        `json:"primary_image_url,omitempty"`
+	ItemID       int64          `json:"item_id"`
+	ProductID    int64          `json:"product_id"`
+	VariantID    int64          `json:"variant_id"`
+	ProductName  string         `json:"product_name"`
+	VariantAttrs map[string]any `json:"variant_attrs,omitempty"`
+	Quantity     int            `json:"quantity"`
+
+	ListUnitPriceCents  int64 `json:"list_unit_price_cents"`
+	FinalUnitPriceCents int64 `json:"final_unit_price_cents"`
+	LineTotalCents      int64 `json:"line_total_cents"`
+	LineDiscountCents   int64 `json:"line_discount_cents"`
+
+	PrimaryImageURL *string `json:"primary_image_url,omitempty"`
+
+	BadgeText *string `json:"badge_text,omitempty"`
 }
 
 type Store interface {

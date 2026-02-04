@@ -39,10 +39,14 @@ FROM orders WHERE id=$1`, id).
 }
 
 // CreateFromCart creates an order snapshot from the user's ACTIVE cart.
-// IMPORTANT:
-//   - For online payments: cart is NOT converted here. It's moved to `checkout_pending` (locked)
-//     so the user can't mutate cart items while payment is in-flight.
-//   - For COD: cart is converted immediately.
+//
+// IMPORTANT BEHAVIOR (no migrations needed):
+// - Discounts are computed at CHECKOUT time by joining cart lines to featured_items/featured_collections.
+// - The result is SNAPSHOTTED into:
+//   - orders.subtotal_cents / orders.discount_cents / orders.total_cents
+//   - order_items.unit_price_cents (final unit price after discount)
+//
+// This ensures the payment gateway amount matches what the user is intended to pay.
 //
 // Assumes this is called INSIDE a transaction.
 func (r *Repository) CreateFromCart(
@@ -53,7 +57,7 @@ func (r *Repository) CreateFromCart(
 ) (*Order, int64 /*cartID*/, error) {
 
 	// 1) Lock the active cart row (prevents two concurrent checkouts creating two orders).
-	//    If you allow only one active cart per user, this becomes your checkout mutex.
+	//    This acts like a per-user checkout mutex (when you enforce one active cart per user).
 	var cartID int64
 	err := r.q.QueryRow(ctx, `
 		SELECT id
@@ -67,35 +71,130 @@ func (r *Repository) CreateFromCart(
 		return nil, 0, fmt.Errorf("no active cart: %w", err)
 	}
 
-	// 2) Compute totals from cart_items (still inside tx, cart locked).
-	var subtotal int64
+	// 2) Compute pricing snapshot from cart_items + featured deals.
+	//
+	// We compute three numbers:
+	// - subtotal_cents  = sum(list_price * qty)
+	// - discount_cents  = sum((list_price - final_price) * qty)
+	// - total_cents     = subtotal_cents - discount_cents  (tax/shipping can be added later)
+	//
+	// "Best deal" logic:
+	// - Eligible deals are active + within starts_at/ends_at for BOTH item and collection.
+	// - A deal can target product_variant_id OR product_id.
+	// - If multiple deals match a line, we pick the "best" one:
+	//     1) lowest deal_price_cents (if present)
+	//     2) otherwise highest deal_percent
+	var subtotal, discount, total int64
 	if err := r.q.QueryRow(ctx, `
-		SELECT COALESCE(SUM(ci.quantity * ci.price_cents),0)
-		FROM cart_items ci
-		WHERE ci.cart_id=$1
-	`, cartID).Scan(&subtotal); err != nil {
-		return nil, 0, fmt.Errorf("subtotal from cart: %w", err)
+WITH cart_lines AS (
+  SELECT
+    ci.id          AS cart_item_id,
+    ci.quantity    AS quantity,
+    pv.id          AS variant_id,
+    p.id           AS product_id,
+    pv.price_cents AS list_unit_price_cents
+  FROM cart_items ci
+  JOIN product_variants pv ON pv.id = ci.product_variant_id
+  JOIN products p          ON p.id  = pv.product_id
+  WHERE ci.cart_id = $1
+),
+eligible_deals AS (
+  SELECT
+    cl.cart_item_id,
+    NULLIF(fi.deal_price_cents, 0) AS deal_price_cents, -- ✅ 0 means "not set"
+    fi.deal_percent
+  FROM cart_lines cl
+  JOIN featured_items fi
+    ON fi.is_active = true
+   AND (fi.starts_at IS NULL OR fi.starts_at <= now())
+   AND (fi.ends_at   IS NULL OR fi.ends_at   >= now())
+   AND (
+        (fi.product_variant_id IS NOT NULL AND fi.product_variant_id = cl.variant_id)
+     OR (fi.product_id IS NOT NULL AND fi.product_id = cl.product_id)
+   )
+  JOIN featured_collections fc
+    ON fc.id = fi.collection_id
+   AND fc.is_active = true
+   AND (fc.starts_at IS NULL OR fc.starts_at <= now())
+   AND (fc.ends_at   IS NULL OR fc.ends_at   >= now())
+),
+best_deal AS (
+  SELECT DISTINCT ON (ed.cart_item_id)
+    ed.cart_item_id,
+    ed.deal_price_cents,
+    ed.deal_percent
+  FROM eligible_deals ed
+  ORDER BY
+    ed.cart_item_id,
+    (ed.deal_price_cents IS NULL) ASC,           -- ✅ fixed-price beats percent
+    ed.deal_price_cents ASC NULLS LAST,          -- ✅ lower fixed price wins
+    ed.deal_percent DESC NULLS LAST              -- ✅ otherwise higher percent wins
+),
+priced AS (
+  SELECT
+    cl.cart_item_id,
+    cl.quantity,
+    cl.variant_id,
+    cl.product_id,
+    cl.list_unit_price_cents,
+
+    -- ✅ Final unit price with hard guards
+    CASE
+      -- Fixed-price deal wins only if it's a real discount
+      WHEN bd.deal_price_cents IS NOT NULL
+           AND bd.deal_price_cents > 0
+           AND bd.deal_price_cents < cl.list_unit_price_cents
+        THEN bd.deal_price_cents
+
+      -- Percent deal (ignore 0/100 and bad data)
+      WHEN bd.deal_percent IS NOT NULL
+           AND bd.deal_percent > 0
+           AND bd.deal_percent < 100
+        THEN (cl.list_unit_price_cents * (100 - bd.deal_percent) / 100)
+
+      -- No deal
+      ELSE cl.list_unit_price_cents
+    END AS final_unit_price_cents
+
+  FROM cart_lines cl
+  LEFT JOIN best_deal bd ON bd.cart_item_id = cl.cart_item_id
+)
+SELECT
+  COALESCE(SUM(quantity * list_unit_price_cents), 0) AS subtotal_cents,
+
+  -- ✅ never let discount go negative
+  COALESCE(SUM(quantity * GREATEST(list_unit_price_cents - final_unit_price_cents, 0)), 0) AS discount_cents,
+
+  COALESCE(SUM(quantity * final_unit_price_cents), 0) AS total_cents
+FROM priced;
+	`, cartID).Scan(&subtotal, &discount, &total); err != nil {
+		return nil, 0, fmt.Errorf("pricing from cart + featured deals: %w", err)
 	}
+
 	if subtotal <= 0 {
 		return nil, 0, fmt.Errorf("cart is empty")
 	}
+	if discount < 0 || discount > subtotal {
+		return nil, 0, fmt.Errorf("invalid discount computed")
+	}
+	if total < 0 {
+		return nil, 0, fmt.Errorf("invalid total computed")
+	}
 
-	// 3) Build the order snapshot values.
-	//    (Later you can add tax/shipping/discount, but keep the snapshot immutable.)
+	// 3) Build the order snapshot values (immutable once created).
 	o := &Order{
 		UserID:        userID,
 		OrderNumber:   r.gen.Generate(userID),
 		SubtotalCents: subtotal,
-		DiscountCents: 0,
+		DiscountCents: discount,
 		TaxCents:      0,
 		ShippingCents: 0,
-		TotalCents:    subtotal,
-		// status/payment_status set in SQL based on method
+		TotalCents:    total,
 	}
 
 	// Choose order status based on payment method.
-	// - COD: order can move to 'processing' (or 'pending' if you want manual confirm)
-	// - Online: order should be 'awaiting_payment' / payment_status 'pending'
+	// - COD: can move to 'processing' immediately (or 'pending' if you want manual confirm).
+	// - Online: should be 'awaiting_payment', payment_status 'pending'.
 	orderStatus := "processing"
 	paymentStatus := "pending"
 	if method != "cash_on_delivery" {
@@ -103,7 +202,7 @@ func (r *Repository) CreateFromCart(
 		paymentStatus = "pending"
 	}
 
-	// 4) Create order row.
+	// 4) Create order row with computed totals.
 	if err := r.q.QueryRow(ctx, `
 		INSERT INTO orders (
 		  user_id, order_number, cart_id, status, payment_status, payment_method,
@@ -123,23 +222,96 @@ func (r *Repository) CreateFromCart(
 		return nil, 0, fmt.Errorf("create order: %w", err)
 	}
 
-	// 5) Copy order_items snapshot.
-	//    This snapshot must remain stable even if product price changes later.
+	// 5) Copy order_items snapshot using the FINAL (discounted) unit price.
+	//    This is the critical fix: don't copy ci.price_cents (it doesn't know discounts).
 	if _, err := r.q.Exec(ctx, `
-		INSERT INTO order_items (
-		  order_id, product_id, product_variant_id, product_name, variant_attributes,
-		  quantity, unit_price_cents, total_price_cents
-		)
-		SELECT
-		  $1,
-		  p.id, pv.id, p.name, pv.attributes,
-		  ci.quantity, ci.price_cents, ci.quantity*ci.price_cents
-		FROM cart_items ci
-		JOIN product_variants pv ON pv.id = ci.product_variant_id
-		JOIN products p ON p.id = pv.product_id
-		WHERE ci.cart_id = $2
-	`, o.ID, cartID); err != nil {
-		return nil, 0, fmt.Errorf("copy order_items: %w", err)
+WITH cart_lines AS (
+  SELECT
+    ci.id          AS cart_item_id,
+    ci.quantity    AS quantity,
+    pv.id          AS variant_id,
+    p.id           AS product_id,
+    p.name         AS product_name,
+    pv.attributes  AS variant_attributes,
+    pv.price_cents AS list_unit_price_cents
+  FROM cart_items ci
+  JOIN product_variants pv ON pv.id = ci.product_variant_id
+  JOIN products p          ON p.id  = pv.product_id
+  WHERE ci.cart_id = $1
+),
+eligible_deals AS (
+  SELECT
+    cl.cart_item_id,
+    NULLIF(fi.deal_price_cents, 0) AS deal_price_cents, -- ✅
+    fi.deal_percent
+  FROM cart_lines cl
+  JOIN featured_items fi
+    ON fi.is_active = true
+   AND (fi.starts_at IS NULL OR fi.starts_at <= now())
+   AND (fi.ends_at   IS NULL OR fi.ends_at   >= now())
+   AND (
+        (fi.product_variant_id IS NOT NULL AND fi.product_variant_id = cl.variant_id)
+     OR (fi.product_id IS NOT NULL AND fi.product_id = cl.product_id)
+   )
+  JOIN featured_collections fc
+    ON fc.id = fi.collection_id
+   AND fc.is_active = true
+   AND (fc.starts_at IS NULL OR fc.starts_at <= now())
+   AND (fc.ends_at   IS NULL OR fc.ends_at   >= now())
+),
+best_deal AS (
+  SELECT DISTINCT ON (ed.cart_item_id)
+    ed.cart_item_id,
+    ed.deal_price_cents,
+    ed.deal_percent
+  FROM eligible_deals ed
+  ORDER BY
+    ed.cart_item_id,
+    (ed.deal_price_cents IS NULL) ASC,
+    ed.deal_price_cents ASC NULLS LAST,
+    ed.deal_percent DESC NULLS LAST
+),
+priced AS (
+  SELECT
+    cl.product_id,
+    cl.variant_id,
+    cl.product_name,
+    cl.variant_attributes,
+    cl.quantity,
+
+    CASE
+      WHEN bd.deal_price_cents IS NOT NULL
+           AND bd.deal_price_cents > 0
+           AND bd.deal_price_cents < cl.list_unit_price_cents
+        THEN bd.deal_price_cents
+
+      WHEN bd.deal_percent IS NOT NULL
+           AND bd.deal_percent > 0
+           AND bd.deal_percent < 100
+        THEN (cl.list_unit_price_cents * (100 - bd.deal_percent) / 100)
+
+      ELSE cl.list_unit_price_cents
+    END AS final_unit_price_cents
+
+  FROM cart_lines cl
+  LEFT JOIN best_deal bd ON bd.cart_item_id = cl.cart_item_id
+)
+INSERT INTO order_items (
+  order_id, product_id, product_variant_id, product_name, variant_attributes,
+  quantity, unit_price_cents, total_price_cents
+)
+SELECT
+  $2,
+  product_id,
+  variant_id,
+  product_name,
+  variant_attributes,
+  quantity,
+  final_unit_price_cents,
+  quantity * final_unit_price_cents
+FROM priced;
+	`, cartID, o.ID); err != nil {
+		return nil, 0, fmt.Errorf("copy order_items (priced): %w", err)
 	}
 
 	// 6) Cart state transition:
@@ -147,12 +319,12 @@ func (r *Repository) CreateFromCart(
 	//    - COD: convert immediately (cart is now finalized).
 	if method != "cash_on_delivery" {
 		cmd, err := r.q.Exec(ctx, `
-	UPDATE carts
-	   SET status='checkout_pending',
-	       checkout_order_id=$2,
-	       updated_at=now()
-	 WHERE id=$1
-	   AND status='active'::cart_status
+UPDATE carts
+   SET status='checkout_pending',
+       checkout_order_id=$2,
+       updated_at=now()
+ WHERE id=$1
+   AND status='active'::cart_status
 `, cartID, o.ID)
 		if err != nil {
 			return nil, 0, fmt.Errorf("lock cart for payment: %w", err)
@@ -162,18 +334,18 @@ func (r *Repository) CreateFromCart(
 		}
 	} else {
 		cmd, err := r.q.Exec(ctx, `
-	UPDATE carts
-	   SET status='converted',
-	     checkout_order_id=NULL,
-	       updated_at=now()
-	 WHERE id=$1
-	   AND status='active'::cart_status
+UPDATE carts
+   SET status='converted',
+       checkout_order_id=NULL,
+       updated_at=now()
+ WHERE id=$1
+   AND status='active'::cart_status
 `, cartID)
 		if err != nil {
-			return nil, 0, fmt.Errorf("change carts status: %w", err)
+			return nil, 0, fmt.Errorf("convert cart: %w", err)
 		}
 		if cmd.RowsAffected() == 0 {
-			return nil, 0, fmt.Errorf("cart not active (cannot lock)")
+			return nil, 0, fmt.Errorf("cart not active (cannot convert)")
 		}
 	}
 
