@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.21.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.20.0...v1.21.0) (2026-02-04)
+
+
+### Features
+
+* add .env to different folder ([f11955c](https://github.com/fullstacksherpa/KhelBackend/commit/f11955c2606d5524d37462ac1cfd768d577b70ed))
+* add feature price on detail and list ([cb6d7ce](https://github.com/fullstacksherpa/KhelBackend/commit/cb6d7cea39354f773cb9928d4b3afd7f3afa05cd))
+* add feature_collections and featured_items admin crud with client view ([8bfe255](https://github.com/fullstacksherpa/KhelBackend/commit/8bfe2555605f339650ceeacce7ef3cc8bda7d37d))
+* add payment log handler ([0508107](https://github.com/fullstacksherpa/KhelBackend/commit/0508107d9bedd0a7321d7c763480738396c3b625))
+* add payment return ([db1e734](https://github.com/fullstacksherpa/KhelBackend/commit/db1e7348e54d69d7919edd840626582d5ea73be9))
+* add payment return and app deeplink ([66e2f30](https://github.com/fullstacksherpa/KhelBackend/commit/66e2f30d59a48b2791749ddf90eeb39590b328a9))
+* add push notification for booking ([0854fe1](https://github.com/fullstacksherpa/KhelBackend/commit/0854fe18f18e2e72b516aae67a519835df85add2))
+* add reset password templ file ([a978db4](https://github.com/fullstacksherpa/KhelBackend/commit/a978db4b724610c4cdc1c4cf64c42dcf0866ed8e))
+* add user account deletion ([be50df4](https://github.com/fullstacksherpa/KhelBackend/commit/be50df4eea338a2eb7fe8c3859f1af2715e47618))
+* add venue search ([03a3ffb](https://github.com/fullstacksherpa/KhelBackend/commit/03a3ffb3b9722fdd8826719a6c8c2eebab844301))
+* added admin payment handler ([1726a54](https://github.com/fullstacksherpa/KhelBackend/commit/1726a54d56de1b31bfa569171c00148aa67125ba))
+* added admindashboard doman ([96f3d55](https://github.com/fullstacksherpa/KhelBackend/commit/96f3d5514d73dd13f14cd44538701130e97955e4))
+* added appreview ([8efd503](https://github.com/fullstacksherpa/KhelBackend/commit/8efd5037b3c8f50c22d89ccff880ab0f3fa01d63))
+* added ecommerce base api and DAL ([cabd7f6](https://github.com/fullstacksherpa/KhelBackend/commit/cabd7f663e944445845ecebb272e614b00674545))
+* added gen-doc in makefile ([2fa3164](https://github.com/fullstacksherpa/KhelBackend/commit/2fa316405fc5927b0cd0516fb962b3e184d18d87))
+* added order route for user ([10acdda](https://github.com/fullstacksherpa/KhelBackend/commit/10acdda6f1ce55fef7e7a3e4b3a3b8d0b66d9683))
+* added payment gateway ([4791470](https://github.com/fullstacksherpa/KhelBackend/commit/4791470c11de541bf53da1a1d661924ff5067360))
+* added pgxPool to container for tx ([3f521d3](https://github.com/fullstacksherpa/KhelBackend/commit/3f521d329a7184496c8d92e327b89100694baba3))
+* added role based access control ([152a054](https://github.com/fullstacksherpa/KhelBackend/commit/152a054b68a225327856f8a58b304d9d8b66aee9))
+* added swagger doc for changed package ([d2f1a8b](https://github.com/fullstacksherpa/KhelBackend/commit/d2f1a8b0875c1dbfb394a14d4ac85e0807ebcb61))
+* added venue owner status change ([d89cd9c](https://github.com/fullstacksherpa/KhelBackend/commit/d89cd9c1a536a363fac98e127fe77173c010cd11))
+* added venue request table and handler ([ce1f9a5](https://github.com/fullstacksherpa/KhelBackend/commit/ce1f9a510d974364454aa3dc1bb64280e91960e2))
+* allow unauthenticated routes to some api ([7915c04](https://github.com/fullstacksherpa/KhelBackend/commit/7915c041907058d4cccfa0ed4485e376562ffa68))
+* change delete user invitation to make idempotent ([5cce001](https://github.com/fullstacksherpa/KhelBackend/commit/5cce0015d08db17bb71e2bebf0bb8ee66780ff23))
+* change storage architecture to seperate domain ([53feb58](https://github.com/fullstacksherpa/KhelBackend/commit/53feb58050bf7534f3271219dda8157264d91538))
+* create base ecommerce setup ([7b4e696](https://github.com/fullstacksherpa/KhelBackend/commit/7b4e696ce1baf7efca29c3a792b1291bd200b545))
+* migrate game table with booking_status ([0f24e6f](https://github.com/fullstacksherpa/KhelBackend/commit/0f24e6f0157cafa73b252790f486deac5c43b511))
+* remove update user ([9fd4032](https://github.com/fullstacksherpa/KhelBackend/commit/9fd403230bbb32f94f2adf298a21fdba2d2c153b))
+* remove watch tower from docker compose ([cb0ae6c](https://github.com/fullstacksherpa/KhelBackend/commit/cb0ae6c60f228c69b1ee480161628058b6b22ab4))
+
+
+### Bug Fixes
+
+* resolve ST1005 and U1000 staticcheck warnings ([be0fcee](https://github.com/fullstacksherpa/KhelBackend/commit/be0fceeb97378907ce25dbe475ba505e8c968142))
+
 ## [1.20.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.19.0...v1.20.0) (2026-02-04)
 
 
