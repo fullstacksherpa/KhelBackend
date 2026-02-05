@@ -125,7 +125,7 @@ func (app *application) mount() http.Handler {
 	r.Use(app.RateLimiterMiddleware)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://khel.gocloudnepal.com", "http://localhost:3000"},
+		AllowedOrigins:   []string{"https://khel.gocloudnepal.com"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -134,7 +134,7 @@ func (app *application) mount() http.Handler {
 	}))
 
 	//Set a timeout value on the request context (ctx), that will signal through ctx.Done() that the request has timed out and further processing should be stopped
-	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(middleware.Timeout(120 * time.Second))
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/venue/{id}", app.getVenueDetailHandler)
@@ -451,11 +451,12 @@ func (app *application) run(mux http.Handler, cancel context.CancelFunc) error {
 	}
 
 	srv := &http.Server{
-		Addr:         "0.0.0.0:" + port,
-		Handler:      mux,
-		WriteTimeout: time.Second * 30,
-		ReadTimeout:  time.Second * 10,
-		IdleTimeout:  time.Minute,
+		Addr:              "0.0.0.0:" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       45 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	// Implementing graceful shutdown

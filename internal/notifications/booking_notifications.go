@@ -63,7 +63,8 @@ func SendBookingNotification(ctx context.Context, push PushSender, store *storag
 				"type":      "booking",
 				"event":     string(event),
 				"bookingId": bookingID,
-				"screen":    "user-bookings-screen", // / is already at client router.push(`/${data.screen}`);
+				"screen":    "settings", // / is already at client router.push(`/${data.screen}`);
+
 			},
 		}
 		msgs = append(msgs, msg)

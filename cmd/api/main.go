@@ -84,13 +84,13 @@ func NewLogger() (*zap.SugaredLogger, error) {
 	return logger.Sugar(), nil
 }
 
-var version = "1.7.0"
+var version = "2.0.0"
 
 //	@title			Khel API
 //	@description	API for Khel, a complete sport application.
 
 //	@contact.name	fullstacksherpa
-//	@contact.url	https://www.fullstacksherpa.tech/
+//	@contact.url	https://khel.gocloudnepal.com/
 //	@contact.email	Ongchen10sherpa@gmail.com
 
 //	@license.name	Apache 2.0
@@ -121,10 +121,13 @@ func main() {
 	}
 
 	// Retrieve and convert maxOpenConns
-	maxOpenConnsStr := os.Getenv("DB_MAX_OPEN_CONNS")
-	maxOpenConns, err := strconv.Atoi(maxOpenConnsStr)
-	if err != nil {
-		log.Fatalf("Invalid value for DB_MAX_OPEN_CONNS: %v", err)
+	maxOpenConns := 10
+	if v := os.Getenv("DB_MAX_OPEN_CONNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			maxOpenConns = n
+		} else {
+			log.Fatalf("Invalid DB_MAX_OPEN_CONNS: %v", err)
+		}
 	}
 
 	cfg := config{
@@ -312,5 +315,7 @@ func main() {
 
 	mux := app.mount()
 
-	logger.Fatal(app.run(mux, cancel))
+	if err := app.run(mux, cancel); err != nil {
+		logger.Fatal(err)
+	}
 }
