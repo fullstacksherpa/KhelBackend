@@ -134,7 +134,7 @@ func (app *application) mount() http.Handler {
 	}))
 
 	//Set a timeout value on the request context (ctx), that will signal through ctx.Done() that the request has timed out and further processing should be stopped
-	r.Use(middleware.Timeout(120 * time.Second))
+	r.Use(middleware.Timeout(90 * time.Second))
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/venue/{id}", app.getVenueDetailHandler)

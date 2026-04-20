@@ -11,7 +11,7 @@ const docTemplate = `{
         "title": "{{.Title}}",
         "contact": {
             "name": "fullstacksherpa",
-            "url": "https://www.fullstacksherpa.tech/",
+            "url": "https://khel.gocloudnepal.com/",
             "email": "Ongchen10sherpa@gmail.com"
         },
         "license": {
