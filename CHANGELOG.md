@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.21.0...v1.22.0) (2026-04-20)
+
+
+### Features
+
+* final ([e661d2a](https://github.com/fullstacksherpa/KhelBackend/commit/e661d2abea03b30cc88ca905c7027898cff5a1bf))
+
 ## [1.21.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.20.0...v1.21.0) (2026-02-04)
 
 
