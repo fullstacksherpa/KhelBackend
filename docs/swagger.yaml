@@ -659,6 +659,150 @@ definitions:
         description: Visibility (public or private)
         type: string
     type: object
+  inventory.ActiveGame:
+    properties:
+      booking_id:
+        type: integer
+      customer_name:
+        type: string
+      customer_phone:
+        type: string
+      end_time:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      total_price:
+        type: integer
+      user_id:
+        type: integer
+      venue_id:
+        type: integer
+    type: object
+  inventory.AddItemToBookingPayload:
+    properties:
+      inventory_item_id:
+        type: integer
+      quantity:
+        minimum: 1
+        type: integer
+    required:
+    - inventory_item_id
+    - quantity
+    type: object
+  inventory.BillingSummary:
+    properties:
+      booking_price:
+        type: integer
+      grand_total:
+        type: integer
+      inventory_total:
+        type: integer
+    type: object
+  inventory.BookingInventoryItem:
+    properties:
+      booking_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      inventory_item_id:
+        type: integer
+      item_name:
+        type: string
+      line_total:
+        type: integer
+      quantity:
+        type: integer
+      unit_price:
+        type: integer
+      updated_at:
+        type: string
+      venue_id:
+        type: integer
+    type: object
+  inventory.GameDetail:
+    properties:
+      added_items:
+        items:
+          $ref: '#/definitions/inventory.BookingInventoryItem'
+        type: array
+      billing_summary:
+        $ref: '#/definitions/inventory.BillingSummary'
+      game:
+        $ref: '#/definitions/inventory.ActiveGame'
+      inventory_items:
+        items:
+          $ref: '#/definitions/inventory.InventoryItem'
+        type: array
+    type: object
+  inventory.InventoryItem:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image_url:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      stock_quantity:
+        type: integer
+      track_stock:
+        type: boolean
+      unit_price:
+        type: integer
+      updated_at:
+        type: string
+      venue_id:
+        type: integer
+    type: object
+  main.ActiveGameResponseItem:
+    properties:
+      booking_id:
+        type: string
+      customer_name:
+        type: string
+      customer_phone:
+        type: string
+      end_time:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      total_price:
+        type: integer
+      user_id:
+        type: integer
+      venue_id:
+        type: integer
+    type: object
+  main.ActiveGamesResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/main.ActiveGameResponseItem'
+        type: array
+    type: object
+  main.AddItemToGameData:
+    properties:
+      added_item:
+        $ref: '#/definitions/main.BookingInventoryItemResponseItem'
+      billing_summary:
+        $ref: '#/definitions/inventory.BillingSummary'
+    type: object
+  main.AddItemToGameResponse:
+    properties:
+      data:
+        $ref: '#/definitions/main.AddItemToGameData'
+    type: object
   main.AdminCreateUserPayload:
     properties:
       email:
@@ -762,6 +906,29 @@ definitions:
     - end_time
     - start_time
     type: object
+  main.BookingInventoryItemResponseItem:
+    properties:
+      booking_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      inventory_item_id:
+        type: integer
+      item_name:
+        type: string
+      line_total:
+        type: integer
+      quantity:
+        type: integer
+      unit_price:
+        type: integer
+      updated_at:
+        type: string
+      venue_id:
+        type: integer
+    type: object
   main.BookingResponse:
     properties:
       created_at:
@@ -809,6 +976,37 @@ definitions:
         type: array
     required:
     - tokens
+    type: object
+  main.CheckoutGameData:
+    properties:
+      bill:
+        $ref: '#/definitions/inventory.BillingSummary'
+      booking_id:
+        type: string
+      change_amount:
+        type: integer
+      final_amount:
+        type: integer
+      message:
+        type: string
+      paid_amount:
+        type: integer
+      payment_method:
+        type: string
+    type: object
+  main.CheckoutGamePayload:
+    properties:
+      paid_amount:
+        example: 2150
+        type: integer
+      payment_method:
+        example: cash
+        type: string
+    type: object
+  main.CheckoutGameResponse:
+    properties:
+      data:
+        $ref: '#/definitions/main.CheckoutGameData'
     type: object
   main.CreateGamePayload:
     properties:
@@ -930,6 +1128,17 @@ definitions:
         example: false
         type: boolean
     type: object
+  main.ErrorResponse:
+    properties:
+      error:
+        example: Bad request
+        type: string
+    type: object
+  main.GameDetailResponse:
+    properties:
+      data:
+        $ref: '#/definitions/inventory.GameDetail'
+    type: object
   main.HourlySlot:
     properties:
       available:
@@ -940,6 +1149,18 @@ definitions:
         type: integer
       start_time:
         type: string
+    type: object
+  main.InventoryItemResponse:
+    properties:
+      data:
+        $ref: '#/definitions/inventory.InventoryItem'
+    type: object
+  main.InventoryItemsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/inventory.InventoryItem'
+        type: array
     type: object
   main.ManualBookingPayload:
     properties:
@@ -963,6 +1184,17 @@ definitions:
     - end_time
     - price
     - start_time
+    type: object
+  main.MessageData:
+    properties:
+      message:
+        example: inventory item deleted successfully
+        type: string
+    type: object
+  main.MessageResponse:
+    properties:
+      data:
+        $ref: '#/definitions/main.MessageData'
     type: object
   main.PendingBookingResponse:
     properties:
@@ -5780,6 +6012,379 @@ paths:
       summary: Add a venue to favorites
       tags:
       - Favorite_Venues
+  /venues/{venueID}/games/{bookingID}:
+    get:
+      consumes:
+      - application/json
+      description: Returns game detail, inventory items, added items, and billing
+        summary.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Encoded Booking ID
+        in: path
+        name: bookingID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Game detail
+          schema:
+            $ref: '#/definitions/main.GameDetailResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Game not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get game detail
+      tags:
+      - venue games
+  /venues/{venueID}/games/{bookingID}/checkout:
+    post:
+      consumes:
+      - application/json
+      description: Closes an active/confirmed game after payment. Backend recalculates
+        final bill, validates payment, stores payment info, and marks booking as done.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Encoded Booking ID
+        in: path
+        name: bookingID
+        required: true
+        type: string
+      - description: Payment details
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.CheckoutGamePayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Game checked out successfully
+          schema:
+            $ref: '#/definitions/main.CheckoutGameResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Booking not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Checkout and close game
+      tags:
+      - venue games
+  /venues/{venueID}/games/{bookingID}/items:
+    post:
+      consumes:
+      - application/json
+      description: Adds an inventory item to a currently active game. If item already
+        exists, quantity is increased.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Encoded Booking ID
+        in: path
+        name: bookingID
+        required: true
+        type: string
+      - description: Inventory item and quantity
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/inventory.AddItemToBookingPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Added item and updated billing summary
+          schema:
+            $ref: '#/definitions/main.AddItemToGameResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Inventory item or game not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Add inventory item to active game
+      tags:
+      - venue games
+  /venues/{venueID}/games/active:
+    get:
+      consumes:
+      - application/json
+      description: Returns games/bookings currently happening at the venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Active games
+          schema:
+            $ref: '#/definitions/main.ActiveGamesResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Venue not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List active games for venue
+      tags:
+      - venue games
+  /venues/{venueID}/inventory:
+    get:
+      consumes:
+      - application/json
+      description: Returns all inventory items for a specific venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Venue inventory items
+          schema:
+            $ref: '#/definitions/main.InventoryItemsResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List venue inventory items
+      tags:
+      - venue inventory
+    post:
+      consumes:
+      - multipart/form-data
+      description: Creates a new inventory item for a venue with optional image upload.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Inventory item name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Inventory item description
+        in: formData
+        name: description
+        type: string
+      - description: Unit price
+        in: formData
+        name: unit_price
+        required: true
+        type: integer
+      - description: Stock quantity
+        in: formData
+        name: stock_quantity
+        type: integer
+      - description: Track stock
+        in: formData
+        name: track_stock
+        type: boolean
+      - description: Inventory item image
+        in: formData
+        name: image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Inventory item created
+          schema:
+            $ref: '#/definitions/main.InventoryItemResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create venue inventory item
+      tags:
+      - venue inventory
+  /venues/{venueID}/inventory/{itemID}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft deletes an inventory item by setting is_active to false.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Inventory Item ID
+        in: path
+        name: itemID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Inventory item deleted
+          schema:
+            $ref: '#/definitions/main.MessageResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Inventory item not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete venue inventory item
+      tags:
+      - venue inventory
+    patch:
+      consumes:
+      - multipart/form-data
+      description: Updates an existing inventory item for a venue. Supports updating
+        text fields and replacing image.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Inventory Item ID
+        in: path
+        name: itemID
+        required: true
+        type: integer
+      - description: Inventory item name
+        in: formData
+        name: name
+        type: string
+      - description: Inventory item description
+        in: formData
+        name: description
+        type: string
+      - description: Unit price
+        in: formData
+        name: unit_price
+        type: integer
+      - description: Stock quantity
+        in: formData
+        name: stock_quantity
+        type: integer
+      - description: Track stock
+        in: formData
+        name: track_stock
+        type: boolean
+      - description: Is active
+        in: formData
+        name: is_active
+        type: boolean
+      - description: Inventory item image
+        in: formData
+        name: image
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Inventory item updated
+          schema:
+            $ref: '#/definitions/main.InventoryItemResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Inventory item not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update venue inventory item
+      tags:
+      - venue inventory
   /venues/{venueID}/pending-bookings:
     get:
       consumes:

@@ -6146,6 +6146,575 @@
                 }
             }
         },
+        "/venues/{venueID}/games/active": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns games/bookings currently happening at the venue.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "venue games"
+                ],
+                "summary": "List active games for venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Active games",
+                        "schema": {
+                            "$ref": "#/definitions/main.ActiveGamesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Venue not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/games/{bookingID}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns game detail, inventory items, added items, and billing summary.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "venue games"
+                ],
+                "summary": "Get game detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Encoded Booking ID",
+                        "name": "bookingID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Game detail",
+                        "schema": {
+                            "$ref": "#/definitions/main.GameDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Game not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/games/{bookingID}/checkout": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Closes an active/confirmed game after payment. Backend recalculates final bill, validates payment, stores payment info, and marks booking as done.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "venue games"
+                ],
+                "summary": "Checkout and close game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Encoded Booking ID",
+                        "name": "bookingID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Payment details",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CheckoutGamePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Game checked out successfully",
+                        "schema": {
+                            "$ref": "#/definitions/main.CheckoutGameResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Booking not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/games/{bookingID}/items": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Adds an inventory item to a currently active game. If item already exists, quantity is increased.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "venue games"
+                ],
+                "summary": "Add inventory item to active game",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Encoded Booking ID",
+                        "name": "bookingID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Inventory item and quantity",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/inventory.AddItemToBookingPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Added item and updated billing summary",
+                        "schema": {
+                            "$ref": "#/definitions/main.AddItemToGameResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Inventory item or game not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/inventory": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns all inventory items for a specific venue.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "venue inventory"
+                ],
+                "summary": "List venue inventory items",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Venue inventory items",
+                        "schema": {
+                            "$ref": "#/definitions/main.InventoryItemsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a new inventory item for a venue with optional image upload.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "venue inventory"
+                ],
+                "summary": "Create venue inventory item",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inventory item name",
+                        "name": "name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inventory item description",
+                        "name": "description",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Unit price",
+                        "name": "unit_price",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Stock quantity",
+                        "name": "stock_quantity",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Track stock",
+                        "name": "track_stock",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Inventory item image",
+                        "name": "image",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Inventory item created",
+                        "schema": {
+                            "$ref": "#/definitions/main.InventoryItemResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/inventory/{itemID}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Soft deletes an inventory item by setting is_active to false.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "venue inventory"
+                ],
+                "summary": "Delete venue inventory item",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Inventory Item ID",
+                        "name": "itemID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Inventory item deleted",
+                        "schema": {
+                            "$ref": "#/definitions/main.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Inventory item not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Updates an existing inventory item for a venue. Supports updating text fields and replacing image.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "venue inventory"
+                ],
+                "summary": "Update venue inventory item",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Inventory Item ID",
+                        "name": "itemID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inventory item name",
+                        "name": "name",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inventory item description",
+                        "name": "description",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Unit price",
+                        "name": "unit_price",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Stock quantity",
+                        "name": "stock_quantity",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Track stock",
+                        "name": "track_stock",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Is active",
+                        "name": "is_active",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Inventory item image",
+                        "name": "image",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Inventory item updated",
+                        "schema": {
+                            "$ref": "#/definitions/main.InventoryItemResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Inventory item not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/venues/{venueID}/pending-bookings": {
             "get": {
                 "security": [
@@ -7990,6 +8559,226 @@
                 }
             }
         },
+        "inventory.ActiveGame": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "type": "integer"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "customer_phone": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total_price": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "venue_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "inventory.AddItemToBookingPayload": {
+            "type": "object",
+            "required": [
+                "inventory_item_id",
+                "quantity"
+            ],
+            "properties": {
+                "inventory_item_id": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "inventory.BillingSummary": {
+            "type": "object",
+            "properties": {
+                "booking_price": {
+                    "type": "integer"
+                },
+                "grand_total": {
+                    "type": "integer"
+                },
+                "inventory_total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "inventory.BookingInventoryItem": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "inventory_item_id": {
+                    "type": "integer"
+                },
+                "item_name": {
+                    "type": "string"
+                },
+                "line_total": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "unit_price": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "inventory.GameDetail": {
+            "type": "object",
+            "properties": {
+                "added_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/inventory.BookingInventoryItem"
+                    }
+                },
+                "billing_summary": {
+                    "$ref": "#/definitions/inventory.BillingSummary"
+                },
+                "game": {
+                    "$ref": "#/definitions/inventory.ActiveGame"
+                },
+                "inventory_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/inventory.InventoryItem"
+                    }
+                }
+            }
+        },
+        "inventory.InventoryItem": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "stock_quantity": {
+                    "type": "integer"
+                },
+                "track_stock": {
+                    "type": "boolean"
+                },
+                "unit_price": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.ActiveGameResponseItem": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "type": "string"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "customer_phone": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total_price": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "venue_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.ActiveGamesResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.ActiveGameResponseItem"
+                    }
+                }
+            }
+        },
+        "main.AddItemToGameData": {
+            "type": "object",
+            "properties": {
+                "added_item": {
+                    "$ref": "#/definitions/main.BookingInventoryItemResponseItem"
+                },
+                "billing_summary": {
+                    "$ref": "#/definitions/inventory.BillingSummary"
+                }
+            }
+        },
+        "main.AddItemToGameResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/main.AddItemToGameData"
+                }
+            }
+        },
         "main.AdminCreateUserPayload": {
             "type": "object",
             "required": [
@@ -8137,6 +8926,41 @@
                 }
             }
         },
+        "main.BookingInventoryItemResponseItem": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "inventory_item_id": {
+                    "type": "integer"
+                },
+                "item_name": {
+                    "type": "string"
+                },
+                "line_total": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "unit_price": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "venue_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "main.BookingResponse": {
             "type": "object",
             "properties": {
@@ -8205,6 +9029,53 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "main.CheckoutGameData": {
+            "type": "object",
+            "properties": {
+                "bill": {
+                    "$ref": "#/definitions/inventory.BillingSummary"
+                },
+                "booking_id": {
+                    "type": "string"
+                },
+                "change_amount": {
+                    "type": "integer"
+                },
+                "final_amount": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "paid_amount": {
+                    "type": "integer"
+                },
+                "payment_method": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.CheckoutGamePayload": {
+            "type": "object",
+            "properties": {
+                "paid_amount": {
+                    "type": "integer",
+                    "example": 2150
+                },
+                "payment_method": {
+                    "type": "string",
+                    "example": "cash"
+                }
+            }
+        },
+        "main.CheckoutGameResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/main.CheckoutGameData"
                 }
             }
         },
@@ -8369,6 +9240,23 @@
                 }
             }
         },
+        "main.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Bad request"
+                }
+            }
+        },
+        "main.GameDetailResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/inventory.GameDetail"
+                }
+            }
+        },
         "main.HourlySlot": {
             "type": "object",
             "properties": {
@@ -8383,6 +9271,25 @@
                 },
                 "start_time": {
                     "type": "string"
+                }
+            }
+        },
+        "main.InventoryItemResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/inventory.InventoryItem"
+                }
+            }
+        },
+        "main.InventoryItemsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/inventory.InventoryItem"
+                    }
                 }
             }
         },
@@ -8416,6 +9323,23 @@
                 },
                 "start_time": {
                     "type": "string"
+                }
+            }
+        },
+        "main.MessageData": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "inventory item deleted successfully"
+                }
+            }
+        },
+        "main.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/main.MessageData"
                 }
             }
         },

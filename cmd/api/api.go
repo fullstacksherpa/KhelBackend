@@ -125,7 +125,7 @@ func (app *application) mount() http.Handler {
 	r.Use(app.RateLimiterMiddleware)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://khel.gocloudnepal.com"},
+		AllowedOrigins:   []string{"https://khel.gocloudnepal.com", "http://localhost:3000"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -199,6 +199,17 @@ func (app *application) mount() http.Handler {
 			// Routes that require venue ownership
 			r.Route("/{venueID}", func(r chi.Router) {
 				r.Use(app.IsOwnerMiddleware)
+				r.Post("/games/{bookingID}/checkout", app.checkoutGameHandler)
+
+				r.Get("/inventory", app.listInventoryItemsHandler)
+				r.Post("/inventory", app.createInventoryItemHandler)
+				r.Patch("/inventory/{itemID}", app.updateInventoryItemHandler)
+				r.Delete("/inventory/{itemID}", app.deleteInventoryItemHandler)
+
+				r.Get("/games/active", app.listActiveGamesHandler)
+				r.Get("/games/{bookingID}", app.getGameDetailHandler)
+				r.Post("/games/{bookingID}/items", app.addItemToGameHandler)
+
 				r.Patch("/status", app.updateVenueStatusOwnerHandler)
 				r.Post("/bookings/manual", app.createManualBookingHandler)
 				r.Get("/pricing", app.getVenuePricing)

@@ -29,6 +29,7 @@ type Store interface {
 	GetBookingsByUser(ctx context.Context, userID int64, filter BookingFilter) ([]UserBooking, error)
 	GetBookingByID(ctx context.Context, bookingID int64) (*Booking, error)
 	GetVenueOwnerIDFromBookingID(ctx context.Context, bookingID int64) (int64, error)
+	CloseBooking(ctx context.Context, venueID int64, bookingID int64, method string, paidAmount int, finalAmount int) error
 }
 
 type Repository struct {
@@ -37,6 +38,48 @@ type Repository struct {
 
 func NewRepository(db *pgxpool.Pool) Store {
 	return &Repository{db: db}
+}
+
+func (r *Repository) CloseBooking(
+	ctx context.Context,
+	venueID int64,
+	bookingID int64,
+	method string,
+	paidAmount int,
+	finalAmount int,
+) error {
+	query := `
+		UPDATE bookings
+		SET
+			status = 'done',
+			payment_method = $1,
+			paid_amount = $2,
+			final_amount = $3,
+			paid_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $4
+		  AND venue_id = $5
+		  AND status = 'confirmed'
+	`
+
+	result, err := r.db.Exec(
+		ctx,
+		query,
+		method,
+		paidAmount,
+		finalAmount,
+		bookingID,
+		venueID,
+	)
+	if err != nil {
+		return fmt.Errorf("close booking: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("booking not found or already closed")
+	}
+
+	return nil
 }
 
 func (r *Repository) GetBookingOwner(ctx context.Context, venueID, bookingID int64) (int64, error) {

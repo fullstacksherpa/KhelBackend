@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"khel/internal/domain/bookings"
+	"khel/internal/domain/inventory"
 	"khel/internal/notifications"
 
 	"log"
@@ -1296,6 +1297,131 @@ func (app *application) getBookingsByUserHandler(w http.ResponseWriter, r *http.
 			Status:       b.Status,
 			CreatedAt:    b.CreatedAt,
 		})
+	}
+
+	app.jsonResponse(w, http.StatusOK, resp)
+}
+
+type CheckoutGamePayload struct {
+	PaymentMethod string `json:"payment_method" example:"cash"`
+	PaidAmount    int    `json:"paid_amount" example:"2150"`
+}
+
+type CheckoutGameData struct {
+	Message       string                   `json:"message"`
+	BookingID     string                   `json:"booking_id"`
+	PaymentMethod string                   `json:"payment_method"`
+	PaidAmount    int                      `json:"paid_amount"`
+	FinalAmount   int                      `json:"final_amount"`
+	ChangeAmount  int                      `json:"change_amount"`
+	Bill          inventory.BillingSummary `json:"bill"`
+}
+
+type CheckoutGameResponse struct {
+	Data CheckoutGameData `json:"data"`
+}
+
+// checkoutGameHandler godoc
+//
+//	@Summary		Checkout and close game
+//	@Description	Closes an active/confirmed game after payment. Backend recalculates final bill, validates payment, stores payment info, and marks booking as done.
+//	@Tags			venue games
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID		path		int						true	"Venue ID"
+//	@Param			bookingID	path		string					true	"Encoded Booking ID"
+//	@Param			payload		body		CheckoutGamePayload		true	"Payment details"
+//	@Success		200			{object}	CheckoutGameResponse	"Game checked out successfully"
+//	@Failure		400			{object}	ErrorResponse			"Bad request"
+//	@Failure		404			{object}	ErrorResponse			"Booking not found"
+//	@Failure		500			{object}	ErrorResponse			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/games/{bookingID}/checkout [post]
+func (app *application) checkoutGameHandler(w http.ResponseWriter, r *http.Request) {
+	venueID, err := readIDParam(r, "venueID")
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	bookingIDParam := chi.URLParam(r, "bookingID")
+
+	// API receives encoded booking ID.
+	// Decode it before calling repository because repository should only know DB int64 IDs.
+	bookingID, err := app.parseBookingParam(bookingIDParam)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	var payload CheckoutGamePayload
+
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	payload.PaymentMethod = strings.TrimSpace(strings.ToLower(payload.PaymentMethod))
+
+	if payload.PaymentMethod == "" {
+		app.badRequestResponse(w, r, errors.New("payment_method is required"))
+		return
+	}
+
+	allowedMethods := map[string]bool{
+		"cash":   true,
+		"esewa":  true,
+		"khalti": true,
+		"other":  true,
+	}
+
+	if !allowedMethods[payload.PaymentMethod] {
+		app.badRequestResponse(w, r, errors.New("invalid payment_method"))
+		return
+	}
+
+	if payload.PaidAmount <= 0 {
+		app.badRequestResponse(w, r, errors.New("paid_amount must be greater than 0"))
+		return
+	}
+
+	// Always calculate bill on backend.
+	// Do not trust frontend total because frontend can be changed/manipulated.
+	summary, err := app.store.Inventory.GetBillingSummary(r.Context(), venueID, bookingID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	if payload.PaidAmount < summary.GrandTotal {
+		app.badRequestResponse(w, r, errors.New("paid_amount is less than final bill amount"))
+		return
+	}
+
+	// final_amount is the actual revenue amount.
+	// paid_amount is what customer gave.
+	// Example: final_amount = 2150, paid_amount = 2200, change = 50.
+	err = app.store.Bookings.CloseBooking(
+		r.Context(),
+		venueID,
+		bookingID,
+		payload.PaymentMethod,
+		payload.PaidAmount,
+		summary.GrandTotal,
+	)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	resp := CheckoutGameData{
+		Message:       "game closed successfully",
+		BookingID:     app.EncodeBookingID(bookingID),
+		PaymentMethod: payload.PaymentMethod,
+		PaidAmount:    payload.PaidAmount,
+		FinalAmount:   summary.GrandTotal,
+		ChangeAmount:  payload.PaidAmount - summary.GrandTotal,
+		Bill:          *summary,
 	}
 
 	app.jsonResponse(w, http.StatusOK, resp)
