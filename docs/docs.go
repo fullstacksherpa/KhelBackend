@@ -6060,6 +6060,173 @@ const docTemplate = `{
                 }
             }
         },
+        "/venues/{venueID}/customers": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Lists users who booked this specific venue only. Supports customer segments such as regular, high_value, risky, cancel_often, and spend_more.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner-Customers"
+                ],
+                "summary": "List venue customers",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "all",
+                            "regular",
+                            "high_value",
+                            "risky",
+                            "cancel_often",
+                            "spend_more"
+                        ],
+                        "type": "string",
+                        "description": "Customer segment",
+                        "name": "segment",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 15, max: 30)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/main.envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/main.venueCustomerListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid venue ID or segment",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden: venue does not belong to owner",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/customers/{userID}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieves customer detail for a specific venue only, including reliability score, spend summary, last booking, consumed inventory items, and recent bookings.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner-Customers"
+                ],
+                "summary": "Get venue customer detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "userID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/main.envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/venuecustomers.VenueCustomerDetail"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid venue ID or user ID",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden: venue does not belong to owner",
+                        "schema": {}
+                    },
+                    "404": {
+                        "description": "Not Found: customer has not booked this venue",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venues/{venueID}/favorite": {
             "post": {
                 "security": [
@@ -10129,6 +10296,23 @@ const docTemplate = `{
                 }
             }
         },
+        "main.venueCustomerListResponse": {
+            "type": "object",
+            "properties": {
+                "customers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/venuecustomers.VenueCustomer"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/params.Pagination"
+                },
+                "segment": {
+                    "type": "string"
+                }
+            }
+        },
         "orders.Order": {
             "type": "object",
             "properties": {
@@ -10318,6 +10502,146 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "venuecustomers.ConsumedItem": {
+            "type": "object",
+            "properties": {
+                "inventory_item_id": {
+                    "type": "integer"
+                },
+                "item_name": {
+                    "type": "string"
+                },
+                "last_consumed_at": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "total_spend": {
+                    "type": "integer"
+                }
+            }
+        },
+        "venuecustomers.CustomerBooking": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "type": "integer"
+                },
+                "booking_price": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "final_amount": {
+                    "type": "integer"
+                },
+                "inventory_spend": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "venuecustomers.VenueCustomer": {
+            "type": "object",
+            "properties": {
+                "canceled_bookings": {
+                    "type": "integer"
+                },
+                "cancellation_rate": {
+                    "type": "number"
+                },
+                "confirmed_bookings": {
+                    "type": "integer"
+                },
+                "done_bookings": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "last_booked_at": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "last_played_at": {
+                    "type": "string"
+                },
+                "pending_bookings": {
+                    "type": "integer"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "profile_picture_url": {
+                    "type": "string"
+                },
+                "rejected_bookings": {
+                    "type": "integer"
+                },
+                "reliability_score": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "total_booking_spend": {
+                    "type": "integer"
+                },
+                "total_bookings": {
+                    "type": "integer"
+                },
+                "total_inventory_spend": {
+                    "type": "integer"
+                },
+                "total_spend": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "venuecustomers.VenueCustomerDetail": {
+            "type": "object",
+            "properties": {
+                "consumed_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/venuecustomers.ConsumedItem"
+                    }
+                },
+                "customer": {
+                    "$ref": "#/definitions/venuecustomers.VenueCustomer"
+                },
+                "recent_bookings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/venuecustomers.CustomerBooking"
+                    }
                 }
             }
         },

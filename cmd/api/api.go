@@ -199,6 +199,8 @@ func (app *application) mount() http.Handler {
 			// Routes that require venue ownership
 			r.Route("/{venueID}", func(r chi.Router) {
 				r.Use(app.IsOwnerMiddleware)
+				r.Get("/customers", app.listVenueCustomersHandler)
+				r.Get("/customers/{userID}", app.getVenueCustomerDetailHandler)
 				r.Post("/games/{bookingID}/checkout", app.checkoutGameHandler)
 
 				r.Get("/inventory", app.listInventoryItemsHandler)

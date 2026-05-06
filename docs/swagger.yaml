@@ -1722,6 +1722,17 @@ definitions:
         description: '"requested" or "active"'
         type: string
     type: object
+  main.venueCustomerListResponse:
+    properties:
+      customers:
+        items:
+          $ref: '#/definitions/venuecustomers.VenueCustomer'
+        type: array
+      pagination:
+        $ref: '#/definitions/params.Pagination'
+      segment:
+        type: string
+    type: object
   orders.Order:
     properties:
       created_at:
@@ -1849,6 +1860,98 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  venuecustomers.ConsumedItem:
+    properties:
+      inventory_item_id:
+        type: integer
+      item_name:
+        type: string
+      last_consumed_at:
+        type: string
+      quantity:
+        type: integer
+      total_spend:
+        type: integer
+    type: object
+  venuecustomers.CustomerBooking:
+    properties:
+      booking_id:
+        type: integer
+      booking_price:
+        type: integer
+      created_at:
+        type: string
+      end_time:
+        type: string
+      final_amount:
+        type: integer
+      inventory_spend:
+        type: integer
+      start_time:
+        type: string
+      status:
+        type: string
+    type: object
+  venuecustomers.VenueCustomer:
+    properties:
+      canceled_bookings:
+        type: integer
+      cancellation_rate:
+        type: number
+      confirmed_bookings:
+        type: integer
+      done_bookings:
+        type: integer
+      email:
+        type: string
+      first_name:
+        type: string
+      full_name:
+        type: string
+      last_booked_at:
+        type: string
+      last_name:
+        type: string
+      last_played_at:
+        type: string
+      pending_bookings:
+        type: integer
+      phone:
+        type: string
+      profile_picture_url:
+        type: string
+      rejected_bookings:
+        type: integer
+      reliability_score:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+      total_booking_spend:
+        type: integer
+      total_bookings:
+        type: integer
+      total_inventory_spend:
+        type: integer
+      total_spend:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+  venuecustomers.VenueCustomerDetail:
+    properties:
+      consumed_items:
+        items:
+          $ref: '#/definitions/venuecustomers.ConsumedItem'
+        type: array
+      customer:
+        $ref: '#/definitions/venuecustomers.VenueCustomer'
+      recent_bookings:
+        items:
+          $ref: '#/definitions/venuecustomers.CustomerBooking'
+        type: array
     type: object
   venuerequest.VenueRequest:
     properties:
@@ -5950,6 +6053,116 @@ paths:
       summary: List Canceled booking requests for a venue
       tags:
       - Venue-Owner
+  /venues/{venueID}/customers:
+    get:
+      consumes:
+      - application/json
+      description: Lists users who booked this specific venue only. Supports customer
+        segments such as regular, high_value, risky, cancel_often, and spend_more.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Customer segment
+        enum:
+        - all
+        - regular
+        - high_value
+        - risky
+        - cancel_often
+        - spend_more
+        in: query
+        name: segment
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 15, max: 30)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/main.envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/main.venueCustomerListResponse'
+              type: object
+        "400":
+          description: 'Bad Request: invalid venue ID or segment'
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: 'Forbidden: venue does not belong to owner'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List venue customers
+      tags:
+      - Venue-Owner-Customers
+  /venues/{venueID}/customers/{userID}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves customer detail for a specific venue only, including
+        reliability score, spend summary, last booking, consumed inventory items,
+        and recent bookings.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: User ID
+        in: path
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/main.envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/venuecustomers.VenueCustomerDetail'
+              type: object
+        "400":
+          description: 'Bad Request: invalid venue ID or user ID'
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: 'Forbidden: venue does not belong to owner'
+          schema: {}
+        "404":
+          description: 'Not Found: customer has not booked this venue'
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get venue customer detail
+      tags:
+      - Venue-Owner-Customers
   /venues/{venueID}/favorite:
     delete:
       consumes:

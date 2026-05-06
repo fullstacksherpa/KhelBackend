@@ -19,6 +19,7 @@ import (
 	"khel/internal/domain/products"
 	"khel/internal/domain/pushtokens"
 	"khel/internal/domain/users"
+	"khel/internal/domain/venuecustomers"
 	"khel/internal/domain/venuerequest"
 	venuereviews "khel/internal/domain/venuereview"
 	"khel/internal/domain/venues"
@@ -40,6 +41,7 @@ type Container struct {
 	Users          users.Store
 	VenueRequests  venuerequest.RequestStore
 	Venues         venues.Store
+	VenueCustomers venuecustomers.Store
 	VenuesReviews  venuereviews.Store
 	Inventory      inventory.Store
 	Followers      followers.Store
@@ -63,6 +65,7 @@ func NewContainer(db *pgxpool.Pool, orderGen *orders.OrderNumberGenerator) *Cont
 		orderGen:       orderGen,
 		VenueRequests:  venuerequest.NewRepository(db),
 		Venues:         venues.NewRepository(db),
+		VenueCustomers: venuecustomers.NewRepository(db),
 		VenuesReviews:  venuereviews.NewRepository(db),
 		Inventory:      inventory.NewRepository(db),
 		Followers:      followers.NewRepository(db),
