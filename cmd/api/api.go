@@ -201,6 +201,7 @@ func (app *application) mount() http.Handler {
 				r.Use(app.IsOwnerMiddleware)
 				r.Get("/customers", app.listVenueCustomersHandler)
 				r.Get("/customers/{userID}", app.getVenueCustomerDetailHandler)
+				r.Get("/earnings", app.getVenueEarningsHandler)
 				r.Post("/games/{bookingID}/checkout", app.checkoutGameHandler)
 
 				r.Get("/inventory", app.listInventoryItemsHandler)

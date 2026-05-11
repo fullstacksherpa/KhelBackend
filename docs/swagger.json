@@ -6219,6 +6219,108 @@
                 }
             }
         },
+        "/venues/{venueID}/earnings": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns earning summary and daily earning breakdown for a venue owner. The endpoint supports period filters such as today, this_week, last_month, and custom date range. Dates are calculated using Nepal timezone.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue-Owner-Earnings"
+                ],
+                "summary": "Get venue earnings",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "today",
+                            "this_week",
+                            "last_month",
+                            "custom"
+                        ],
+                        "type": "string",
+                        "default": "today",
+                        "description": "Earning period",
+                        "name": "period",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date for custom period. Required when period=custom. Format: YYYY-MM-DD",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date for custom period. Required when period=custom. Format: YYYY-MM-DD",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number for daily breakdown pagination. Default: 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page for daily breakdown pagination. Default: 15, max: 30",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/main.envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/main.venueEarningsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request: invalid venue ID, period, or custom date range",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {}
+                    },
+                    "403": {
+                        "description": "Forbidden: venue does not belong to owner",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/venues/{venueID}/favorite": {
             "post": {
                 "security": [
@@ -10305,6 +10407,23 @@
                 }
             }
         },
+        "main.venueEarningsResponse": {
+            "type": "object",
+            "properties": {
+                "daily": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/venueearnings.DailyEarning"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/params.Pagination"
+                },
+                "summary": {
+                    "$ref": "#/definitions/venueearnings.VenueEarningSummary"
+                }
+            }
+        },
         "orders.Order": {
             "type": "object",
             "properties": {
@@ -10634,6 +10753,61 @@
                     "items": {
                         "$ref": "#/definitions/venuecustomers.CustomerBooking"
                     }
+                }
+            }
+        },
+        "venueearnings.DailyEarning": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "inventory_earning": {
+                    "type": "integer"
+                },
+                "slot_earning": {
+                    "type": "integer"
+                },
+                "total_bookings": {
+                    "type": "integer"
+                },
+                "total_earning": {
+                    "type": "integer"
+                }
+            }
+        },
+        "venueearnings.VenueEarningSummary": {
+            "type": "object",
+            "properties": {
+                "cash_earning": {
+                    "type": "integer"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "inventory_earning": {
+                    "type": "integer"
+                },
+                "online_earning": {
+                    "type": "integer"
+                },
+                "other_earning": {
+                    "type": "integer"
+                },
+                "period": {
+                    "type": "string"
+                },
+                "slot_earning": {
+                    "type": "integer"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "total_bookings": {
+                    "type": "integer"
+                },
+                "total_earning": {
+                    "type": "integer"
                 }
             }
         },
