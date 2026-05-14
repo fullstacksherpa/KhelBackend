@@ -234,7 +234,6 @@ func (app *application) createTokenHandler(w http.ResponseWriter, r *http.Reques
 		"user_id":       userIDStr,
 		"role":          role,
 	}
-	fmt.Println(response)
 
 	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
 		app.internalServerError(w, r, err)

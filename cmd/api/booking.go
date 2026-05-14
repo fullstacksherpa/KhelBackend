@@ -33,17 +33,19 @@ type UserBookingResponse struct {
 }
 type BookingResponse struct {
 	ID            string    `json:"id"`
+	RawID         int64     `json:"raw_id,omitempty"`
 	VenueID       int64     `json:"venue_id"`
+	FacilityID    int64     `json:"facility_id"`
 	UserID        int64     `json:"user_id"`
 	StartTime     time.Time `json:"start_time"`
 	EndTime       time.Time `json:"end_time"`
 	TotalPrice    int       `json:"total_price"`
 	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 	CustomerName  *string   `json:"customer_name,omitempty"`
 	CustomerPhone *string   `json:"customer_phone,omitempty"`
 	Note          *string   `json:"note,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type PendingBookingResponse struct {
@@ -130,17 +132,19 @@ func (app *application) parseBookingParam(param string) (int64, error) {
 func (app *application) bookingToResponse(b *bookings.Booking) BookingResponse {
 	return BookingResponse{
 		ID:            app.EncodeBookingID(b.ID),
+		RawID:         b.ID,
 		VenueID:       b.VenueID,
+		FacilityID:    b.FacilityID,
 		UserID:        b.UserID,
 		StartTime:     b.StartTime,
 		EndTime:       b.EndTime,
 		TotalPrice:    b.TotalPrice,
 		Status:        b.Status,
+		CreatedAt:     b.CreatedAt,
+		UpdatedAt:     b.UpdatedAt,
 		CustomerName:  b.CustomerName,
 		CustomerPhone: b.CustomerPhone,
 		Note:          b.Note,
-		CreatedAt:     b.CreatedAt,
-		UpdatedAt:     b.UpdatedAt,
 	}
 }
 
@@ -207,8 +211,19 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 
 	dayOfWeek := strings.ToLower(dateInKtm.Weekday().String())
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	// Step 3: Load pricing slots and bookings for the venue and the selected date
-	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
+	pricingSlots, err := app.store.Bookings.GetPricingSlots(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		dayOfWeek,
+	)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -238,7 +253,7 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 
 	pricingSlots = filtered
 
-	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, date)
+	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, defaultFacility.ID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -361,12 +376,23 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 
 	dayOfWeek := strings.ToLower(localStart.Weekday().String())
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	//sample data
 	//start_time 🎯: 2025-07-02 08:00:00 +0545 +0545
 	//end_time 🎯: 2025-07-02 09:00:00 +0545 +0545
 	//localStart 🎯: 2025-07-02 08:00:00 +0545 +0545
 	//dayOfWeek 🎯: wednesday
-	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
+	pricingSlots, err := app.store.Bookings.GetPricingSlots(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		dayOfWeek,
+	)
 	if err != nil || len(pricingSlots) == 0 {
 		http.Error(w, "No pricing available for this day", http.StatusBadRequest)
 		return
@@ -394,7 +420,12 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check for overlapping bookings.
-	bookingsList, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
+	bookingsList, err := app.store.Bookings.GetBookingsForDate(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		payload.StartTime,
+	)
 	if err != nil {
 		http.Error(w, "Error checking bookings", http.StatusInternalServerError)
 		return
@@ -414,6 +445,7 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	// Create the booking.
 	booking := &bookings.Booking{
 		VenueID:    venueID,
+		FacilityID: defaultFacility.ID,
 		UserID:     user.ID,
 		StartTime:  payload.StartTime,
 		EndTime:    payload.EndTime,
@@ -454,11 +486,6 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	resp := app.bookingToResponse(booking)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
-}
-
-// intervalsOverlap checks whether two intervals overlap.
-func intervalsOverlap(a, b bookings.Interval) bool {
-	return a.Start.Before(b.End) && b.Start.Before(a.End)
 }
 
 type ManualBookingPayload struct {
@@ -504,6 +531,12 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 		app.badRequestResponse(w, r, err)
 	}
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	//sample data
 	//frontend send like start_time 🎯 : 2025-06-29T11:00:00+05:45
 	//end_time 🎯 : 2025-06-29T12:00:00+05:45
@@ -511,7 +544,12 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 	//serverlog end_time 🎯: 2025-07-02 09:00:00 +0545 +0545
 
 	// Check for overlapping bookings.
-	bookingList, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
+	bookingList, err := app.store.Bookings.GetBookingsForDate(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		payload.StartTime,
+	)
 	if err != nil {
 		http.Error(w, "Error checking bookings", http.StatusInternalServerError)
 		return
@@ -599,7 +637,18 @@ func (app *application) getVenuePricing(w http.ResponseWriter, r *http.Request) 
 
 	dayOfWeek := r.URL.Query().Get("day")
 
-	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
+	pricingSlots, err := app.store.Bookings.GetPricingSlots(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		dayOfWeek,
+	)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -714,7 +763,13 @@ func (app *application) deleteVenuePricingHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	err = app.store.Bookings.DeletePricingSlot(r.Context(), venueID, pricingID)
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
+	err = app.store.Bookings.DeletePricingSlot(r.Context(), venueID, defaultFacility.ID, pricingID)
 	if err != nil {
 		if strings.Contains(err.Error(), "no pricing slot found") {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -846,8 +901,14 @@ func (app *application) getPendingBookingsHandler(w http.ResponseWriter, r *http
 		return
 	}
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), vid)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	// 3) fetch from store
-	bookings, err := app.store.Bookings.GetPendingBookingsForVenueDate(r.Context(), vid, date)
+	bookings, err := app.store.Bookings.GetPendingBookingsForVenueDate(r.Context(), vid, defaultFacility.ID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -909,10 +970,16 @@ func (app *application) getScheduledBookingsHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), vid)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	//date will be Parsed time is: 2025-06-29 00:00:00 +0545 +0545
 
 	// 3) fetch from store
-	bookings, err := app.store.Bookings.GetScheduledBookingsForVenueDate(r.Context(), vid, date)
+	bookings, err := app.store.Bookings.GetScheduledBookingsForVenueDate(r.Context(), vid, defaultFacility.ID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -978,10 +1045,12 @@ func (app *application) getCanceledBookingsHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), vid)
+
 	//date will be Parsed time is: 2025-06-29 00:00:00 +0545 +0545
 
 	// 3) fetch from store
-	bookings, err := app.store.Bookings.GetCanceledBookingsForVenueDate(r.Context(), vid, date)
+	bookings, err := app.store.Bookings.GetCanceledBookingsForVenueDate(r.Context(), vid, defaultFacility.ID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return

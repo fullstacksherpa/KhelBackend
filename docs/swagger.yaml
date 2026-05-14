@@ -117,22 +117,67 @@ definitions:
       user_id:
         type: integer
     type: object
+  bookings.CanceledBooking:
+    properties:
+      booking_id:
+        type: integer
+      end_time:
+        type: string
+      price:
+        type: integer
+      requested_at:
+        type: string
+      start_time:
+        type: string
+      user_id:
+        type: integer
+      user_image:
+        description: nullable
+        type: string
+      user_name:
+        type: string
+      user_number:
+        type: string
+    type: object
+  bookings.PendingBooking:
+    properties:
+      booking_id:
+        type: integer
+      end_time:
+        type: string
+      price:
+        type: integer
+      requested_at:
+        type: string
+      start_time:
+        type: string
+      user_id:
+        type: integer
+      user_image:
+        description: nullable
+        type: string
+      user_name:
+        type: string
+      user_number:
+        type: string
+    type: object
   bookings.PricingSlot:
     properties:
-      dayOfWeek:
+      day_of_week:
         type: string
-      endTime:
+      end_time:
         type: string
+      facility_id:
+        description: new real booking/pricing scope
+        type: integer
       id:
         type: integer
       price:
         type: integer
-      startTime:
-        description: |-
-          Note: start_time and end_time are stored as TIME in the DB.
-          We use time.Time to hold the time part.
+      start_time:
         type: string
-      venueID:
+      venue_id:
+        description: kept for backward compatibility
         type: integer
     type: object
   bookings.ScheduledBooking:
@@ -226,6 +271,35 @@ definitions:
       subtotal_cents:
         type: integer
       total_cents:
+        type: integer
+    type: object
+  facilities.Facility:
+    properties:
+      capacity:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image_urls:
+        items:
+          type: string
+        type: array
+      is_active:
+        type: boolean
+      is_default:
+        type: boolean
+      name:
+        type: string
+      sport:
+        type: string
+      surface_type:
+        type: string
+      updated_at:
+        type: string
+      venue_id:
         type: integer
     type: object
   featured.CollectionDetail:
@@ -939,10 +1013,14 @@ definitions:
         type: string
       end_time:
         type: string
+      facility_id:
+        type: integer
       id:
         type: string
       note:
         type: string
+      raw_id:
+        type: integer
       start_time:
         type: string
       status:
@@ -1008,6 +1086,41 @@ definitions:
       data:
         $ref: '#/definitions/main.CheckoutGameData'
     type: object
+  main.CreateFacilityBookingPayload:
+    properties:
+      end_time:
+        type: string
+      start_time:
+        type: string
+    required:
+    - end_time
+    - start_time
+    type: object
+  main.CreateFacilityPayload:
+    properties:
+      capacity:
+        type: integer
+      description:
+        maxLength: 500
+        type: string
+      image_urls:
+        items:
+          type: string
+        type: array
+      is_default:
+        type: boolean
+      name:
+        maxLength: 120
+        type: string
+      sport:
+        maxLength: 50
+        type: string
+      surface_type:
+        maxLength: 80
+        type: string
+    required:
+    - name
+    type: object
   main.CreateGamePayload:
     properties:
       end_time:
@@ -1056,6 +1169,25 @@ definitions:
     - start_time
     - venue_id
     - visibility
+    type: object
+  main.CreateManualFacilityBookingPayload:
+    properties:
+      customer_name:
+        maxLength: 120
+        type: string
+      customer_phone:
+        maxLength: 30
+        type: string
+      end_time:
+        type: string
+      note:
+        maxLength: 500
+        type: string
+      start_time:
+        type: string
+    required:
+    - end_time
+    - start_time
     type: object
   main.CreatePricingPayload:
     properties:
@@ -1133,6 +1265,42 @@ definitions:
       error:
         example: Bad request
         type: string
+    type: object
+  main.FacilityAvailableTimeSlotResponse:
+    properties:
+      available:
+        type: boolean
+      end_time:
+        type: string
+      price_per_hour:
+        type: integer
+      start_time:
+        type: string
+    type: object
+  main.FacilityBookingResponse:
+    properties:
+      booking: {}
+    type: object
+  main.FacilityCanceledBookingsResponse:
+    properties:
+      bookings:
+        items:
+          $ref: '#/definitions/bookings.CanceledBooking'
+        type: array
+    type: object
+  main.FacilityPendingBookingsResponse:
+    properties:
+      bookings:
+        items:
+          $ref: '#/definitions/bookings.PendingBooking'
+        type: array
+    type: object
+  main.FacilityScheduledBookingsResponse:
+    properties:
+      bookings:
+        items:
+          $ref: '#/definitions/bookings.ScheduledBooking'
+        type: array
     type: object
   main.GameDetailResponse:
     properties:
@@ -1371,6 +1539,31 @@ definitions:
       role:
         type: string
       user_id:
+        type: string
+    type: object
+  main.UpdateFacilityPayload:
+    properties:
+      capacity:
+        type: integer
+      description:
+        maxLength: 500
+        type: string
+      image_urls:
+        items:
+          type: string
+        type: array
+      is_active:
+        type: boolean
+      is_default:
+        type: boolean
+      name:
+        maxLength: 120
+        type: string
+      sport:
+        maxLength: 50
+        type: string
+      surface_type:
+        maxLength: 80
         type: string
     type: object
   main.UpdatePricingPayload:
@@ -6281,6 +6474,727 @@ paths:
       summary: Get venue earnings
       tags:
       - Venue-Owner-Earnings
+  /venues/{venueID}/facilities:
+    get:
+      description: Returns all facilities/grounds/courts under a venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Facilities
+          schema:
+            items:
+              $ref: '#/definitions/facilities.Facility'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List facilities under venue
+      tags:
+      - Venue Facilities
+    post:
+      consumes:
+      - application/json
+      description: Creates a bookable facility/ground/court under a venue. Facilities
+        are the new booking and pricing scope.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateFacilityPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Facility created
+          schema:
+            $ref: '#/definitions/facilities.Facility'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create facility under venue
+      tags:
+      - Venue Facilities
+  /venues/{venueID}/facilities/{facilityID}:
+    delete:
+      description: Deletes a non-default facility. Default facility cannot be deleted
+        because old venue-level APIs depend on it.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found or default facility cannot be deleted
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete facility
+      tags:
+      - Venue Facilities
+    get:
+      description: Returns one facility by venue ID and facility ID.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Facility
+          schema:
+            $ref: '#/definitions/facilities.Facility'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get facility detail
+      tags:
+      - Venue Facilities
+    patch:
+      consumes:
+      - application/json
+      description: Updates a facility under a venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Facility update payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.UpdateFacilityPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Facility updated
+          schema:
+            $ref: '#/definitions/facilities.Facility'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update facility
+      tags:
+      - Venue Facilities
+  /venues/{venueID}/facilities/{facilityID}/available-times:
+    get:
+      consumes:
+      - application/json
+      description: Returns hourly available booking slots for one facility under a
+        venue. Response shape matches the old venue-level available-times API, but
+        availability is calculated at facility level.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Booking date in YYYY-MM-DD format, for example 2026-05-14
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Hourly available time slots
+          schema:
+            items:
+              $ref: '#/definitions/main.FacilityAvailableTimeSlotResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get hourly available times for a facility
+      tags:
+      - Facility Bookings
+  /venues/{venueID}/facilities/{facilityID}/bookings:
+    post:
+      consumes:
+      - application/json
+      description: Creates a pending booking request for a specific facility under
+        a venue. Availability and pricing are checked at facility level.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Booking payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateFacilityBookingPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Booking request created
+          schema:
+            $ref: '#/definitions/main.FacilityBookingResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Time slot already booked
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Request booking for a facility
+      tags:
+      - Facility Bookings
+  /venues/{venueID}/facilities/{facilityID}/bookings/manual:
+    post:
+      consumes:
+      - application/json
+      description: Creates a confirmed manual/offline booking for one facility. This
+        is useful when an owner receives a booking by phone, walk-in, or cash payment.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Manual booking payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateManualFacilityBookingPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Manual booking created
+          schema:
+            $ref: '#/definitions/main.FacilityBookingResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Time slot already booked
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create manual booking for a facility
+      tags:
+      - Facility Bookings
+  /venues/{venueID}/facilities/{facilityID}/canceled-bookings:
+    get:
+      consumes:
+      - application/json
+      description: Returns canceled bookings for one facility under a venue. This
+        keeps canceled bookings separated per facility.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Booking date in YYYY-MM-DD format. Defaults to today's date in
+          Nepal timezone.
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Canceled bookings
+          schema:
+            $ref: '#/definitions/main.FacilityCanceledBookingsResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get canceled bookings for a facility
+      tags:
+      - Facility Bookings
+  /venues/{venueID}/facilities/{facilityID}/pending-bookings:
+    get:
+      consumes:
+      - application/json
+      description: Returns pending booking requests for one facility under a venue.
+        This is the facility-level replacement for venue-level pending bookings.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Booking date in YYYY-MM-DD format. Defaults to today's date in
+          Nepal timezone.
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pending bookings
+          schema:
+            $ref: '#/definitions/main.FacilityPendingBookingsResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get pending bookings for a facility
+      tags:
+      - Facility Bookings
+  /venues/{venueID}/facilities/{facilityID}/pricing:
+    get:
+      consumes:
+      - application/json
+      description: Returns pricing slots for a facility under a venue. Optional `day`
+        query filters by day of week.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Day of week
+        in: query
+        name: day
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pricing slots
+          schema:
+            items:
+              $ref: '#/definitions/bookings.PricingSlot'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve pricing slots for a facility
+      tags:
+      - Facility Pricing
+    post:
+      consumes:
+      - application/json
+      description: Adds new pricing slots to a facility under a venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Pricing slots
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.BulkCreatePricingPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Pricing slots created
+          schema:
+            items:
+              $ref: '#/definitions/bookings.PricingSlot'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create pricing slots for a facility
+      tags:
+      - Facility Pricing
+  /venues/{venueID}/facilities/{facilityID}/pricing/{pricingID}:
+    delete:
+      description: Deletes a pricing slot for a specific facility under a venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Pricing Slot ID
+        in: path
+        name: pricingID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility or pricing not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete facility pricing slot
+      tags:
+      - Facility Pricing
+    put:
+      consumes:
+      - application/json
+      description: Updates a pricing slot for a specific facility under a venue.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Pricing Slot ID
+        in: path
+        name: pricingID
+        required: true
+        type: integer
+      - description: Pricing update payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.UpdatePricingPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pricing updated
+          schema:
+            $ref: '#/definitions/bookings.PricingSlot'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility or pricing not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update facility pricing slot
+      tags:
+      - Facility Pricing
+  /venues/{venueID}/facilities/{facilityID}/scheduled-bookings:
+    get:
+      consumes:
+      - application/json
+      description: Returns confirmed/scheduled bookings for one facility under a venue.
+        This lets owners manage each ground/court separately.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Booking date in YYYY-MM-DD format. Defaults to today's date in
+          Nepal timezone.
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Scheduled bookings
+          schema:
+            $ref: '#/definitions/main.FacilityScheduledBookingsResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get scheduled bookings for a facility
+      tags:
+      - Facility Bookings
   /venues/{venueID}/favorite:
     delete:
       consumes:

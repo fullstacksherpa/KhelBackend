@@ -199,6 +199,30 @@ func (app *application) mount() http.Handler {
 			// Routes that require venue ownership
 			r.Route("/{venueID}", func(r chi.Router) {
 				r.Use(app.IsOwnerMiddleware)
+
+				//New facility management routes
+				r.Get("/facilities", app.listFacilitiesHandler)
+				r.Post("/facilities", app.createFacilityHandler)
+				r.Get("/facilities/{facilityID}", app.getFacilityHandler)
+				r.Patch("/facilities/{facilityID}", app.updateFacilityHandler)
+				r.Delete("/facilities/{facilityID}", app.deleteFacilityHandler)
+
+				// Facility based pricing routes
+				r.Get("/facilities/{facilityID}/pricing", app.getFacilityPricingHandler)
+				r.Post("/facilities/{facilityID}/pricing", app.createFacilityPricingHandler)
+				r.Put("/facilities/{facilityID}/pricing/{pricingID}", app.updateFacilityPricingHandler)
+				r.Delete("/facilities/{facilityID}/pricing/{pricingID}", app.deleteFacilityPricingHandler)
+
+				// facility booking and available for venue owner
+				r.Get("/facilities/{facilityID}/available-times", app.availableFacilityTimesHandler)
+				r.Post("/facilities/{facilityID}/bookings", app.bookFacilityHandler)
+				r.Post("/facilities/{facilityID}/bookings/manual", app.createManualFacilityBookingHandler)
+
+				// Facility booking view for venue owner
+				r.Get("/facilities/{facilityID}/pending-bookings", app.getPendingFacilityBookingsHandler)
+				r.Get("/facilities/{facilityID}/scheduled-bookings", app.getScheduledFacilityBookingsHandler)
+				r.Get("/facilities/{facilityID}/canceled-bookings", app.getCanceledFacilityBookingsHandler)
+
 				r.Get("/customers", app.listVenueCustomersHandler)
 				r.Get("/customers/{userID}", app.getVenueCustomerDetailHandler)
 				r.Get("/earnings", app.getVenueEarningsHandler)

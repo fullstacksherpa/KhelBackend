@@ -6329,6 +6329,1095 @@ const docTemplate = `{
                 }
             }
         },
+        "/venues/{venueID}/facilities": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns all facilities/grounds/courts under a venue.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue Facilities"
+                ],
+                "summary": "List facilities under venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Facilities",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/facilities.Facility"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a bookable facility/ground/court under a venue. Facilities are the new booking and pricing scope.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue Facilities"
+                ],
+                "summary": "Create facility under venue",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Facility payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateFacilityPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Facility created",
+                        "schema": {
+                            "$ref": "#/definitions/facilities.Facility"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns one facility by venue ID and facility ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue Facilities"
+                ],
+                "summary": "Get facility detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Facility",
+                        "schema": {
+                            "$ref": "#/definitions/facilities.Facility"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Deletes a non-default facility. Default facility cannot be deleted because old venue-level APIs depend on it.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue Facilities"
+                ],
+                "summary": "Delete facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found or default facility cannot be deleted",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Updates a facility under a venue.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue Facilities"
+                ],
+                "summary": "Update facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Facility update payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.UpdateFacilityPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Facility updated",
+                        "schema": {
+                            "$ref": "#/definitions/facilities.Facility"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/available-times": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns hourly available booking slots for one facility under a venue. Response shape matches the old venue-level available-times API, but availability is calculated at facility level.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Bookings"
+                ],
+                "summary": "Get hourly available times for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Booking date in YYYY-MM-DD format, for example 2026-05-14",
+                        "name": "date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Hourly available time slots",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.FacilityAvailableTimeSlotResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/bookings": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a pending booking request for a specific facility under a venue. Availability and pricing are checked at facility level.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Bookings"
+                ],
+                "summary": "Request booking for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Booking payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateFacilityBookingPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Booking request created",
+                        "schema": {
+                            "$ref": "#/definitions/main.FacilityBookingResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Time slot already booked",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/bookings/manual": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a confirmed manual/offline booking for one facility. This is useful when an owner receives a booking by phone, walk-in, or cash payment.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Bookings"
+                ],
+                "summary": "Create manual booking for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Manual booking payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateManualFacilityBookingPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Manual booking created",
+                        "schema": {
+                            "$ref": "#/definitions/main.FacilityBookingResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Time slot already booked",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/canceled-bookings": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns canceled bookings for one facility under a venue. This keeps canceled bookings separated per facility.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Bookings"
+                ],
+                "summary": "Get canceled bookings for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Booking date in YYYY-MM-DD format. Defaults to today's date in Nepal timezone.",
+                        "name": "date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Canceled bookings",
+                        "schema": {
+                            "$ref": "#/definitions/main.FacilityCanceledBookingsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/pending-bookings": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns pending booking requests for one facility under a venue. This is the facility-level replacement for venue-level pending bookings.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Bookings"
+                ],
+                "summary": "Get pending bookings for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Booking date in YYYY-MM-DD format. Defaults to today's date in Nepal timezone.",
+                        "name": "date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pending bookings",
+                        "schema": {
+                            "$ref": "#/definitions/main.FacilityPendingBookingsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/pricing": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns pricing slots for a facility under a venue. Optional ` + "`" + `day` + "`" + ` query filters by day of week.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Pricing"
+                ],
+                "summary": "Retrieve pricing slots for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Day of week",
+                        "name": "day",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pricing slots",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/bookings.PricingSlot"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Adds new pricing slots to a facility under a venue.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Pricing"
+                ],
+                "summary": "Create pricing slots for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Pricing slots",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.BulkCreatePricingPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Pricing slots created",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/bookings.PricingSlot"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/pricing/{pricingID}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Updates a pricing slot for a specific facility under a venue.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Pricing"
+                ],
+                "summary": "Update facility pricing slot",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pricing Slot ID",
+                        "name": "pricingID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Pricing update payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.UpdatePricingPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pricing updated",
+                        "schema": {
+                            "$ref": "#/definitions/bookings.PricingSlot"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility or pricing not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Deletes a pricing slot for a specific facility under a venue.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Pricing"
+                ],
+                "summary": "Delete facility pricing slot",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pricing Slot ID",
+                        "name": "pricingID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility or pricing not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/scheduled-bookings": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns confirmed/scheduled bookings for one facility under a venue. This lets owners manage each ground/court separately.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Facility Bookings"
+                ],
+                "summary": "Get scheduled bookings for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Booking date in YYYY-MM-DD format. Defaults to today's date in Nepal timezone.",
+                        "name": "date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scheduled bookings",
+                        "schema": {
+                            "$ref": "#/definitions/main.FacilityScheduledBookingsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/venues/{venueID}/favorite": {
             "post": {
                 "security": [
@@ -8043,14 +9132,84 @@ const docTemplate = `{
                 }
             }
         },
+        "bookings.CanceledBooking": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "requested_at": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_image": {
+                    "description": "nullable",
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_number": {
+                    "type": "string"
+                }
+            }
+        },
+        "bookings.PendingBooking": {
+            "type": "object",
+            "properties": {
+                "booking_id": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "requested_at": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_image": {
+                    "description": "nullable",
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_number": {
+                    "type": "string"
+                }
+            }
+        },
         "bookings.PricingSlot": {
             "type": "object",
             "properties": {
-                "dayOfWeek": {
+                "day_of_week": {
                     "type": "string"
                 },
-                "endTime": {
+                "end_time": {
                     "type": "string"
+                },
+                "facility_id": {
+                    "description": "new real booking/pricing scope",
+                    "type": "integer"
                 },
                 "id": {
                     "type": "integer"
@@ -8058,11 +9217,11 @@ const docTemplate = `{
                 "price": {
                     "type": "integer"
                 },
-                "startTime": {
-                    "description": "Note: start_time and end_time are stored as TIME in the DB.\nWe use time.Time to hold the time part.",
+                "start_time": {
                     "type": "string"
                 },
-                "venueID": {
+                "venue_id": {
+                    "description": "kept for backward compatibility",
                     "type": "integer"
                 }
             }
@@ -8202,6 +9361,50 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "total_cents": {
+                    "type": "integer"
+                }
+            }
+        },
+        "facilities.Facility": {
+            "type": "object",
+            "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_urls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sport": {
+                    "type": "string"
+                },
+                "surface_type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "venue_id": {
                     "type": "integer"
                 }
             }
@@ -9253,11 +10456,17 @@ const docTemplate = `{
                 "end_time": {
                     "type": "string"
                 },
+                "facility_id": {
+                    "type": "integer"
+                },
                 "id": {
                     "type": "string"
                 },
                 "note": {
                     "type": "string"
+                },
+                "raw_id": {
+                    "type": "integer"
                 },
                 "start_time": {
                     "type": "string"
@@ -9356,6 +10565,57 @@ const docTemplate = `{
                 }
             }
         },
+        "main.CreateFacilityBookingPayload": {
+            "type": "object",
+            "required": [
+                "end_time",
+                "start_time"
+            ],
+            "properties": {
+                "end_time": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.CreateFacilityPayload": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "image_urls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 120
+                },
+                "sport": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "surface_type": {
+                    "type": "string",
+                    "maxLength": 80
+                }
+            }
+        },
         "main.CreateGamePayload": {
             "type": "object",
             "required": [
@@ -9418,6 +10678,33 @@ const docTemplate = `{
                         "public",
                         "private"
                     ]
+                }
+            }
+        },
+        "main.CreateManualFacilityBookingPayload": {
+            "type": "object",
+            "required": [
+                "end_time",
+                "start_time"
+            ],
+            "properties": {
+                "customer_name": {
+                    "type": "string",
+                    "maxLength": 120
+                },
+                "customer_phone": {
+                    "type": "string",
+                    "maxLength": 30
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "start_time": {
+                    "type": "string"
                 }
             }
         },
@@ -9523,6 +10810,62 @@ const docTemplate = `{
                 "error": {
                     "type": "string",
                     "example": "Bad request"
+                }
+            }
+        },
+        "main.FacilityAvailableTimeSlotResponse": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "price_per_hour": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.FacilityBookingResponse": {
+            "type": "object",
+            "properties": {
+                "booking": {}
+            }
+        },
+        "main.FacilityCanceledBookingsResponse": {
+            "type": "object",
+            "properties": {
+                "bookings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/bookings.CanceledBooking"
+                    }
+                }
+            }
+        },
+        "main.FacilityPendingBookingsResponse": {
+            "type": "object",
+            "properties": {
+                "bookings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/bookings.PendingBooking"
+                    }
+                }
+            }
+        },
+        "main.FacilityScheduledBookingsResponse": {
+            "type": "object",
+            "properties": {
+                "bookings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/bookings.ScheduledBooking"
+                    }
                 }
             }
         },
@@ -9879,6 +11222,42 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "string"
+                }
+            }
+        },
+        "main.UpdateFacilityPayload": {
+            "type": "object",
+            "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "image_urls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 120
+                },
+                "sport": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "surface_type": {
+                    "type": "string",
+                    "maxLength": 80
                 }
             }
         },
