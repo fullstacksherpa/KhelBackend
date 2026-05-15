@@ -31,61 +31,6 @@ type UserBookingResponse struct {
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 }
-type BookingResponse struct {
-	ID            string    `json:"id"`
-	RawID         int64     `json:"raw_id,omitempty"`
-	VenueID       int64     `json:"venue_id"`
-	FacilityID    int64     `json:"facility_id"`
-	UserID        int64     `json:"user_id"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	TotalPrice    int       `json:"total_price"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-	CustomerName  *string   `json:"customer_name,omitempty"`
-	CustomerPhone *string   `json:"customer_phone,omitempty"`
-	Note          *string   `json:"note,omitempty"`
-}
-
-type PendingBookingResponse struct {
-	BookingID    string    `json:"booking_id"` // now encoded string
-	UserID       int64     `json:"user_id"`
-	UserName     string    `json:"user_name"`
-	UserImageURL *string   `json:"user_image"` // nullable
-	UserPhone    string    `json:"user_number"`
-	Price        int       `json:"price"`
-	RequestedAt  time.Time `json:"requested_at"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
-}
-
-type ScheduledBookingResponse struct {
-	BookingID     string    `json:"booking_id"`
-	UserID        int64     `json:"user_id"`
-	UserName      string    `json:"user_name"`
-	UserImageURL  *string   `json:"user_image"`
-	UserPhone     string    `json:"user_number"`
-	Price         int       `json:"price"`
-	AcceptedAt    time.Time `json:"accepted_at"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	CustomerName  *string   `json:"customer_name,omitempty" swaggertype:"string"`  // optional
-	CustomerPhone *string   `json:"customer_phone,omitempty" swaggertype:"string"` // optional
-	Note          *string   `json:"note,omitempty" swaggertype:"string"`           // optional
-}
-
-type CanceledBookingResponse struct {
-	BookingID    string    `json:"booking_id"`
-	UserID       int64     `json:"user_id"`
-	UserName     string    `json:"user_name"`
-	UserImageURL *string   `json:"user_image"` // nullable
-	UserPhone    string    `json:"user_number"`
-	Price        int       `json:"price"`
-	RequestedAt  time.Time `json:"requested_at"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
-}
 
 func (app *application) EncodeBookingID(id int64) string {
 	// Check if the int64 fits into int
@@ -127,25 +72,6 @@ func (app *application) parseBookingParam(param string) (int64, error) {
 	}
 
 	return 0, fmt.Errorf("invalid booking id: %s", param)
-}
-
-func (app *application) bookingToResponse(b *bookings.Booking) BookingResponse {
-	return BookingResponse{
-		ID:            app.EncodeBookingID(b.ID),
-		RawID:         b.ID,
-		VenueID:       b.VenueID,
-		FacilityID:    b.FacilityID,
-		UserID:        b.UserID,
-		StartTime:     b.StartTime,
-		EndTime:       b.EndTime,
-		TotalPrice:    b.TotalPrice,
-		Status:        b.Status,
-		CreatedAt:     b.CreatedAt,
-		UpdatedAt:     b.UpdatedAt,
-		CustomerName:  b.CustomerName,
-		CustomerPhone: b.CustomerPhone,
-		Note:          b.Note,
-	}
 }
 
 // AvailableTimeSlot represents a free time interval for booking.
@@ -789,9 +715,15 @@ type BulkCreatePricingPayload struct {
 
 type CreatePricingPayload struct {
 	DayOfWeek string `json:"day_of_week" validate:"required,oneof=sunday monday tuesday wednesday thursday friday saturday"`
+
+	// StartTime must be in 24-hour HH:mm:ss format.
+	// Example: "09:00:00"
 	StartTime string `json:"start_time" validate:"required"` // format "15:04:05"
-	EndTime   string `json:"end_time"   validate:"required"` // format "15:04:05"
-	Price     int    `json:"price"      validate:"required,gt=0"`
+
+	// EndTime must be in 24-hour HH:mm:ss format.
+	// Example: "10:00:00"
+	EndTime string `json:"end_time"   validate:"required"` // format "15:04:05"
+	Price   int    `json:"price"      validate:"required,gt=0"`
 }
 
 // CreateVenuePricing godoc
@@ -1087,15 +1019,15 @@ func (app *application) getCanceledBookingsHandler(w http.ResponseWriter, r *htt
 	app.jsonResponse(w, http.StatusOK, resp)
 }
 
-// acceptBookingHandler godoc
+// acceptBookingHandler godoc rE7xJX1G
 //
 //	@Summary		Accept a pending booking request
 //	@Description	Marks the booking with status="pending" as "confirmed".
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID		path	int	true	"Venue ID"
-//	@Param			bookingID	path	int	true	"Booking ID"
+//	@Param			venueID		path	int		true	"Venue ID"
+//	@Param			bookingID	path	string	true	"Booking ID"
 //	@Success		204
 //	@Failure		400	{object}	error	"Bad Request"
 //	@Failure		404	{object}	error	"Not Found"
@@ -1164,8 +1096,8 @@ func (app *application) acceptBookingHandler(w http.ResponseWriter, r *http.Requ
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID		path	int	true	"Venue ID"
-//	@Param			bookingID	path	int	true	"Booking ID"
+//	@Param			venueID		path	int		true	"Venue ID"
+//	@Param			bookingID	path	string	true	"Booking ID"
 //	@Success		204
 //	@Failure		400	{object}	error	"Bad Request"
 //	@Failure		404	{object}	error	"Not Found"

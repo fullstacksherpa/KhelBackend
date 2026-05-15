@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,19 +45,54 @@ func (app *application) extractPublicIDFromURL(photoURL string) (string, error) 
 		return "", fmt.Errorf("invalid URL format: %w", err)
 	}
 
-	pathParts := strings.Split(parsedURL.Path, "/")
-	for i, part := range pathParts {
-		if part == "upload" && i+2 < len(pathParts) {
-			publicIDParts := pathParts[i+2:] // Skip "v..." version part
-			publicID := strings.Join(publicIDParts, "/")
+	parts := strings.Split(parsedURL.Path, "/")
 
-			// Remove file extension
-			publicID = strings.TrimSuffix(publicID, filepath.Ext(publicID))
-			return publicID, nil
+	uploadIndex := -1
+	for i, part := range parts {
+		if part == "upload" {
+			uploadIndex = i
+			break
 		}
 	}
 
-	return "", errors.New("failed to extract public ID from URL")
+	if uploadIndex == -1 || uploadIndex+1 >= len(parts) {
+		return "", errors.New("failed to find upload path in Cloudinary URL")
+	}
+
+	publicParts := parts[uploadIndex+1:]
+
+	// Skip transformations and version parts until we reach actual folder/public ID.
+	for len(publicParts) > 0 {
+		part := publicParts[0]
+
+		if strings.HasPrefix(part, "v") && len(part) > 1 {
+			if _, err := strconv.ParseInt(part[1:], 10, 64); err == nil {
+				publicParts = publicParts[1:]
+				break
+			}
+		}
+
+		// Transformation usually contains comma, like w_800,h_450,c_fill
+		if strings.Contains(part, ",") {
+			publicParts = publicParts[1:]
+			continue
+		}
+
+		break
+	}
+
+	if len(publicParts) == 0 {
+		return "", errors.New("failed to extract public ID from Cloudinary URL")
+	}
+
+	publicID := strings.Join(publicParts, "/")
+	publicID = strings.TrimSuffix(publicID, filepath.Ext(publicID))
+
+	if publicID == "" {
+		return "", errors.New("empty Cloudinary public ID")
+	}
+
+	return publicID, nil
 }
 
 // -----------------------------------------------

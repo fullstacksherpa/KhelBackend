@@ -181,11 +181,17 @@ func (app *application) mount() http.Handler {
 		r.With(app.optionalAuth).Get("/venues/list-venues", app.listVenuesHandler)
 
 		r.With(app.optionalAuth).Get("/venues/{venueID}/reviews", app.getVenueReviewsHandler)
+		r.With(app.optionalAuth).Get("/venues/{venueID}/facilities", app.listFacilitiesHandler)
+		r.With(app.optionalAuth).Get("/venues/{venueID}/facilities/{facilityID}", app.getFacilityHandler)
+		r.With(app.optionalAuth).Get("/venues/{venueID}/facilities/{facilityID}/pricing", app.getFacilityPricingHandler)
 		r.Route("/venues", func(r chi.Router) {
 
 			r.Use(app.AuthTokenMiddleware)
 
 			r.Get("/favorites", app.listFavoritesHandler)
+			r.Get("/{venueID}/facilities/{facilityID}/available-times", app.availableFacilityTimesHandler)
+			r.Post("/{venueID}/facilities/{facilityID}/bookings", app.bookFacilityHandler)
+			//todo delete later, already depreciated
 			r.Get("/{venueID}/available-times", app.availableTimesHandler)
 			r.Get("/is-venue-owner", app.isVenueOwnerHandler)
 			r.Post("/", app.createVenueHandler)
@@ -201,21 +207,19 @@ func (app *application) mount() http.Handler {
 				r.Use(app.IsOwnerMiddleware)
 
 				//New facility management routes
-				r.Get("/facilities", app.listFacilitiesHandler)
+
 				r.Post("/facilities", app.createFacilityHandler)
-				r.Get("/facilities/{facilityID}", app.getFacilityHandler)
 				r.Patch("/facilities/{facilityID}", app.updateFacilityHandler)
 				r.Delete("/facilities/{facilityID}", app.deleteFacilityHandler)
 
 				// Facility based pricing routes
-				r.Get("/facilities/{facilityID}/pricing", app.getFacilityPricingHandler)
+
 				r.Post("/facilities/{facilityID}/pricing", app.createFacilityPricingHandler)
 				r.Put("/facilities/{facilityID}/pricing/{pricingID}", app.updateFacilityPricingHandler)
 				r.Delete("/facilities/{facilityID}/pricing/{pricingID}", app.deleteFacilityPricingHandler)
 
 				// facility booking and available for venue owner
-				r.Get("/facilities/{facilityID}/available-times", app.availableFacilityTimesHandler)
-				r.Post("/facilities/{facilityID}/bookings", app.bookFacilityHandler)
+
 				r.Post("/facilities/{facilityID}/bookings/manual", app.createManualFacilityBookingHandler)
 
 				// Facility booking view for venue owner

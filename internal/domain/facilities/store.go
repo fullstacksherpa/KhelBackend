@@ -316,3 +316,67 @@ func (r *Repository) BelongsToVenue(ctx context.Context, venueID, facilityID int
 
 	return ok, nil
 }
+
+func (r *Repository) SetDefault(ctx context.Context, venueID, facilityID int64) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// First make sure the facility exists, belongs to this venue, and is active.
+	// We do this before unsetting the old default so we do not accidentally leave
+	// the venue with no default facility if the new facility is invalid.
+	var exists bool
+	err = tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM facilities
+			WHERE id = $1
+			  AND venue_id = $2
+			  AND is_active = TRUE
+		)
+	`, facilityID, venueID).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("check facility exists: %w", err)
+	}
+
+	if !exists {
+		return ErrFacilityNotFound
+	}
+
+	// Unset the current default facility for this venue, if one exists.
+	_, err = tx.Exec(ctx, `
+		UPDATE facilities
+		SET is_default = FALSE,
+		    updated_at = NOW()
+		WHERE venue_id = $1
+		  AND is_default = TRUE
+	`, venueID)
+	if err != nil {
+		return fmt.Errorf("unset current default facility: %w", err)
+	}
+
+	// Set the selected active facility as the new default.
+	tag, err := tx.Exec(ctx, `
+		UPDATE facilities
+		SET is_default = TRUE,
+		    updated_at = NOW()
+		WHERE id = $1
+		  AND venue_id = $2
+		  AND is_active = TRUE
+	`, facilityID, venueID)
+	if err != nil {
+		return fmt.Errorf("set new default facility: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return ErrFacilityNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit set default facility: %w", err)
+	}
+
+	return nil
+}

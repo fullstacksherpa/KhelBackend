@@ -51,6 +51,8 @@ func (app *application) getFacilityPricingHandler(w http.ResponseWriter, r *http
 //
 //	@Summary		Create pricing slots for a facility
 //	@Description	Adds new pricing slots to a facility under a venue.
+//	@Description	start_time and end_time must use 24-hour HH:mm:ss format. Example: 09:00:00, 18:30:00.
+//	@Description	start_time must be before end_time.
 //	@Tags			Facility Pricing
 //	@Accept			json
 //	@Produce		json

@@ -57,4 +57,8 @@ type Store interface {
 	Update(ctx context.Context, venueID, facilityID int64, input UpdateFacilityInput) (*Facility, error)
 	Delete(ctx context.Context, venueID, facilityID int64) error
 	BelongsToVenue(ctx context.Context, venueID, facilityID int64) (bool, error)
+
+	// SetDefault makes one active facility the default facility for a venue.
+	// It also unsets any previous default facility in the same transaction.
+	SetDefault(ctx context.Context, venueID, facilityID int64) error
 }

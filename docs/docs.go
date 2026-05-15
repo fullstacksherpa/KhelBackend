@@ -6389,9 +6389,9 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Creates a bookable facility/ground/court under a venue. Facilities are the new booking and pricing scope.",
+                "description": "Creates a bookable facility such as Ground A, Court 1, Cricket Net 2, etc. This endpoint accepts multipart/form-data because facility images can be uploaded together with normal form fields.\nIf one or more images are uploaded using the \"images\" field, those images are uploaded to Cloudinary and saved for the facility.\nIf no images are uploaded and image_action is \"default\", \"skip\", or empty, the facility will use the venue's existing default image URLs.",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -6399,7 +6399,7 @@ const docTemplate = `{
                 "tags": [
                     "Venue Facilities"
                 ],
-                "summary": "Create facility under venue",
+                "summary": "Create a facility under a venue",
                 "parameters": [
                     {
                         "type": "integer",
@@ -6409,24 +6409,64 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Facility payload",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/main.CreateFacilityPayload"
-                        }
+                        "type": "string",
+                        "description": "Facility name. Example: Ground A, Court 1",
+                        "name": "name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Facility description",
+                        "name": "description",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sport type. Example: football, futsal, cricket",
+                        "name": "sport",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Surface type. Example: turf, grass, concrete",
+                        "name": "surface_type",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum player/person capacity",
+                        "name": "capacity",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether this facility is the default facility for the venue",
+                        "name": "is_default",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Image behavior when no image file is uploaded. Allowed values: default, skip. Empty also uses venue default images.",
+                        "name": "image_action",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Facility image files. Can be sent multiple times with the same field name: images",
+                        "name": "images",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
                     "201": {
-                        "description": "Facility created",
+                        "description": "Facility created successfully",
                         "schema": {
                             "$ref": "#/definitions/facilities.Facility"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid form data, validation error, or invalid image_action",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -6516,14 +6556,14 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Deletes a non-default facility. Default facility cannot be deleted because old venue-level APIs depend on it.",
+                "description": "Deletes a facility under a venue.\nDefault facilities cannot be deleted. To delete a default facility, first set another active facility as the default.\nAfter the database record is deleted, the facility images are deleted from Cloudinary asynchronously.\nCloudinary deletion happens in a goroutine so the API response does not wait for external image cleanup.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Venue Facilities"
                 ],
-                "summary": "Delete facility",
+                "summary": "Delete a facility",
                 "parameters": [
                     {
                         "type": "integer",
@@ -6545,13 +6585,25 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid venueID/facilityID or attempt to delete default facility",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Facility not found or default facility cannot be deleted",
+                        "description": "Facility not found",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -6570,9 +6622,9 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Updates a facility under a venue.",
+                "description": "Updates a facility under a venue. This endpoint accepts multipart/form-data because the client may update normal facility fields and images in one request.\nBy default, existing images are kept. To change images, send image_action.\nimage_action=keep keeps current images.\nimage_action=replace uploads new images and deletes removed old Cloudinary images asynchronously.\nimage_action=delete removes all facility images and deletes old Cloudinary images asynchronously.\nimage_action=default replaces facility images with the parent venue's default image URLs.\nIf is_default=true is sent, this facility becomes the default facility for the venue using SetDefault. Sending is_default=false is not allowed because every venue should keep one default facility.",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -6580,7 +6632,7 @@ const docTemplate = `{
                 "tags": [
                     "Venue Facilities"
                 ],
-                "summary": "Update facility",
+                "summary": "Update a facility",
                 "parameters": [
                     {
                         "type": "integer",
@@ -6597,24 +6649,81 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Facility update payload",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/main.UpdateFacilityPayload"
-                        }
+                        "type": "string",
+                        "description": "Facility name. Example: Ground A, Court 1",
+                        "name": "name",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Facility description",
+                        "name": "description",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sport type. Example: football, futsal, cricket",
+                        "name": "sport",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Surface type. Example: turf, grass, concrete",
+                        "name": "surface_type",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum player/person capacity",
+                        "name": "capacity",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether this facility is active",
+                        "name": "is_active",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Set to true to make this facility the venue default. False is not allowed.",
+                        "name": "is_default",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Image update action. Allowed values: keep, replace, delete, default. Empty means keep.",
+                        "name": "image_action",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "New facility image files. Required when image_action=replace. Send multiple files using the same field name: images",
+                        "name": "images",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Facility updated",
+                        "description": "Facility updated successfully",
                         "schema": {
                             "$ref": "#/definitions/facilities.Facility"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid form data, validation error, invalid image_action, or invalid is_default usage",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -7132,7 +7241,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Adds new pricing slots to a facility under a venue.",
+                "description": "Adds new pricing slots to a facility under a venue.\nstart_time and end_time must use 24-hour HH:mm:ss format. Example: 09:00:00, 18:30:00.\nstart_time must be before end_time.",
                 "consumes": [
                     "application/json"
                 ],
@@ -8166,7 +8275,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Booking ID",
                         "name": "bookingID",
                         "in": "path",
@@ -8219,7 +8328,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Booking ID",
                         "name": "bookingID",
                         "in": "path",
@@ -10465,9 +10574,6 @@ const docTemplate = `{
                 "note": {
                     "type": "string"
                 },
-                "raw_id": {
-                    "type": "integer"
-                },
                 "start_time": {
                     "type": "string"
                 },
@@ -10577,42 +10683,6 @@ const docTemplate = `{
                 },
                 "start_time": {
                     "type": "string"
-                }
-            }
-        },
-        "main.CreateFacilityPayload": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "capacity": {
-                    "type": "integer"
-                },
-                "description": {
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "image_urls": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "is_default": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 120
-                },
-                "sport": {
-                    "type": "string",
-                    "maxLength": 50
-                },
-                "surface_type": {
-                    "type": "string",
-                    "maxLength": 80
                 }
             }
         },
@@ -10730,14 +10800,14 @@ const docTemplate = `{
                     ]
                 },
                 "end_time": {
-                    "description": "format \"15:04:05\"",
+                    "description": "EndTime must be in 24-hour HH:mm:ss format.\nExample: \"10:00:00\"",
                     "type": "string"
                 },
                 "price": {
                     "type": "integer"
                 },
                 "start_time": {
-                    "description": "format \"15:04:05\"",
+                    "description": "StartTime must be in 24-hour HH:mm:ss format.\nExample: \"09:00:00\"",
                     "type": "string"
                 }
             }
@@ -10967,7 +11037,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "booking_id": {
-                    "description": "now encoded string",
                     "type": "string"
                 },
                 "end_time": {
@@ -10986,7 +11055,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "user_image": {
-                    "description": "nullable",
                     "type": "string"
                 },
                 "user_name": {
@@ -11159,18 +11227,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "customer_name": {
-                    "description": "optional",
                     "type": "string"
                 },
                 "customer_phone": {
-                    "description": "optional",
                     "type": "string"
                 },
                 "end_time": {
                     "type": "string"
                 },
                 "note": {
-                    "description": "optional",
                     "type": "string"
                 },
                 "price": {
@@ -11222,42 +11287,6 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "string"
-                }
-            }
-        },
-        "main.UpdateFacilityPayload": {
-            "type": "object",
-            "properties": {
-                "capacity": {
-                    "type": "integer"
-                },
-                "description": {
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "image_urls": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "is_default": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 120
-                },
-                "sport": {
-                    "type": "string",
-                    "maxLength": 50
-                },
-                "surface_type": {
-                    "type": "string",
-                    "maxLength": 80
                 }
             }
         },

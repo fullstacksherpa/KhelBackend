@@ -136,8 +136,8 @@ func (app *application) getPendingFacilityBookingsHandler(w http.ResponseWriter,
 		return
 	}
 
-	app.jsonResponse(w, http.StatusOK, FacilityPendingBookingsResponse{
-		Bookings: pendingBookings,
+	app.jsonResponse(w, http.StatusOK, PendingBookingsResponse{
+		Bookings: app.pendingBookingsToResponse(pendingBookings),
 	})
 }
 
@@ -195,8 +195,8 @@ func (app *application) getScheduledFacilityBookingsHandler(w http.ResponseWrite
 		return
 	}
 
-	app.jsonResponse(w, http.StatusOK, FacilityScheduledBookingsResponse{
-		Bookings: scheduledBookings,
+	app.jsonResponse(w, http.StatusOK, ScheduledBookingsResponse{
+		Bookings: app.scheduledBookingsToResponse(scheduledBookings),
 	})
 }
 
@@ -254,8 +254,8 @@ func (app *application) getCanceledFacilityBookingsHandler(w http.ResponseWriter
 		return
 	}
 
-	app.jsonResponse(w, http.StatusOK, FacilityCanceledBookingsResponse{
-		Bookings: canceledBookings,
+	app.jsonResponse(w, http.StatusOK, CanceledBookingsResponse{
+		Bookings: app.canceledBookingsToResponse(canceledBookings),
 	})
 }
 
@@ -787,15 +787,15 @@ func splitPricingSlotIntoHourlySlots(
 			End:   slotEnd,
 		}
 
-		if isIntervalBooked(currentSlot, bookedIntervals) {
-			continue
-		}
+		isBooked := isIntervalBooked(currentSlot, bookedIntervals)
 
 		slots = append(slots, FacilityAvailableTimeSlotResponse{
 			StartTime:    slotStart,
 			EndTime:      slotEnd,
 			PricePerHour: pricePerHour,
-			Available:    true,
+
+			// If the slot overlaps with an existing booking, it is not available.
+			Available: !isBooked,
 		})
 	}
 
