@@ -30,54 +30,6 @@ func containsURL(urls []string, target string) bool {
 	return false
 }
 
-func filterCloudinaryDeleteURLs(oldURLs, newURLs, protectedURLs []string) []string {
-	removedURLs := findRemovedImageURLs(oldURLs, newURLs)
-
-	protectedSet := make(map[string]bool, len(protectedURLs))
-	for _, url := range protectedURLs {
-		protectedSet[strings.TrimSpace(url)] = true
-	}
-
-	var safeToDelete []string
-
-	for _, url := range removedURLs {
-		cleanURL := strings.TrimSpace(url)
-		if cleanURL == "" {
-			continue
-		}
-
-		// Important:
-		// If this image belongs to the parent venue image_urls,
-		// do not delete it from Cloudinary.
-		if protectedSet[cleanURL] {
-			continue
-		}
-
-		safeToDelete = append(safeToDelete, cleanURL)
-	}
-
-	return safeToDelete
-}
-
-// findRemovedImageURLs returns URLs that existed before but are no longer
-// present after an update. Those removed URLs are safe candidates for
-// Cloudinary deletion.
-func findRemovedImageURLs(oldURLs, newURLs []string) []string {
-	newSet := make(map[string]bool, len(newURLs))
-	for _, url := range newURLs {
-		newSet[url] = true
-	}
-
-	var removed []string
-	for _, oldURL := range oldURLs {
-		if !newSet[oldURL] {
-			removed = append(removed, oldURL)
-		}
-	}
-
-	return removed
-}
-
 // shouldDeleteFacilityPhotoFromCloudinary returns true only when the photo is
 // facility-specific.
 //

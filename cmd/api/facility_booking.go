@@ -976,52 +976,6 @@ func combineDateWithClockTime(date time.Time, clock time.Time, loc *time.Locatio
 	)
 }
 
-// subtractBookedIntervals subtracts booked intervals from one open/pricing interval.
-//
-// Example:
-//
-//	open interval:  6pm - 10pm
-//	booked:         7pm - 8pm
-//	result:         6pm - 7pm, 8pm - 10pm
-func subtractBookedIntervals(
-	open bookings.Interval,
-	bookedIntervals []bookings.Interval,
-) []bookings.Interval {
-	free := []bookings.Interval{open}
-
-	for _, booked := range bookedIntervals {
-		var nextFree []bookings.Interval
-
-		for _, currentFree := range free {
-			// No overlap, keep current free interval as-is.
-			if !intervalsOverlap(currentFree, booked) {
-				nextFree = append(nextFree, currentFree)
-				continue
-			}
-
-			// Left side remains free.
-			if booked.Start.After(currentFree.Start) {
-				nextFree = append(nextFree, bookings.Interval{
-					Start: currentFree.Start,
-					End:   minTime(booked.Start, currentFree.End),
-				})
-			}
-
-			// Right side remains free.
-			if booked.End.Before(currentFree.End) {
-				nextFree = append(nextFree, bookings.Interval{
-					Start: maxTime(booked.End, currentFree.Start),
-					End:   currentFree.End,
-				})
-			}
-		}
-
-		free = nextFree
-	}
-
-	return free
-}
-
 // intervalsOverlap returns true when two intervals overlap.
 //
 // Touching boundaries are not overlapping.
@@ -1031,22 +985,6 @@ func subtractBookedIntervals(
 //	07:00-08:30 and 08:00-09:00 = overlap
 func intervalsOverlap(a, b bookings.Interval) bool {
 	return a.Start.Before(b.End) && b.Start.Before(a.End)
-}
-
-func minTime(a, b time.Time) time.Time {
-	if a.Before(b) {
-		return a
-	}
-
-	return b
-}
-
-func maxTime(a, b time.Time) time.Time {
-	if a.After(b) {
-		return a
-	}
-
-	return b
 }
 
 // cleanOptionalString trims optional strings and converts empty strings to nil.

@@ -979,6 +979,10 @@ func (app *application) getCanceledBookingsHandler(w http.ResponseWriter, r *htt
 	}
 
 	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), vid)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("failed to get defaultfacility: %w", err))
+		return
+	}
 
 	//date will be Parsed time is: 2025-06-29 00:00:00 +0545 +0545
 
