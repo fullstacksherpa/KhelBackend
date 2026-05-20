@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.22.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.21.0...v1.22.0) (2026-05-20)
+
+
+### Features
+
+* add booking route with facility based ([cfaea7f](https://github.com/fullstacksherpa/KhelBackend/commit/cfaea7f5e2436e9bb7ebf78678fc652a878307db))
+* add facility level booking ([6c15a94](https://github.com/fullstacksherpa/KhelBackend/commit/6c15a94709c8097c4c9afdc245ac792e2df69bda))
+* add venue earning ([03607b9](https://github.com/fullstacksherpa/KhelBackend/commit/03607b9a3205f248898621e702f035c32e11004c))
+* add venue inventory features ([f03b612](https://github.com/fullstacksherpa/KhelBackend/commit/f03b612b72b753b4b54e465413e4da1a8a58c18e))
+* add venue-customer domain ([f91ed74](https://github.com/fullstacksherpa/KhelBackend/commit/f91ed74d5b064ac0156ec7f00065d2d1e8157786))
+* encode booking id ([d3d7bff](https://github.com/fullstacksherpa/KhelBackend/commit/d3d7bff77ecda7909d50f9684c02116ed1ab6a08))
+* final ([e661d2a](https://github.com/fullstacksherpa/KhelBackend/commit/e661d2abea03b30cc88ca905c7027898cff5a1bf))
+* remove unused var ([a43d301](https://github.com/fullstacksherpa/KhelBackend/commit/a43d301326993bb4d60c33fb15ac32c570ac1144))
+
 ## [1.21.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.20.0...v1.21.0) (2026-02-04)
 
 
