@@ -43,7 +43,7 @@ type FacilityCanceledBookingsResponse struct {
 // parseBookingDateFromQuery parses ?date=YYYY-MM-DD from request.
 //
 // Important:
-// We use Asia/Kathmandu because your product is Nepal-based.
+// We use Asia/Kathmandu because our product is Nepal-based.
 // This prevents bugs where the server timezone or UTC shifts the booking date.
 //
 // Example:

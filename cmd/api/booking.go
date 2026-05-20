@@ -708,6 +708,7 @@ func (app *application) deleteVenuePricingHandler(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// needed for facility_pricing
 type BulkCreatePricingPayload struct {
 	//we use dive, required to ensure each item inside the array is individually validated.
 	Slots []CreatePricingPayload `json:"slots" validate:"required,dive,required"`

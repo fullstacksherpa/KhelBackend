@@ -6537,7 +6537,8 @@ paths:
       description: |-
         Deletes a facility under a venue.
         Default facilities cannot be deleted. To delete a default facility, first set another active facility as the default.
-        After the database record is deleted, the facility images are deleted from Cloudinary asynchronously.
+        After the database record is deleted, facility-specific images are deleted from Cloudinary asynchronously.
+        If a facility image is also used by the parent venue, it is not deleted from Cloudinary.
         Cloudinary deletion happens in a goroutine so the API response does not wait for external image cleanup.
       parameters:
       - description: Venue ID
@@ -6621,13 +6622,12 @@ paths:
       consumes:
       - multipart/form-data
       description: |-
-        Updates a facility under a venue. This endpoint accepts multipart/form-data because the client may update normal facility fields and images in one request.
-        By default, existing images are kept. To change images, send image_action.
-        image_action=keep keeps current images.
-        image_action=replace uploads new images and deletes removed old Cloudinary images asynchronously.
-        image_action=delete removes all facility images and deletes old Cloudinary images asynchronously.
-        image_action=default replaces facility images with the parent venue's default image URLs.
-        If is_default=true is sent, this facility becomes the default facility for the venue using SetDefault. Sending is_default=false is not allowed because every venue should keep one default facility.
+        Updates facility details under a venue.
+        This endpoint does not update facility photos. Facility photos are managed separately through the facility photo endpoints.
+        To add a facility photo, use POST /venues/{venueID}/facilities/{facilityID}/photos.
+        To delete a facility photo, use DELETE /venues/{venueID}/facilities/{facilityID}/photos?photo_url=...
+        If is_default=true is sent, this facility becomes the default facility for the venue using SetDefault.
+        Sending is_default=false is not allowed because every venue should keep one default facility.
       parameters:
       - description: Venue ID
         in: path
@@ -6668,16 +6668,6 @@ paths:
         in: formData
         name: is_default
         type: boolean
-      - description: 'Image update action. Allowed values: keep, replace, delete,
-          default. Empty means keep.'
-        in: formData
-        name: image_action
-        type: string
-      - description: 'New facility image files. Required when image_action=replace.
-          Send multiple files using the same field name: images'
-        in: formData
-        name: images
-        type: file
       produces:
       - application/json
       responses:
@@ -6686,8 +6676,8 @@ paths:
           schema:
             $ref: '#/definitions/facilities.Facility'
         "400":
-          description: Invalid form data, validation error, invalid image_action,
-            or invalid is_default usage
+          description: Invalid form data, validation error, or invalid is_default
+            usage
           schema:
             $ref: '#/definitions/main.ErrorResponse'
         "401":
@@ -6994,6 +6984,140 @@ paths:
       summary: Get pending bookings for a facility
       tags:
       - Facility Bookings
+  /venues/{venueID}/facilities/{facilityID}/photos:
+    delete:
+      consumes:
+      - application/json
+      description: Removes a specific photo URL from a facility. If the photo is also
+        a parent venue photo, it is not deleted from Cloudinary.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Photo URL to delete
+        in: query
+        name: photo_url
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Photo deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a facility photo
+      tags:
+      - Venue Facilities
+    get:
+      description: Returns all image URLs associated with a specific facility.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of facility image URLs
+          schema:
+            items:
+              type: string
+            type: array
+        "400":
+          description: Invalid venueID/facilityID
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve all facility photo URLs
+      tags:
+      - Venue Facilities
+    post:
+      consumes:
+      - multipart/form-data
+      description: Uploads one new facility photo to Cloudinary and adds the URL to
+        the facility.
+      parameters:
+      - description: Venue ID
+        in: path
+        name: venueID
+        required: true
+        type: integer
+      - description: Facility ID
+        in: path
+        name: facilityID
+        required: true
+        type: integer
+      - description: Photo file to upload
+        in: formData
+        name: photo
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Photo uploaded successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Facility not found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Upload a new photo for a facility
+      tags:
+      - Venue Facilities
   /venues/{venueID}/facilities/{facilityID}/pricing:
     get:
       consumes:

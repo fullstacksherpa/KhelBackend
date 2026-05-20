@@ -6556,7 +6556,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Deletes a facility under a venue.\nDefault facilities cannot be deleted. To delete a default facility, first set another active facility as the default.\nAfter the database record is deleted, the facility images are deleted from Cloudinary asynchronously.\nCloudinary deletion happens in a goroutine so the API response does not wait for external image cleanup.",
+                "description": "Deletes a facility under a venue.\nDefault facilities cannot be deleted. To delete a default facility, first set another active facility as the default.\nAfter the database record is deleted, facility-specific images are deleted from Cloudinary asynchronously.\nIf a facility image is also used by the parent venue, it is not deleted from Cloudinary.\nCloudinary deletion happens in a goroutine so the API response does not wait for external image cleanup.",
                 "produces": [
                     "application/json"
                 ],
@@ -6622,7 +6622,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Updates a facility under a venue. This endpoint accepts multipart/form-data because the client may update normal facility fields and images in one request.\nBy default, existing images are kept. To change images, send image_action.\nimage_action=keep keeps current images.\nimage_action=replace uploads new images and deletes removed old Cloudinary images asynchronously.\nimage_action=delete removes all facility images and deletes old Cloudinary images asynchronously.\nimage_action=default replaces facility images with the parent venue's default image URLs.\nIf is_default=true is sent, this facility becomes the default facility for the venue using SetDefault. Sending is_default=false is not allowed because every venue should keep one default facility.",
+                "description": "Updates facility details under a venue.\nThis endpoint does not update facility photos. Facility photos are managed separately through the facility photo endpoints.\nTo add a facility photo, use POST /venues/{venueID}/facilities/{facilityID}/photos.\nTo delete a facility photo, use DELETE /venues/{venueID}/facilities/{facilityID}/photos?photo_url=...\nIf is_default=true is sent, this facility becomes the default facility for the venue using SetDefault.\nSending is_default=false is not allowed because every venue should keep one default facility.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -6689,18 +6689,6 @@ const docTemplate = `{
                         "description": "Set to true to make this facility the venue default. False is not allowed.",
                         "name": "is_default",
                         "in": "formData"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Image update action. Allowed values: keep, replace, delete, default. Empty means keep.",
-                        "name": "image_action",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "file",
-                        "description": "New facility image files. Required when image_action=replace. Send multiple files using the same field name: images",
-                        "name": "images",
-                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -6711,7 +6699,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid form data, validation error, invalid image_action, or invalid is_default usage",
+                        "description": "Invalid form data, validation error, or invalid is_default usage",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -7146,6 +7134,208 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/venues/{venueID}/facilities/{facilityID}/photos": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns all image URLs associated with a specific facility.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue Facilities"
+                ],
+                "summary": "Retrieve all facility photo URLs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of facility image URLs",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid venueID/facilityID",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Uploads one new facility photo to Cloudinary and adds the URL to the facility.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue Facilities"
+                ],
+                "summary": "Upload a new photo for a facility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Photo file to upload",
+                        "name": "photo",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Photo uploaded successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Facility not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Removes a specific photo URL from a facility. If the photo is also a parent venue photo, it is not deleted from Cloudinary.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Venue Facilities"
+                ],
+                "summary": "Delete a facility photo",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Venue ID",
+                        "name": "venueID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Facility ID",
+                        "name": "facilityID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Photo URL to delete",
+                        "name": "photo_url",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Photo deleted successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }

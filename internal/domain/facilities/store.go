@@ -380,3 +380,84 @@ func (r *Repository) SetDefault(ctx context.Context, venueID, facilityID int64) 
 
 	return nil
 }
+
+// RemovePhotoURL removes one specific photo URL from a facility's image_urls array.
+//
+// It only removes the photo from the facility that belongs to the given venue.
+// This is safer because it checks both venue_id and facility_id.
+//
+// Example:
+// facilityID = 10
+// photoURL = "https://example.com/image1.jpg"
+//
+// Before:
+// image_urls = ["image1.jpg", "image2.jpg"]
+//
+// After:
+// image_urls = ["image2.jpg"]
+func (r *Repository) RemovePhotoURL(ctx context.Context, venueID, facilityID int64, photoURL string) error {
+	query := `
+		UPDATE facilities
+		SET
+			image_urls = array_remove(image_urls, $1),
+			updated_at = NOW()
+		WHERE venue_id = $2
+		  AND id = $3
+	`
+
+	result, err := r.db.Exec(ctx, query, photoURL, venueID, facilityID)
+	if err != nil {
+		return fmt.Errorf("failed to remove facility photo URL: %w", err)
+	}
+
+	// If no row was updated, it means the facility does not exist
+	// or it does not belong to this venue.
+	if result.RowsAffected() == 0 {
+		return ErrFacilityNotFound
+	}
+
+	return nil
+}
+
+func (r *Repository) GetImageURLs(ctx context.Context, venueID, facilityID int64) ([]string, error) {
+	const query = `
+		SELECT image_urls
+		FROM facilities
+		WHERE venue_id = $1
+		  AND id = $2
+	`
+
+	var urls []string
+
+	err := r.db.QueryRow(ctx, query, venueID, facilityID).Scan(&urls)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrFacilityNotFound
+		}
+		return nil, fmt.Errorf("failed to get facility image URLs: %w", err)
+	}
+
+	return urls, nil
+}
+
+func (r *Repository) AddPhotoURL(ctx context.Context, venueID, facilityID int64, photoURL string) error {
+	const query = `
+		UPDATE facilities
+		SET
+			image_urls = array_append(COALESCE(image_urls, '{}'), $1),
+			updated_at = NOW()
+		WHERE venue_id = $2
+		  AND id = $3
+	`
+
+	result, err := r.db.Exec(ctx, query, photoURL, venueID, facilityID)
+	if err != nil {
+		return fmt.Errorf("failed to add facility photo URL: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrFacilityNotFound
+	}
+
+	return nil
+}

@@ -63,14 +63,13 @@ type CreateFacilityPayload struct {
 }
 
 type UpdateFacilityPayload struct {
-	Name        *string  `json:"name,omitempty" validate:"omitempty,max=120"`
-	Description *string  `json:"description,omitempty" validate:"omitempty,max=500"`
-	Sport       *string  `json:"sport,omitempty" validate:"omitempty,max=50"`
-	SurfaceType *string  `json:"surface_type,omitempty" validate:"omitempty,max=80"`
-	Capacity    *int     `json:"capacity,omitempty" validate:"omitempty,gt=0"`
-	ImageURLs   []string `json:"image_urls,omitempty"`
-	IsActive    *bool    `json:"is_active,omitempty"`
-	IsDefault   *bool    `json:"is_default,omitempty"`
+	Name        *string `json:"name,omitempty" validate:"omitempty,max=120"`
+	Description *string `json:"description,omitempty" validate:"omitempty,max=500"`
+	Sport       *string `json:"sport,omitempty" validate:"omitempty,max=50"`
+	SurfaceType *string `json:"surface_type,omitempty" validate:"omitempty,max=80"`
+	Capacity    *int    `json:"capacity,omitempty" validate:"omitempty,gt=0"`
+	IsActive    *bool   `json:"is_active,omitempty"`
+	IsDefault   *bool   `json:"is_default,omitempty"`
 }
 
 // createFacilityHandler godoc
@@ -151,6 +150,12 @@ func (app *application) createFacilityHandler(w http.ResponseWriter, r *http.Req
 
 	switch {
 	case len(files) > 0:
+		files := r.MultipartForm.File["images"]
+
+		if len(files) > 7 {
+			app.badRequestResponse(w, r, errors.New("a facility can have a maximum of 7 photos"))
+			return
+		}
 		imageURLs, err = app.uploadFacilityImagesToCloudinary(files, venueID, name)
 		if err != nil {
 			app.internalServerError(w, r, err)
@@ -272,13 +277,12 @@ func (app *application) getFacilityHandler(w http.ResponseWriter, r *http.Reques
 // updateFacilityHandler godoc
 //
 //	@Summary		Update a facility
-//	@Description	Updates a facility under a venue. This endpoint accepts multipart/form-data because the client may update normal facility fields and images in one request.
-//	@Description	By default, existing images are kept. To change images, send image_action.
-//	@Description	image_action=keep keeps current images.
-//	@Description	image_action=replace uploads new images and deletes removed old Cloudinary images asynchronously.
-//	@Description	image_action=delete removes all facility images and deletes old Cloudinary images asynchronously.
-//	@Description	image_action=default replaces facility images with the parent venue's default image URLs.
-//	@Description	If is_default=true is sent, this facility becomes the default facility for the venue using SetDefault. Sending is_default=false is not allowed because every venue should keep one default facility.
+//	@Description	Updates facility details under a venue.
+//	@Description	This endpoint does not update facility photos. Facility photos are managed separately through the facility photo endpoints.
+//	@Description	To add a facility photo, use POST /venues/{venueID}/facilities/{facilityID}/photos.
+//	@Description	To delete a facility photo, use DELETE /venues/{venueID}/facilities/{facilityID}/photos?photo_url=...
+//	@Description	If is_default=true is sent, this facility becomes the default facility for the venue using SetDefault.
+//	@Description	Sending is_default=false is not allowed because every venue should keep one default facility.
 //	@Tags			Venue Facilities
 //	@Accept			multipart/form-data
 //	@Produce		json
@@ -291,10 +295,8 @@ func (app *application) getFacilityHandler(w http.ResponseWriter, r *http.Reques
 //	@Param			capacity		formData	int					false	"Maximum player/person capacity"
 //	@Param			is_active		formData	bool				false	"Whether this facility is active"
 //	@Param			is_default		formData	bool				false	"Set to true to make this facility the venue default. False is not allowed."
-//	@Param			image_action	formData	string				false	"Image update action. Allowed values: keep, replace, delete, default. Empty means keep."
-//	@Param			images			formData	file				false	"New facility image files. Required when image_action=replace. Send multiple files using the same field name: images"
 //	@Success		200				{object}	facilities.Facility	"Facility updated successfully"
-//	@Failure		400				{object}	ErrorResponse		"Invalid form data, validation error, invalid image_action, or invalid is_default usage"
+//	@Failure		400				{object}	ErrorResponse		"Invalid form data, validation error, or invalid is_default usage"
 //	@Failure		401				{object}	ErrorResponse		"Unauthorized"
 //	@Failure		403				{object}	ErrorResponse		"Forbidden"
 //	@Failure		404				{object}	ErrorResponse		"Facility not found"
@@ -305,27 +307,6 @@ func (app *application) updateFacilityHandler(w http.ResponseWriter, r *http.Req
 	venueID, facilityID, err := app.parseVenueAndFacilityID(r)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
-		return
-	}
-
-	// Load the current facility before updating.
-	// We need this for two reasons:
-	// 1. To know which old images should be deleted from Cloudinary after image changes.
-	// 2. To validate default facility behavior safely.
-	oldFacility, err := app.store.Facilities.GetByID(r.Context(), venueID, facilityID)
-	if err != nil {
-		if errors.Is(err, facilities.ErrFacilityNotFound) {
-			app.notFoundResponse(w, r, err)
-			return
-		}
-		app.internalServerError(w, r, err)
-		return
-	}
-
-	// This endpoint accepts multipart/form-data because images and normal
-	// text fields can be sent in one request.
-	if err := r.ParseMultipartForm(maxFacilityImageMemory); err != nil {
-		app.badRequestResponse(w, r, fmt.Errorf("invalid multipart form: %w", err))
 		return
 	}
 
@@ -388,72 +369,10 @@ func (app *application) updateFacilityHandler(w http.ResponseWriter, r *http.Req
 		Capacity:    payload.Capacity,
 		IsActive:    payload.IsActive,
 		IsDefault:   nil,
-	}
 
-	imageAction := strings.ToLower(strings.TrimSpace(r.FormValue("image_action")))
-
-	// New files are only required when image_action=replace.
-	// Frontend should append multiple files using the same key: "images".
-	files := r.MultipartForm.File["images"]
-
-	var newImageURLs []string
-
-	// This flag tells us whether the image list was intentionally changed.
-	// If false, the repository should leave old image_urls unchanged.
-	shouldUpdateImages := false
-
-	switch imageAction {
-	case "", "keep":
-		// Default behavior: keep current facility images.
-		// This prevents accidental image deletion when only text fields are updated.
-
-	case "replace":
-		// Replace means:
-		// 1. Upload new facility images to Cloudinary.
-		// 2. Save the new URLs in DB.
-		// 3. After DB update succeeds, delete removed old images asynchronously.
-		if len(files) == 0 {
-			app.badRequestResponse(w, r, fmt.Errorf("images are required when image_action is replace"))
-			return
-		}
-
-		facilityName := oldFacility.Name
-		if payload.Name != nil {
-			facilityName = *payload.Name
-		}
-
-		newImageURLs, err = app.uploadFacilityImagesToCloudinary(files, venueID, facilityName)
-		if err != nil {
-			app.internalServerError(w, r, err)
-			return
-		}
-
-		input.ImageURLs = newImageURLs
-		shouldUpdateImages = true
-
-	case "delete":
-		// Delete means this facility should have no images.
-		// Old Cloudinary images are deleted only after the DB update succeeds.
-		newImageURLs = []string{}
-		input.ImageURLs = newImageURLs
-		shouldUpdateImages = true
-
-	case "default":
-		// Default means use the parent venue's image URLs for this facility.
-		// Any old facility-specific images removed by this change will be cleaned
-		// from Cloudinary after the DB update succeeds.
-		newImageURLs, err = app.store.Venues.GetImageURLs(r.Context(), venueID)
-		if err != nil {
-			app.internalServerError(w, r, err)
-			return
-		}
-
-		input.ImageURLs = newImageURLs
-		shouldUpdateImages = true
-
-	default:
-		app.badRequestResponse(w, r, fmt.Errorf("invalid image_action"))
-		return
+		// ImageURLs are intentionally not updated here.
+		// Facility photos have dedicated CRUD endpoints so we can safely handle
+		// shared venue images without accidentally deleting them from Cloudinary.
 	}
 
 	updatedFacility, err := app.store.Facilities.Update(r.Context(), venueID, facilityID, input)
@@ -492,13 +411,6 @@ func (app *application) updateFacilityHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	if shouldUpdateImages {
-		// Only delete old images after the database update succeeds.
-		// This avoids losing Cloudinary images if the DB update fails.
-		removedURLs := findRemovedImageURLs(oldFacility.ImageURLs, updatedFacility.ImageURLs)
-		app.deleteCloudinaryImagesAsync(removedURLs)
-	}
-
 	app.jsonResponse(w, http.StatusOK, updatedFacility)
 }
 
@@ -507,7 +419,8 @@ func (app *application) updateFacilityHandler(w http.ResponseWriter, r *http.Req
 //	@Summary		Delete a facility
 //	@Description	Deletes a facility under a venue.
 //	@Description	Default facilities cannot be deleted. To delete a default facility, first set another active facility as the default.
-//	@Description	After the database record is deleted, the facility images are deleted from Cloudinary asynchronously.
+//	@Description	After the database record is deleted, facility-specific images are deleted from Cloudinary asynchronously.
+//	@Description	If a facility image is also used by the parent venue, it is not deleted from Cloudinary.
 //	@Description	Cloudinary deletion happens in a goroutine so the API response does not wait for external image cleanup.
 //	@Tags			Venue Facilities
 //	@Produce		json
@@ -550,8 +463,20 @@ func (app *application) deleteFacilityHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Get venue images before deleting the facility record.
+	// Venue images are protected because facilities may reuse them as default images.
+	venueImageURLs, err := app.store.Venues.GetImageURLs(r.Context(), venueID)
+	if err != nil {
+		app.internalServerError(w, r, fmt.Errorf("could not get venue image URLs: %w", err))
+		return
+	}
+
+	// Only facility-specific images should be deleted from Cloudinary.
+	// Shared venue images must stay because the venue still depends on them.
+	safeToDeleteURLs := filterFacilityOnlyImageURLs(facility.ImageURLs, venueImageURLs)
+
 	// Delete the database record first.
-	// Cloudinary cleanup should only happen after DB delete succeeds.
+	// Cloudinary cleanup should only happen after the database delete succeeds.
 	if err := app.store.Facilities.Delete(r.Context(), venueID, facilityID); err != nil {
 		if errors.Is(err, facilities.ErrFacilityNotFound) {
 			app.notFoundResponse(w, r, err)
@@ -561,10 +486,7 @@ func (app *application) deleteFacilityHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Delete Cloudinary images in the background.
-	// Do not call app.internalServerError inside the goroutine because the
-	// HTTP response is already completed or about to be completed.
-	app.deleteCloudinaryImagesAsync(facility.ImageURLs)
+	app.deleteCloudinaryImagesAsync(safeToDeleteURLs)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -658,25 +580,6 @@ func (app *application) deleteCloudinaryImagesAsync(urls []string) {
 			}
 		}
 	}(urls)
-}
-
-// findRemovedImageURLs returns URLs that existed before but are no longer
-// present after an update. Those removed URLs are safe candidates for
-// Cloudinary deletion.
-func findRemovedImageURLs(oldURLs, newURLs []string) []string {
-	newSet := make(map[string]bool, len(newURLs))
-	for _, url := range newURLs {
-		newSet[url] = true
-	}
-
-	var removed []string
-	for _, oldURL := range oldURLs {
-		if !newSet[oldURL] {
-			removed = append(removed, oldURL)
-		}
-	}
-
-	return removed
 }
 
 const maxFacilityImageMemory = 20 << 20 // 20MB

@@ -212,6 +212,10 @@ func (app *application) mount() http.Handler {
 				r.Patch("/facilities/{facilityID}", app.updateFacilityHandler)
 				r.Delete("/facilities/{facilityID}", app.deleteFacilityHandler)
 
+				// Facility images management
+				r.Get("/facilities/{facilityID}/photos", app.getFacilityAllPhotosHandler)
+				r.Post("/facilities/{facilityID}/photos", app.uploadFacilityPhotoHandler)
+				r.Delete("/facilities/{facilityID}/photos", app.deleteFacilityPhotoHandler)
 				// Facility based pricing routes
 
 				r.Post("/facilities/{facilityID}/pricing", app.createFacilityPricingHandler)
