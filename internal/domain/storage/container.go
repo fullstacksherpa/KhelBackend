@@ -9,15 +9,19 @@ import (
 	"khel/internal/domain/appreviews"
 	"khel/internal/domain/bookings"
 	"khel/internal/domain/carts"
+	"khel/internal/domain/facilities"
 	"khel/internal/domain/featured"
 	"khel/internal/domain/followers"
 	"khel/internal/domain/gameqa"
 	"khel/internal/domain/games"
+	"khel/internal/domain/inventory"
 	"khel/internal/domain/orders"
 	"khel/internal/domain/paymentsrepo"
 	"khel/internal/domain/products"
 	"khel/internal/domain/pushtokens"
 	"khel/internal/domain/users"
+	"khel/internal/domain/venuecustomers"
+	"khel/internal/domain/venueearnings"
 	"khel/internal/domain/venuerequest"
 	venuereviews "khel/internal/domain/venuereview"
 	"khel/internal/domain/venues"
@@ -39,7 +43,11 @@ type Container struct {
 	Users          users.Store
 	VenueRequests  venuerequest.RequestStore
 	Venues         venues.Store
+	Facilities     facilities.Store
+	VenueCustomers venuecustomers.Store
 	VenuesReviews  venuereviews.Store
+	VenueEarnings  venueearnings.Store
+	Inventory      inventory.Store
 	Followers      followers.Store
 	Games          games.Store
 	Bookings       bookings.Store
@@ -61,7 +69,11 @@ func NewContainer(db *pgxpool.Pool, orderGen *orders.OrderNumberGenerator) *Cont
 		orderGen:       orderGen,
 		VenueRequests:  venuerequest.NewRepository(db),
 		Venues:         venues.NewRepository(db),
+		Facilities:     facilities.NewRepository(db),
+		VenueCustomers: venuecustomers.NewRepository(db),
+		VenueEarnings:  venueearnings.NewRepository(db),
 		VenuesReviews:  venuereviews.NewRepository(db),
+		Inventory:      inventory.NewRepository(db),
 		Followers:      followers.NewRepository(db),
 		Games:          games.NewRepository(db),
 		Bookings:       bookings.NewRepository(db),

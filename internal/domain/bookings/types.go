@@ -3,30 +3,33 @@ package bookings
 import "time"
 
 type PricingSlot struct {
-	ID        int64
-	VenueID   int64
-	DayOfWeek string
-	// Note: start_time and end_time are stored as TIME in the DB.
-	// We use time.Time to hold the time part.
-	StartTime time.Time
-	EndTime   time.Time
-	Price     int
+	ID         int64     `json:"id"`
+	VenueID    int64     `json:"venue_id"`    // kept for backward compatibility
+	FacilityID int64     `json:"facility_id"` // new real booking/pricing scope
+	DayOfWeek  string    `json:"day_of_week"`
+	StartTime  time.Time `json:"start_time"`
+	EndTime    time.Time `json:"end_time"`
+	Price      int       `json:"price"`
 }
 
 // Booking represents a booking record.
 type Booking struct {
-	ID            int64     `json:"id"`
-	VenueID       int64     `json:"venue_id"`
-	UserID        int64     `json:"user_id"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	TotalPrice    int       `json:"total_price"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-	CustomerName  *string   `json:"customer_name,omitempty" swaggertype:"string"`  // optional
-	CustomerPhone *string   `json:"customer_phone,omitempty" swaggertype:"string"` // optional
-	Note          *string   `json:"note,omitempty" swaggertype:"string"`           // optional
+	ID         int64 `json:"id"`
+	VenueID    int64 `json:"venue_id"`    // keep for now
+	FacilityID int64 `json:"facility_id"` // new real booking scope
+
+	UserID     int64     `json:"user_id"`
+	StartTime  time.Time `json:"start_time"`
+	EndTime    time.Time `json:"end_time"`
+	TotalPrice int       `json:"total_price"`
+	Status     string    `json:"status"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	CustomerName  *string `json:"customer_name,omitempty" swaggertype:"string"`
+	CustomerPhone *string `json:"customer_phone,omitempty" swaggertype:"string"`
+	Note          *string `json:"note,omitempty" swaggertype:"string"`
 }
 
 // AvailableTimeSlot represents a free time interval for booking.
@@ -85,7 +88,9 @@ type ScheduledBooking struct {
 type UserBooking struct {
 	BookingID    int64     `json:"booking_id"`
 	VenueID      int64     `json:"venue_id"`
+	FacilityID   int64     `json:"facility_id"`
 	VenueName    string    `json:"venue_name"`
+	FacilityName string    `json:"facility_name"`
 	VenueAddress string    `json:"venue_address"`
 	StartTime    time.Time `json:"start_time"`
 	EndTime      time.Time `json:"end_time"`

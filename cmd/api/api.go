@@ -125,7 +125,7 @@ func (app *application) mount() http.Handler {
 	r.Use(app.RateLimiterMiddleware)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://khel.gocloudnepal.com"},
+		AllowedOrigins:   []string{"https://khel.gocloudnepal.com", "http://localhost:3000"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -181,11 +181,17 @@ func (app *application) mount() http.Handler {
 		r.With(app.optionalAuth).Get("/venues/list-venues", app.listVenuesHandler)
 
 		r.With(app.optionalAuth).Get("/venues/{venueID}/reviews", app.getVenueReviewsHandler)
+		r.With(app.optionalAuth).Get("/venues/{venueID}/facilities", app.listFacilitiesHandler)
+		r.With(app.optionalAuth).Get("/venues/{venueID}/facilities/{facilityID}", app.getFacilityHandler)
+		r.With(app.optionalAuth).Get("/venues/{venueID}/facilities/{facilityID}/pricing", app.getFacilityPricingHandler)
 		r.Route("/venues", func(r chi.Router) {
 
 			r.Use(app.AuthTokenMiddleware)
 
 			r.Get("/favorites", app.listFavoritesHandler)
+			r.Get("/{venueID}/facilities/{facilityID}/available-times", app.availableFacilityTimesHandler)
+			r.Post("/{venueID}/facilities/{facilityID}/bookings", app.bookFacilityHandler)
+			//todo delete later, already depreciated
 			r.Get("/{venueID}/available-times", app.availableTimesHandler)
 			r.Get("/is-venue-owner", app.isVenueOwnerHandler)
 			r.Post("/", app.createVenueHandler)
@@ -199,6 +205,46 @@ func (app *application) mount() http.Handler {
 			// Routes that require venue ownership
 			r.Route("/{venueID}", func(r chi.Router) {
 				r.Use(app.IsOwnerMiddleware)
+
+				//New facility management routes
+
+				r.Post("/facilities", app.createFacilityHandler)
+				r.Patch("/facilities/{facilityID}", app.updateFacilityHandler)
+				r.Delete("/facilities/{facilityID}", app.deleteFacilityHandler)
+
+				// Facility images management
+				r.Get("/facilities/{facilityID}/photos", app.getFacilityAllPhotosHandler)
+				r.Post("/facilities/{facilityID}/photos", app.uploadFacilityPhotoHandler)
+				r.Delete("/facilities/{facilityID}/photos", app.deleteFacilityPhotoHandler)
+				// Facility based pricing routes
+
+				r.Post("/facilities/{facilityID}/pricing", app.createFacilityPricingHandler)
+				r.Put("/facilities/{facilityID}/pricing/{pricingID}", app.updateFacilityPricingHandler)
+				r.Delete("/facilities/{facilityID}/pricing/{pricingID}", app.deleteFacilityPricingHandler)
+
+				// facility booking and available for venue owner
+
+				r.Post("/facilities/{facilityID}/bookings/manual", app.createManualFacilityBookingHandler)
+
+				// Facility booking view for venue owner
+				r.Get("/facilities/{facilityID}/pending-bookings", app.getPendingFacilityBookingsHandler)
+				r.Get("/facilities/{facilityID}/scheduled-bookings", app.getScheduledFacilityBookingsHandler)
+				r.Get("/facilities/{facilityID}/canceled-bookings", app.getCanceledFacilityBookingsHandler)
+
+				r.Get("/customers", app.listVenueCustomersHandler)
+				r.Get("/customers/{userID}", app.getVenueCustomerDetailHandler)
+				r.Get("/earnings", app.getVenueEarningsHandler)
+				r.Post("/games/{bookingID}/checkout", app.checkoutGameHandler)
+
+				r.Get("/inventory", app.listInventoryItemsHandler)
+				r.Post("/inventory", app.createInventoryItemHandler)
+				r.Patch("/inventory/{itemID}", app.updateInventoryItemHandler)
+				r.Delete("/inventory/{itemID}", app.deleteInventoryItemHandler)
+
+				r.Get("/games/active", app.listActiveGamesHandler)
+				r.Get("/games/{bookingID}", app.getGameDetailHandler)
+				r.Post("/games/{bookingID}/items", app.addItemToGameHandler)
+
 				r.Patch("/status", app.updateVenueStatusOwnerHandler)
 				r.Post("/bookings/manual", app.createManualBookingHandler)
 				r.Get("/pricing", app.getVenuePricing)

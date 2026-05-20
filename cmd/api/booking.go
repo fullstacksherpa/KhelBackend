@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"khel/internal/domain/bookings"
+	"khel/internal/domain/inventory"
 	"khel/internal/notifications"
 
 	"log"
@@ -29,59 +30,6 @@ type UserBookingResponse struct {
 	TotalPrice   int       `json:"total_price"`
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
-}
-type BookingResponse struct {
-	ID            string    `json:"id"`
-	VenueID       int64     `json:"venue_id"`
-	UserID        int64     `json:"user_id"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	TotalPrice    int       `json:"total_price"`
-	Status        string    `json:"status"`
-	CustomerName  *string   `json:"customer_name,omitempty"`
-	CustomerPhone *string   `json:"customer_phone,omitempty"`
-	Note          *string   `json:"note,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
-}
-
-type PendingBookingResponse struct {
-	BookingID    string    `json:"booking_id"` // now encoded string
-	UserID       int64     `json:"user_id"`
-	UserName     string    `json:"user_name"`
-	UserImageURL *string   `json:"user_image"` // nullable
-	UserPhone    string    `json:"user_number"`
-	Price        int       `json:"price"`
-	RequestedAt  time.Time `json:"requested_at"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
-}
-
-type ScheduledBookingResponse struct {
-	BookingID     string    `json:"booking_id"`
-	UserID        int64     `json:"user_id"`
-	UserName      string    `json:"user_name"`
-	UserImageURL  *string   `json:"user_image"`
-	UserPhone     string    `json:"user_number"`
-	Price         int       `json:"price"`
-	AcceptedAt    time.Time `json:"accepted_at"`
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	CustomerName  *string   `json:"customer_name,omitempty" swaggertype:"string"`  // optional
-	CustomerPhone *string   `json:"customer_phone,omitempty" swaggertype:"string"` // optional
-	Note          *string   `json:"note,omitempty" swaggertype:"string"`           // optional
-}
-
-type CanceledBookingResponse struct {
-	BookingID    string    `json:"booking_id"`
-	UserID       int64     `json:"user_id"`
-	UserName     string    `json:"user_name"`
-	UserImageURL *string   `json:"user_image"` // nullable
-	UserPhone    string    `json:"user_number"`
-	Price        int       `json:"price"`
-	RequestedAt  time.Time `json:"requested_at"`
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
 }
 
 func (app *application) EncodeBookingID(id int64) string {
@@ -124,23 +72,6 @@ func (app *application) parseBookingParam(param string) (int64, error) {
 	}
 
 	return 0, fmt.Errorf("invalid booking id: %s", param)
-}
-
-func (app *application) bookingToResponse(b *bookings.Booking) BookingResponse {
-	return BookingResponse{
-		ID:            app.EncodeBookingID(b.ID),
-		VenueID:       b.VenueID,
-		UserID:        b.UserID,
-		StartTime:     b.StartTime,
-		EndTime:       b.EndTime,
-		TotalPrice:    b.TotalPrice,
-		Status:        b.Status,
-		CustomerName:  b.CustomerName,
-		CustomerPhone: b.CustomerPhone,
-		Note:          b.Note,
-		CreatedAt:     b.CreatedAt,
-		UpdatedAt:     b.UpdatedAt,
-	}
 }
 
 // AvailableTimeSlot represents a free time interval for booking.
@@ -206,8 +137,19 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 
 	dayOfWeek := strings.ToLower(dateInKtm.Weekday().String())
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	// Step 3: Load pricing slots and bookings for the venue and the selected date
-	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
+	pricingSlots, err := app.store.Bookings.GetPricingSlots(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		dayOfWeek,
+	)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -237,7 +179,7 @@ func (app *application) availableTimesHandler(w http.ResponseWriter, r *http.Req
 
 	pricingSlots = filtered
 
-	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, date)
+	bookings, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, defaultFacility.ID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -360,12 +302,23 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 
 	dayOfWeek := strings.ToLower(localStart.Weekday().String())
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	//sample data
 	//start_time 🎯: 2025-07-02 08:00:00 +0545 +0545
 	//end_time 🎯: 2025-07-02 09:00:00 +0545 +0545
 	//localStart 🎯: 2025-07-02 08:00:00 +0545 +0545
 	//dayOfWeek 🎯: wednesday
-	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
+	pricingSlots, err := app.store.Bookings.GetPricingSlots(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		dayOfWeek,
+	)
 	if err != nil || len(pricingSlots) == 0 {
 		http.Error(w, "No pricing available for this day", http.StatusBadRequest)
 		return
@@ -393,7 +346,12 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check for overlapping bookings.
-	bookingsList, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
+	bookingsList, err := app.store.Bookings.GetBookingsForDate(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		payload.StartTime,
+	)
 	if err != nil {
 		http.Error(w, "Error checking bookings", http.StatusInternalServerError)
 		return
@@ -413,6 +371,7 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	// Create the booking.
 	booking := &bookings.Booking{
 		VenueID:    venueID,
+		FacilityID: defaultFacility.ID,
 		UserID:     user.ID,
 		StartTime:  payload.StartTime,
 		EndTime:    payload.EndTime,
@@ -453,11 +412,6 @@ func (app *application) bookVenueHandler(w http.ResponseWriter, r *http.Request)
 	resp := app.bookingToResponse(booking)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
-}
-
-// intervalsOverlap checks whether two intervals overlap.
-func intervalsOverlap(a, b bookings.Interval) bool {
-	return a.Start.Before(b.End) && b.Start.Before(a.End)
 }
 
 type ManualBookingPayload struct {
@@ -503,6 +457,12 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 		app.badRequestResponse(w, r, err)
 	}
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	//sample data
 	//frontend send like start_time 🎯 : 2025-06-29T11:00:00+05:45
 	//end_time 🎯 : 2025-06-29T12:00:00+05:45
@@ -510,7 +470,12 @@ func (app *application) createManualBookingHandler(w http.ResponseWriter, r *htt
 	//serverlog end_time 🎯: 2025-07-02 09:00:00 +0545 +0545
 
 	// Check for overlapping bookings.
-	bookingList, err := app.store.Bookings.GetBookingsForDate(r.Context(), venueID, payload.StartTime)
+	bookingList, err := app.store.Bookings.GetBookingsForDate(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		payload.StartTime,
+	)
 	if err != nil {
 		http.Error(w, "Error checking bookings", http.StatusInternalServerError)
 		return
@@ -598,7 +563,18 @@ func (app *application) getVenuePricing(w http.ResponseWriter, r *http.Request) 
 
 	dayOfWeek := r.URL.Query().Get("day")
 
-	pricingSlots, err := app.store.Bookings.GetPricingSlots(r.Context(), venueID, dayOfWeek)
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
+	pricingSlots, err := app.store.Bookings.GetPricingSlots(
+		r.Context(),
+		venueID,
+		defaultFacility.ID,
+		dayOfWeek,
+	)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -713,7 +689,13 @@ func (app *application) deleteVenuePricingHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	err = app.store.Bookings.DeletePricingSlot(r.Context(), venueID, pricingID)
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), venueID)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
+	err = app.store.Bookings.DeletePricingSlot(r.Context(), venueID, defaultFacility.ID, pricingID)
 	if err != nil {
 		if strings.Contains(err.Error(), "no pricing slot found") {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -726,6 +708,7 @@ func (app *application) deleteVenuePricingHandler(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// needed for facility_pricing
 type BulkCreatePricingPayload struct {
 	//we use dive, required to ensure each item inside the array is individually validated.
 	Slots []CreatePricingPayload `json:"slots" validate:"required,dive,required"`
@@ -733,9 +716,15 @@ type BulkCreatePricingPayload struct {
 
 type CreatePricingPayload struct {
 	DayOfWeek string `json:"day_of_week" validate:"required,oneof=sunday monday tuesday wednesday thursday friday saturday"`
+
+	// StartTime must be in 24-hour HH:mm:ss format.
+	// Example: "09:00:00"
 	StartTime string `json:"start_time" validate:"required"` // format "15:04:05"
-	EndTime   string `json:"end_time"   validate:"required"` // format "15:04:05"
-	Price     int    `json:"price"      validate:"required,gt=0"`
+
+	// EndTime must be in 24-hour HH:mm:ss format.
+	// Example: "10:00:00"
+	EndTime string `json:"end_time"   validate:"required"` // format "15:04:05"
+	Price   int    `json:"price"      validate:"required,gt=0"`
 }
 
 // CreateVenuePricing godoc
@@ -845,8 +834,14 @@ func (app *application) getPendingBookingsHandler(w http.ResponseWriter, r *http
 		return
 	}
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), vid)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	// 3) fetch from store
-	bookings, err := app.store.Bookings.GetPendingBookingsForVenueDate(r.Context(), vid, date)
+	bookings, err := app.store.Bookings.GetPendingBookingsForVenueDate(r.Context(), vid, defaultFacility.ID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -908,10 +903,16 @@ func (app *application) getScheduledBookingsHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), vid)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
+		return
+	}
+
 	//date will be Parsed time is: 2025-06-29 00:00:00 +0545 +0545
 
 	// 3) fetch from store
-	bookings, err := app.store.Bookings.GetScheduledBookingsForVenueDate(r.Context(), vid, date)
+	bookings, err := app.store.Bookings.GetScheduledBookingsForVenueDate(r.Context(), vid, defaultFacility.ID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -977,10 +978,16 @@ func (app *application) getCanceledBookingsHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
+	defaultFacility, err := app.store.Facilities.GetDefaultByVenueID(r.Context(), vid)
+	if err != nil {
+		app.badRequestResponse(w, r, fmt.Errorf("failed to get defaultfacility: %w", err))
+		return
+	}
+
 	//date will be Parsed time is: 2025-06-29 00:00:00 +0545 +0545
 
 	// 3) fetch from store
-	bookings, err := app.store.Bookings.GetCanceledBookingsForVenueDate(r.Context(), vid, date)
+	bookings, err := app.store.Bookings.GetCanceledBookingsForVenueDate(r.Context(), vid, defaultFacility.ID, date)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -1017,15 +1024,15 @@ func (app *application) getCanceledBookingsHandler(w http.ResponseWriter, r *htt
 	app.jsonResponse(w, http.StatusOK, resp)
 }
 
-// acceptBookingHandler godoc
+// acceptBookingHandler godoc rE7xJX1G
 //
 //	@Summary		Accept a pending booking request
 //	@Description	Marks the booking with status="pending" as "confirmed".
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID		path	int	true	"Venue ID"
-//	@Param			bookingID	path	int	true	"Booking ID"
+//	@Param			venueID		path	int		true	"Venue ID"
+//	@Param			bookingID	path	string	true	"Booking ID"
 //	@Success		204
 //	@Failure		400	{object}	error	"Bad Request"
 //	@Failure		404	{object}	error	"Not Found"
@@ -1094,8 +1101,8 @@ func (app *application) acceptBookingHandler(w http.ResponseWriter, r *http.Requ
 //	@Tags			Venue-Owner
 //	@Accept			json
 //	@Produce		json
-//	@Param			venueID		path	int	true	"Venue ID"
-//	@Param			bookingID	path	int	true	"Booking ID"
+//	@Param			venueID		path	int		true	"Venue ID"
+//	@Param			bookingID	path	string	true	"Booking ID"
 //	@Success		204
 //	@Failure		400	{object}	error	"Bad Request"
 //	@Failure		404	{object}	error	"Not Found"
@@ -1296,6 +1303,131 @@ func (app *application) getBookingsByUserHandler(w http.ResponseWriter, r *http.
 			Status:       b.Status,
 			CreatedAt:    b.CreatedAt,
 		})
+	}
+
+	app.jsonResponse(w, http.StatusOK, resp)
+}
+
+type CheckoutGamePayload struct {
+	PaymentMethod string `json:"payment_method" example:"cash"`
+	PaidAmount    int    `json:"paid_amount" example:"2150"`
+}
+
+type CheckoutGameData struct {
+	Message       string                   `json:"message"`
+	BookingID     string                   `json:"booking_id"`
+	PaymentMethod string                   `json:"payment_method"`
+	PaidAmount    int                      `json:"paid_amount"`
+	FinalAmount   int                      `json:"final_amount"`
+	ChangeAmount  int                      `json:"change_amount"`
+	Bill          inventory.BillingSummary `json:"bill"`
+}
+
+type CheckoutGameResponse struct {
+	Data CheckoutGameData `json:"data"`
+}
+
+// checkoutGameHandler godoc
+//
+//	@Summary		Checkout and close game
+//	@Description	Closes an active/confirmed game after payment. Backend recalculates final bill, validates payment, stores payment info, and marks booking as done.
+//	@Tags			venue games
+//	@Accept			json
+//	@Produce		json
+//	@Param			venueID		path		int						true	"Venue ID"
+//	@Param			bookingID	path		string					true	"Encoded Booking ID"
+//	@Param			payload		body		CheckoutGamePayload		true	"Payment details"
+//	@Success		200			{object}	CheckoutGameResponse	"Game checked out successfully"
+//	@Failure		400			{object}	ErrorResponse			"Bad request"
+//	@Failure		404			{object}	ErrorResponse			"Booking not found"
+//	@Failure		500			{object}	ErrorResponse			"Internal Server Error"
+//	@Security		ApiKeyAuth
+//	@Router			/venues/{venueID}/games/{bookingID}/checkout [post]
+func (app *application) checkoutGameHandler(w http.ResponseWriter, r *http.Request) {
+	venueID, err := readIDParam(r, "venueID")
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	bookingIDParam := chi.URLParam(r, "bookingID")
+
+	// API receives encoded booking ID.
+	// Decode it before calling repository because repository should only know DB int64 IDs.
+	bookingID, err := app.parseBookingParam(bookingIDParam)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	var payload CheckoutGamePayload
+
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	payload.PaymentMethod = strings.TrimSpace(strings.ToLower(payload.PaymentMethod))
+
+	if payload.PaymentMethod == "" {
+		app.badRequestResponse(w, r, errors.New("payment_method is required"))
+		return
+	}
+
+	allowedMethods := map[string]bool{
+		"cash":   true,
+		"esewa":  true,
+		"khalti": true,
+		"other":  true,
+	}
+
+	if !allowedMethods[payload.PaymentMethod] {
+		app.badRequestResponse(w, r, errors.New("invalid payment_method"))
+		return
+	}
+
+	if payload.PaidAmount <= 0 {
+		app.badRequestResponse(w, r, errors.New("paid_amount must be greater than 0"))
+		return
+	}
+
+	// Always calculate bill on backend.
+	// Do not trust frontend total because frontend can be changed/manipulated.
+	summary, err := app.store.Inventory.GetBillingSummary(r.Context(), venueID, bookingID)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	if payload.PaidAmount < summary.GrandTotal {
+		app.badRequestResponse(w, r, errors.New("paid_amount is less than final bill amount"))
+		return
+	}
+
+	// final_amount is the actual revenue amount.
+	// paid_amount is what customer gave.
+	// Example: final_amount = 2150, paid_amount = 2200, change = 50.
+	err = app.store.Bookings.CloseBooking(
+		r.Context(),
+		venueID,
+		bookingID,
+		payload.PaymentMethod,
+		payload.PaidAmount,
+		summary.GrandTotal,
+	)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	resp := CheckoutGameData{
+		Message:       "game closed successfully",
+		BookingID:     app.EncodeBookingID(bookingID),
+		PaymentMethod: payload.PaymentMethod,
+		PaidAmount:    payload.PaidAmount,
+		FinalAmount:   summary.GrandTotal,
+		ChangeAmount:  payload.PaidAmount - summary.GrandTotal,
+		Bill:          *summary,
 	}
 
 	app.jsonResponse(w, http.StatusOK, resp)

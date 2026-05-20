@@ -1269,3 +1269,19 @@ Order table constraint, only these states are allowed:
 
 ❌ converted + checkout_order_id SET (your current convert does this)
 ❌ active + checkout_order_id SET (if you set order id before status)
+
+### Booking ID Handling Strategy
+
+- Internally (DB & repository): use int64 IDs
+- Externally (API): use encoded string IDs
+
+Flow:
+
+1. Encode bookingID before sending response to client
+2. Client uses encoded bookingID in API requests
+3. Decode bookingID in handler before calling repository
+
+Rule:
+Encode → only in responses  
+Decode → only in handlers  
+Repository → always uses int64 IDs
