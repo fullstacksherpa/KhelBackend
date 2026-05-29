@@ -2641,134 +2641,6 @@ paths:
       summary: Bulk update display order (Admin)
       tags:
       - Admin
-  /admin/venue-requests:
-    get:
-      description: Admin route. List venue requests by status with pagination.
-      parameters:
-      - description: requested|approved|rejected
-        in: query
-        name: status
-        type: string
-      - description: page number (default 1)
-        in: query
-        name: page
-        type: integer
-      - description: page size (default 20, max 60)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/venuerequest.VenueRequest'
-            type: array
-        "401":
-          description: Unauthorized
-          schema: {}
-        "403":
-          description: Forbidden
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: List venue requests (admin)
-      tags:
-      - Admin Venue-Requests
-  /admin/venue-requests/{id}/approve:
-    post:
-      consumes:
-      - application/json
-      description: Approves venue request and creates real venues row with owner_id.
-      parameters:
-      - description: Venue request ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Owner assignment + optional admin note
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/main.adminApproveVenueReqPayload'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/venues.Venue'
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "403":
-          description: Forbidden
-          schema: {}
-        "404":
-          description: Not Found
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Approve a venue request (admin)
-      tags:
-      - Admin Venue-Requests
-  /admin/venue-requests/{id}/reject:
-    post:
-      consumes:
-      - application/json
-      description: Rejects venue request with optional admin note.
-      parameters:
-      - description: Venue request ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Optional admin note
-        in: body
-        name: payload
-        schema:
-          $ref: '#/definitions/main.adminRejectVenueReqPayload'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema: {}
-        "401":
-          description: Unauthorized
-          schema: {}
-        "403":
-          description: Forbidden
-          schema: {}
-        "404":
-          description: Not Found
-          schema: {}
-        "500":
-          description: Internal Server Error
-          schema: {}
-      security:
-      - ApiKeyAuth: []
-      summary: Reject a venue request (admin)
-      tags:
-      - Admin Venue-Requests
   /ads/{adID}/click:
     post:
       consumes:
@@ -5398,6 +5270,134 @@ paths:
       summary: Admin creates a user
       tags:
       - superadmin-role
+  /superadmin/venue-requests:
+    get:
+      description: Admin route. List venue requests by status with pagination.
+      parameters:
+      - description: requested|approved|rejected
+        in: query
+        name: status
+        type: string
+      - description: page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20, max 60)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/venuerequest.VenueRequest'
+            type: array
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: List venue requests (admin)
+      tags:
+      - Admin Venue-Requests
+  /superadmin/venue-requests/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approves venue request and creates real venues row with owner_id.
+      parameters:
+      - description: Venue request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Owner assignment + optional admin note
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.adminApproveVenueReqPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/venues.Venue'
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Approve a venue request (admin)
+      tags:
+      - Admin Venue-Requests
+  /superadmin/venue-requests/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Rejects venue request with optional admin note.
+      parameters:
+      - description: Venue request ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Optional admin note
+        in: body
+        name: payload
+        schema:
+          $ref: '#/definitions/main.adminRejectVenueReqPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema: {}
+        "401":
+          description: Unauthorized
+          schema: {}
+        "403":
+          description: Forbidden
+          schema: {}
+        "404":
+          description: Not Found
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Reject a venue request (admin)
+      tags:
+      - Admin Venue-Requests
   /superadmin/venues/:
     get:
       description: Paginated list of venues with optional filters (sport, status).

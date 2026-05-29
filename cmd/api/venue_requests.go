@@ -130,7 +130,7 @@ func (e errInvalidRequest) Error() string { return string(e) }
 //	@Failure		403		{object}	error
 //	@Failure		500		{object}	error
 //	@Security		ApiKeyAuth
-//	@Router			/admin/venue-requests [get]
+//	@Router			/superadmin/venue-requests [get]
 func (app *application) adminListVenueRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
@@ -192,7 +192,7 @@ func readInt(raw string, def int) int {
 //	@Failure		404		{object}	error
 //	@Failure		500		{object}	error
 //	@Security		ApiKeyAuth
-//	@Router			/admin/venue-requests/{id}/approve [post]
+//	@Router			/superadmin/venue-requests/{id}/approve [post]
 func (app *application) adminApproveVenueRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	requestID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
@@ -280,7 +280,7 @@ type adminApproveVenueReqPayload struct {
 //	@Failure		404		{object}	error
 //	@Failure		500		{object}	error
 //	@Security		ApiKeyAuth
-//	@Router			/admin/venue-requests/{id}/reject [post]
+//	@Router			/superadmin/venue-requests/{id}/reject [post]
 func (app *application) adminRejectVenueRequestHandler(w http.ResponseWriter, r *http.Request) {
 	requestID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || requestID <= 0 {
