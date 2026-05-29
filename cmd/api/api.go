@@ -134,7 +134,7 @@ func (app *application) mount() http.Handler {
 	}))
 
 	//Set a timeout value on the request context (ctx), that will signal through ctx.Done() that the request has timed out and further processing should be stopped
-	r.Use(middleware.Timeout(90 * time.Second))
+	r.Use(middleware.Timeout(40 * time.Second))
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/venue/{id}", app.getVenueDetailHandler)
@@ -500,9 +500,9 @@ func (app *application) run(mux http.Handler, cancel context.CancelFunc) error {
 		Addr:              "0.0.0.0:" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       45 * time.Second,
-		WriteTimeout:      120 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		ReadTimeout:       2 * time.Minute,
+		WriteTimeout:      2 * time.Minute,
+		IdleTimeout:       90 * time.Second,
 	}
 
 	// Implementing graceful shutdown
