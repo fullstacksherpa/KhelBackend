@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.23.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.22.0...v1.23.0) (2026-05-29)
+
+
+### Features
+
+* reduce global context time ([f772e48](https://github.com/fullstacksherpa/KhelBackend/commit/f772e48f658bb9f1179eeccb60cb5a2c921abed1))
+* reduce global context time ([3f9e79e](https://github.com/fullstacksherpa/KhelBackend/commit/3f9e79e624082e880bcdd54cfd6bb6acfa3c1652))
+
 ## [1.22.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.21.0...v1.22.0) (2026-05-20)
 
 
