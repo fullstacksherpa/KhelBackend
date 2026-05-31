@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.1](https://github.com/fullstacksherpa/KhelBackend/compare/v1.24.0...v1.24.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* add cors for staging ([4f92752](https://github.com/fullstacksherpa/KhelBackend/commit/4f9275259a1526ea693f9369c87388d817afdac5))
+
 ## [1.24.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.23.0...v1.24.0) (2026-05-31)
 
 
