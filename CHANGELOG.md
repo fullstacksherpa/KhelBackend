@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.23.0...v1.24.0) (2026-05-31)
+
+
+### Features
+
+* remove todo ([f3fcf92](https://github.com/fullstacksherpa/KhelBackend/commit/f3fcf920403418b507eb7ed167d16acb879e96a6))
+
 ## [1.23.0](https://github.com/fullstacksherpa/KhelBackend/compare/v1.22.0...v1.23.0) (2026-05-29)
 
 
