@@ -125,7 +125,7 @@ func (app *application) mount() http.Handler {
 	r.Use(app.RateLimiterMiddleware)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://khel.gocloudnepal.com", "http://localhost:3000"},
+		AllowedOrigins:   []string{"https://khel.gocloudnepal.com", "https://khel-staging.vercel.app/"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
