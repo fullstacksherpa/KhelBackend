@@ -101,7 +101,7 @@ func (r *Repository) Create(ctx context.Context, tx pgx.Tx, user *User) error {
 
 	if err != nil {
 		switch {
-		//TODO: check unique constraint in db
+
 		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key"`:
 			return ErrDuplicateEmail
 		case err.Error() == `pq: duplicate key value violates unique constraint "users_phone_key"`:

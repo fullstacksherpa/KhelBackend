@@ -24,8 +24,6 @@ func (app *application) deletePhotoFromCloudinary(photoURL string) error {
 	if err != nil {
 		return fmt.Errorf("failed to extract public ID: %w", err)
 	}
-	//TODO: Delete later
-	fmt.Println(publicID)
 
 	// Delete the asset from Cloudinary
 	_, err = app.cld.Upload.Destroy(context.Background(), uploader.DestroyParams{

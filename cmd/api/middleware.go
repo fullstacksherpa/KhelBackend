@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"khel/internal/auth"
 	"khel/internal/domain/accesscontrol"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -173,9 +172,6 @@ func (app *application) RequireGameAdminAssistant(next http.Handler) http.Handle
 			writeJSONError(w, http.StatusBadRequest, "Invalid game ID")
 			return
 		}
-		// TODO:remove later
-		log.Println("Checking gameID ⚽:", gameID)
-		log.Println("Checking userID 👷🏽‍♂️:", user.ID)
 
 		// Check if user is admin or assistant
 		isAdminAssistant, err := app.store.Games.IsAdminAssistant(r.Context(), gameID, user.ID)

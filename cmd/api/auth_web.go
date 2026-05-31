@@ -1,10 +1,12 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -72,22 +74,35 @@ func (app *application) clearAuthCookies(w http.ResponseWriter) {
 // - sets HttpOnly cookies for web
 // - returns small JSON (user_id, role)
 func (app *application) createTokenCookieHandler(w http.ResponseWriter, r *http.Request) {
+
 	var payload CreateUserTokenPayload
 	if err := readJSON(w, r, &payload); err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
+
 	if err := Validate.Struct(payload); err != nil {
+		app.logger.Warnw("login cookie: validation failed", "error", err)
 		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	user, err := app.store.Users.GetByEmail(r.Context(), payload.Email)
+	email := strings.TrimSpace(strings.ToLower(payload.Email))
+
+	user, err := app.store.Users.GetByEmail(r.Context(), email)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			app.logger.Warnw("login cookie: user email not found in DB", "email", email)
+		} else {
+			app.logger.Errorw("login cookie: user lookup failed", "email", email, "error", err)
+		}
+
 		app.unauthorizedErrorResponse(w, r, err)
 		return
 	}
+
 	if err := user.Password.Compare(payload.Password); err != nil {
+		app.logger.Warnw("login cookie: password compare failed", "user_id", user.ID, "error", err)
 		app.unauthorizedErrorResponse(w, r, err)
 		return
 	}

@@ -86,9 +86,6 @@ func (app *application) createGameHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	//TODO: delete later
-	fmt.Printf("Games Created at database..........✅")
-
 	// Put the admin in the game player
 	err = app.store.Games.InsertAdminInPlayer(r.Context(), gameID, user.ID)
 	if err != nil {

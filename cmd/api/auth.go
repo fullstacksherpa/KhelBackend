@@ -461,6 +461,7 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 	// 5) Build reset URL for frontend + send email
 	// -------------------------------------------------------------------------
 	resetURL := fmt.Sprintf("%s/reset-password/?token=%s", app.config.frontendURL, resetToken)
+	app.logger.Infow("reset password email sent", "resetToken", resetToken)
 
 	vars := struct {
 		Username string
@@ -476,6 +477,7 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 		payload.Email, // toName (you can change if you store full name)
 		vars,
 	)
+	app.logger.Infow("reset password email sent", "status_code", status)
 	if err != nil {
 		// ⚠️ This is a server problem (SMTP, provider issues, etc)
 		// Some teams still return 200 here to avoid leaking delivery status.
@@ -484,8 +486,6 @@ func (app *application) requestResetPasswordHandler(w http.ResponseWriter, r *ht
 		app.internalServerError(w, r, err)
 		return
 	}
-
-	app.logger.Infow("reset password email sent", "status_code", status, "email", payload.Email)
 
 	// -------------------------------------------------------------------------
 	// 6) Always return a generic success message
