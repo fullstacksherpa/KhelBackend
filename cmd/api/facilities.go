@@ -306,7 +306,7 @@ func (app *application) getFacilityHandler(w http.ResponseWriter, r *http.Reques
 func (app *application) updateFacilityHandler(w http.ResponseWriter, r *http.Request) {
 	venueID, facilityID, err := app.parseVenueAndFacilityID(r)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.badRequestResponse(w, r, err)    
 		return
 	}
 

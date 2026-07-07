@@ -91,8 +91,14 @@ func (app *application) uploadProfilePictureHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("Profile picture uploaded successfully: %s", uploadResult.SecureURL)))
+	response := map[string]string{
+		"profile_picture_url": uploadResult.SecureURL,
+	}
+
+	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
 }
 
 // updateProfilePictureHandler godoc
@@ -210,8 +216,10 @@ func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent) // No content response on success
-	w.Write([]byte(fmt.Sprintf("User info updated successfully: %s", updates)))
+	if err := app.jsonResponse(w, http.StatusNoContent, updates); err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
 }
 
 type FollowUser struct {
